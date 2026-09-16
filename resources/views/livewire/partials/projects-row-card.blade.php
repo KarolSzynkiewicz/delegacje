@@ -45,6 +45,17 @@
     </div>
 
     <div class="dt-card__row">
+        <span class="dt-card__label">Kierownik</span>
+        <span class="dt-card__value">
+            @if($project->currentSiteLead?->employee)
+                {{ $project->currentSiteLead->employee->full_name }}
+            @else
+                —
+            @endif
+        </span>
+    </div>
+
+    <div class="dt-card__row">
         <span class="dt-card__label">Okres</span>
         <span class="dt-card__value">
             {{ $project->start_date?->format('d.m.Y') ?? '—' }}

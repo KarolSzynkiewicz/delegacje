@@ -38,7 +38,7 @@ class Step3VehicleAssignments extends Component
 
     public bool $transferWizardEmbed = false;
 
-    /** Stepper dopisywania / edycji uczestnika istniejącego wyjazdu — zapis zamiast kroku 4. */
+    /** Stepper dopisywania / edycji uczestnika istniejącego wyjazdu — zapis z kroku 3. */
     public bool $participantPlannerEmbed = false;
 
     public array $allowedEmployeeIds = [];
@@ -992,7 +992,7 @@ class Step3VehicleAssignments extends Component
             return;
         }
 
-        $this->dispatch('go-to-step', step: 4);
+        $this->dispatch('save-departure');
     }
 
     public function render()

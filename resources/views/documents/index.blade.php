@@ -36,6 +36,8 @@
                             <th>Opis</th>
                             <th>Okresowy</th>
                             <th>Wymagane</th>
+                            <th>Na spółkę</th>
+                            <th>Planner</th>
                             <th>Liczba przypisań</th>
                             <th>Akcje</th>
                         </tr>
@@ -51,6 +53,22 @@
                                         <x-ui.badge variant="danger">Tak</x-ui.badge>
                                     @else
                                         <x-ui.badge variant="info">Nie</x-ui.badge>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($document->is_company_scoped)
+                                        <x-ui.badge variant="warning">Tak</x-ui.badge>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($document->planner_icon)
+                                        <span class="doc-chip" title="Widoczny w plannerze">
+                                            <i class="bi {{ $document->planner_icon }}"></i>
+                                        </span>
+                                    @else
+                                        <span class="text-muted">—</span>
                                     @endif
                                 </td>
                                 <td>{{ $document->employee_documents_count }}</td>

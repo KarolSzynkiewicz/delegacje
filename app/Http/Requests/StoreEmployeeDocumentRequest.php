@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Document;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class StoreEmployeeDocumentRequest extends FormRequest
 {
@@ -26,6 +28,12 @@ class StoreEmployeeDocumentRequest extends FormRequest
         return [
             'employee_id' => ['required', 'exists:employees,id'],
             'document_id' => ['required', 'exists:documents,id'],
+            'company_id' => [
+                Rule::requiredIf(fn () => (bool) Document::find($this->input('document_id'))?->is_company_scoped),
+                'nullable',
+                'integer',
+                'exists:companies,id',
+            ],
             'valid_from' => ['required', 'date'],
             'valid_to' => ['nullable', 'date', 'after_or_equal:valid_from'],
             'is_okresowy' => ['nullable', 'boolean'],
@@ -46,6 +54,7 @@ class StoreEmployeeDocumentRequest extends FormRequest
             'employee_id.exists' => 'Wybrany pracownik nie istnieje.',
             'document_id.required' => 'Dokument jest wymagany.',
             'document_id.exists' => 'Wybrany dokument nie istnieje.',
+            'company_id.required' => 'Wybierz spółkę dla tego dokumentu.',
             'valid_from.required' => 'Data ważności od jest wymagana.',
             'valid_from.date' => 'Data ważności od musi być poprawną datą.',
             'valid_to.date' => 'Data ważności do musi być poprawną datą.',
@@ -65,7 +74,7 @@ class StoreEmployeeDocumentRequest extends FormRequest
             'errors' => $validator->errors()->messages(),
             'employee_id' => $this->input('employee_id'),
         ]);
-        
+
         parent::failedValidation($validator);
     }
 }

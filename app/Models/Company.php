@@ -38,6 +38,11 @@ class Company extends Model
         return $this->hasMany(CompanyAssignment::class);
     }
 
+    public function employeeDocuments(): HasMany
+    {
+        return $this->hasMany(EmployeeDocument::class);
+    }
+
     public function employees(): BelongsToMany
     {
         return $this->belongsToMany(Employee::class, 'company_assignments')

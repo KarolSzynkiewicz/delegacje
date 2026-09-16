@@ -132,6 +132,13 @@
                         </x-ui.button>
                     </x-ui.action-buttons>
                 </div>
+                @if($employee->roles->isNotEmpty())
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        @foreach($employee->roles as $role)
+                            <x-role-seniority-badge :role="$role" />
+                        @endforeach
+                    </div>
+                @endif
                 <div class="d-flex flex-wrap gap-1 mb-2">
                     @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
                         <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
@@ -243,6 +250,13 @@
                                         <x-ui.badge variant="warning">Komornik</x-ui.badge>
                                     @endif
                                 </div>
+                                @if($employee->roles->isNotEmpty())
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                        @foreach($employee->roles as $role)
+                                            <x-role-seniority-badge :role="$role" />
+                                        @endforeach
+                                    </div>
+                                @endif
                             </td>
                             <td class="text-nowrap font-mono small">
                                 {{ $employee->hired_at?->format('Y-m-d') ?? '—' }}

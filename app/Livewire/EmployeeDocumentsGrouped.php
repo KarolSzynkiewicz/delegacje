@@ -75,7 +75,7 @@ class EmployeeDocumentsGrouped extends Component
 
         // Eager load employeeDocuments with document relationship to avoid N+1 queries
         $employees = $employeesQuery
-            ->with(['employeeDocuments.document'])
+            ->with(['employeeDocuments.document', 'employeeDocuments.company', 'companyAssignments'])
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->paginate(20);
@@ -204,8 +204,12 @@ class EmployeeDocumentsGrouped extends Component
             return 'not_required';
         }
 
-        return $employee->hasDocumentTypeActiveInDateRange(
-            $document->id,
+        if (! $document->isRequiredForEmployeeDuring($employee, now()->startOfDay(), now()->endOfDay())) {
+            return 'not_required';
+        }
+
+        return $employee->hasDocumentRequirementCovered(
+            $document,
             now()->startOfDay(),
             now()->endOfDay()
         ) ? 'ok' : 'missing';

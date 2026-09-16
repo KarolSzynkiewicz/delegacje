@@ -12,6 +12,7 @@ class EmployeeDocument extends Model
 
     protected $fillable = [
         'document_id',
+        'company_id',
         'employee_id',
         // 'type', // USUNIĘTE - niepotrzebne, używamy 'kind'
         'valid_from',
@@ -34,12 +35,28 @@ class EmployeeDocument extends Model
         return $this->belongsTo(Document::class);
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
     /**
      * Get the employee.
      */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function label(): string
+    {
+        $name = $this->document?->name ?? 'Dokument';
+
+        if ($this->company_id && $this->company) {
+            return $name.' · '.$this->company->name;
+        }
+
+        return $name;
     }
 
     /**
@@ -71,6 +88,15 @@ class EmployeeDocument extends Model
     /**
      * Check if document is expired.
      */
+    public function isCurrentlyValid(): bool
+    {
+        if ($this->valid_from && $this->valid_from->isFuture()) {
+            return false;
+        }
+
+        return ! $this->isExpired();
+    }
+
     public function isExpired(): bool
     {
         if ($this->kind === 'bezokresowy') {

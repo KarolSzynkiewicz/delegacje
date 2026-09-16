@@ -78,6 +78,61 @@
                             <p class="emp-fact__value emp-fact__value--notes">{{ $employee->notes ?: '-' }}</p>
                         </div>
                     </div>
+                    <div class="emp-seniority mt-3">
+                        <div class="emp-fact__label">Zawody i seniority</div>
+                        <p class="small text-muted mb-2">Poziom należy do zawodu, nie do człowieka. Puste = nieustalone, nie poziom 1. Ocena okresowa i staż to osobne informacje.</p>
+                        @forelse($employee->roles as $role)
+                            <form wire:submit="saveSeniority({{ $role->id }})" class="emp-seniority__row" wire:key="sr-{{ $role->id }}">
+                                <div class="emp-seniority__name">
+                                    <x-role-seniority-badge :role="$role" />
+                                </div>
+                                @if(auth()->user()->hasPermission('employees.update'))
+                                    <select
+                                        class="form-select form-select-sm"
+                                        wire:model="seniorityLevels.{{ $role->id }}"
+                                        aria-label="Seniority — {{ $role->name }}"
+                                    >
+                                        <option value="">Nieustalone</option>
+                                        @foreach(\App\Enums\RoleSeniority::cases() as $case)
+                                            <option value="{{ $case->value }}">{{ $case->value }} — {{ $case->label() }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-sm"
+                                        wire:model="seniorityComments.{{ $role->id }}"
+                                        placeholder="Komentarz (opcjonalnie)"
+                                        maxlength="255"
+                                    >
+                                    <x-ui.button variant="primary" type="submit" class="btn-sm">Zapisz</x-ui.button>
+                                @endif
+                            </form>
+                        @empty
+                            <p class="text-muted mb-0">Brak zawodów — dodaj je w edycji pracownika.</p>
+                        @endforelse
+
+                        @if($employee->seniorityChanges->isNotEmpty())
+                            <div class="emp-seniority__history mt-3">
+                                <div class="emp-fact__label">Historia zmian</div>
+                                <ol class="emp-lifecycle__list">
+                                    @foreach($employee->seniorityChanges->take(12) as $change)
+                                        <li class="emp-lifecycle__item">
+                                            <span class="fw-semibold">{{ $change->role?->name ?? 'Zawód' }}</span>
+                                            <span class="font-mono">{{ $change->fromLevel()?->shortLabel() ?? '?' }} → {{ $change->toLevel()?->shortLabel() ?? '?' }}</span>
+                                            <span class="font-mono text-muted">{{ $change->created_at?->format('Y-m-d') }}</span>
+                                            @if($change->changedBy)
+                                                <span class="text-muted">{{ $change->changedBy->name }}</span>
+                                            @endif
+                                            @if($change->comment)
+                                                <span class="text-muted">{{ $change->comment }}</span>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ol>
+                            </div>
+                        @endif
+                    </div>
+
                     @if($lifecycleEvents->isNotEmpty())
                         <div class="emp-lifecycle">
                             <div class="emp-fact__label">Cykl życia</div>
@@ -146,7 +201,9 @@
                             <tbody>
                                 @foreach($tabData as $employeeDocument)
                                     <tr>
-                                        <td>{{ $employeeDocument->document->name ?? '-' }}</td>
+                                        <td>
+                                            {{ $employeeDocument->label() }}
+                                        </td>
                                         <td>
                                             <x-ui.badge variant="info">
                                                 {{ $employeeDocument->kind === 'okresowy' ? 'Okresowy' : 'Bezokresowy' }}

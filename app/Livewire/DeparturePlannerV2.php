@@ -9,7 +9,6 @@ use App\Models\Employee;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Vehicle;
-use App\Services\LocationTrackingService;
 use App\Support\DepartureRoutePlan;
 use App\Support\PublicTransportTicketCosts;
 use Carbon\Carbon;
@@ -686,11 +685,14 @@ class DeparturePlannerV2 extends Component
             }
         }
 
-        $this->currentStep = $step;
-
-        if ($step === 4 && $this->transportMode === 'public' && empty($this->vehicleId)) {
-            $this->ensureRouteSegmentsForPublicStep();
+        if ($step < 1) {
+            $step = 1;
         }
+        if ($step > 3) {
+            $step = 3;
+        }
+
+        $this->currentStep = $step;
     }
 
     /**
@@ -927,9 +929,6 @@ class DeparturePlannerV2 extends Component
         }
         if ($this->step3TabIncomplete) {
             $out[] = 'Krok 3: część osób nie ma przypisanego pojazdu dojazdowego.';
-        }
-        if ($this->step4TabIncomplete) {
-            $out[] = 'Krok 4: niekompletna trasa (dystans/czas) dla transportu własnego.';
         }
 
         if ($this->transportMode === 'public') {
@@ -1257,7 +1256,7 @@ class DeparturePlannerV2 extends Component
             ->get();
     }
 
-    /** Dla kroku 4 (np. bilety na odcinki ziemne transportu publicznego). */
+    /** Identyfikatory wybranych pracowników (bilety, walidacja, zapis). */
     public function getSelectedEmployeeIdsProperty(): array
     {
         return $this->getSelectedEmployeeIds();
@@ -1370,23 +1369,6 @@ class DeparturePlannerV2 extends Component
         return false;
     }
 
-    /** Krok 4: przy własnym aucie — brak trasy; przy publicznym — transfery ziemne poza kreatorem. */
-    public function getStep4TabIncompleteProperty(): bool
-    {
-        if ($this->transportMode === 'public') {
-            return false;
-        }
-
-        $rd = $this->routeData;
-        $dist = data_get($rd, 'route_distance', data_get($rd, 'distance'));
-        $dur = data_get($rd, 'route_duration', data_get($rd, 'duration'));
-        $routeOk = is_array($rd)
-            && $dist !== null && $dist !== '' && is_numeric($dist) && (float) $dist > 0
-            && $dur !== null && $dur !== '' && (int) $dur > 0;
-
-        return ! $routeOk;
-    }
-
     /** Tytuł sekcji biletów: lotnisko vs dworzec. */
     public function getPublicTransportTicketsSectionTitleProperty(): string
     {
@@ -1429,6 +1411,10 @@ class DeparturePlannerV2 extends Component
 
     public function render()
     {
+        if ((int) $this->currentStep > 3) {
+            $this->currentStep = 3;
+        }
+
         return view('livewire.departure-planner-v2');
     }
 }

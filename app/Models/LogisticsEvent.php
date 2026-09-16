@@ -315,6 +315,14 @@ class LogisticsEvent extends Model
     }
 
     /**
+     * Trasa uznana za ustaloną: zapisany dystans i czas (waypointy z planu nie wystarczą).
+     */
+    public function hasEstablishedRoute(): bool
+    {
+        return $this->hasRouteData();
+    }
+
+    /**
      * Get route distance formatted (km).
      *
      * Prosty transfer (TransferCreateBoard + GroundTransferSlot) zapisuje route_distance w metrach (jak ORS × 1000).

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
@@ -125,47 +126,53 @@ class ProjectAssignmentService
      */
     protected function validateEmployeeDocuments(Employee $employee, Carbon $startDate, Carbon $endDate): void
     {
-        // Sprawdź czy dokument is required
-        $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
+        $requiredDocuments = $employee->requiredDocumentsInDateRange($startDate, $endDate);
 
-        // Jeśli kolumna nie istnieje, nie ma wymaganych dokumentów - nie blokuj
-        if (! $hasIsRequiredColumn) {
+        if ($requiredDocuments->isEmpty()) {
             return;
         }
 
-        // Sprawdź czy są wymagane dokumenty
-        $requiredDocuments = \App\Models\Document::where('is_required', true)->get();
-
-        // Jeśli nie ma żadnych wymaganych dokumentów, nie blokuj przypisania
-        if ($requiredDocuments->isEmpty()) {
-            return; // Nie ma wymaganych dokumentów - wszystko OK
-        }
-
-        // Sprawdź czy pracownik ma wszystkie wymagane dokumenty
         if (! $employee->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
-            // Znajdź brakujące wymagane dokumenty
             $missingDocuments = [];
+            $companyIds = $employee->companyIdsAssignedInDateRange($startDate, $endDate);
+            $companiesById = $companyIds->isEmpty()
+                ? collect()
+                : Company::query()->whereIn('id', $companyIds)->get()->keyBy('id');
 
             foreach ($requiredDocuments as $document) {
-                $hasActiveDocument = $employee->employeeDocuments()
-                    ->where('document_id', $document->id)
-                    ->where(function ($q) use ($startDate, $endDate) {
-                        $q->where(function ($q2) use ($endDate) {
-                            $q2->where('kind', 'bezokresowy')
-                                ->where('valid_from', '<=', $endDate);
-                        })->orWhere(function ($q2) use ($startDate, $endDate) {
-                            $q2->where('kind', 'okresowy')
-                                ->where('valid_from', '<=', $startDate)
-                                ->where(function ($q3) use ($endDate) {
-                                    $q3->whereNull('valid_to')
-                                        ->orWhere('valid_to', '>=', $endDate);
-                                });
-                        });
-                    })
-                    ->exists();
+                $targets = $document->is_company_scoped
+                    ? $companyIds->map(fn ($id) => ['company_id' => (int) $id, 'company' => $companiesById->get($id)])
+                    : collect([['company_id' => null, 'company' => null]]);
 
-                if (! $hasActiveDocument) {
-                    $missingDocuments[] = $document->name;
+                foreach ($targets as $target) {
+                    $companyId = $target['company_id'];
+
+                    $query = $employee->employeeDocuments()
+                        ->where('document_id', $document->id);
+
+                    if ($companyId !== null) {
+                        $query->where('company_id', $companyId);
+                    }
+
+                    $hasActiveDocument = $query
+                        ->where(function ($q) use ($startDate, $endDate) {
+                            $q->where(function ($q2) use ($endDate) {
+                                $q2->where('kind', 'bezokresowy')
+                                    ->where('valid_from', '<=', $endDate);
+                            })->orWhere(function ($q2) use ($startDate, $endDate) {
+                                $q2->where('kind', 'okresowy')
+                                    ->where('valid_from', '<=', $startDate)
+                                    ->where(function ($q3) use ($endDate) {
+                                        $q3->whereNull('valid_to')
+                                            ->orWhere('valid_to', '>=', $endDate);
+                                    });
+                            });
+                        })
+                        ->exists();
+
+                    if (! $hasActiveDocument) {
+                        $missingDocuments[] = $document->requirementLabelForCompany($target['company']);
+                    }
                 }
             }
 
@@ -237,7 +244,7 @@ class ProjectAssignmentService
      */
     public function getEmployeesWithAvailabilityStatus(?Carbon $startDate = null, ?Carbon $endDate = null, ?int $excludeAssignmentId = null, ?int $roleId = null, ?int $projectId = null): \Illuminate\Support\Collection
     {
-        $employees = Employee::with(['roles', 'employeeDocuments.document'])
+        $employees = Employee::with(['roles', 'employeeDocuments.document', 'companyAssignments'])
             ->orderBy('last_name')
             ->get();
 

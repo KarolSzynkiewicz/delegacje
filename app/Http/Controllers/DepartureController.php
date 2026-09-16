@@ -883,7 +883,7 @@ class DepartureController extends Controller
                 return redirect()
                     ->back()
                     ->withInput()
-                    ->with('error', 'Nie można określić lokalizacji docelowej. Uzupełnij trasę (krok 4) albo upewnij się, że projekty mają przypisaną lokalizację.');
+                    ->with('error', 'Nie można określić lokalizacji docelowej. Upewnij się, że projekty mają przypisaną lokalizację.');
             }
 
             $baseLocation = Location::getBase();

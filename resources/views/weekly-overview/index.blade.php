@@ -97,11 +97,11 @@
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <x-employee-cell :employee="$employee" />
                                 </div>
-                                @if($employee->roles->count() > 0)
+                                                @if($employee->roles->count() > 0)
                                     <div class="mb-2">
                                         <div class="d-flex flex-wrap gap-1">
                                             @foreach($employee->roles as $role)
-                                                <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
+                                                <x-role-seniority-badge :role="$role" />
                                             @endforeach
                                         </div>
                                     </div>
@@ -280,6 +280,23 @@
                     <h3 class="fs-5 fw-bold mb-0 text-dark">
                         <a href="{{ route('projects.show', $project) }}" class="text-decoration-underline">{{ $project->name }}</a>
                     </h3>
+                    @php
+                        $weekSiteLeads = $weekData['site_leads'] ?? collect();
+                    @endphp
+                    @if($weekSiteLeads->isNotEmpty())
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            @foreach($weekSiteLeads as $siteLead)
+                                @if($siteLead->employee)
+                                    <span class="d-inline-flex align-items-center gap-1">
+                                        <x-project-site-lead-badge />
+                                        <a href="{{ route('employees.show', $siteLead->employee) }}" class="small text-decoration-none">
+                                            {{ $siteLead->employee->full_name }}
+                                        </a>
+                                    </span>
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
                     
                     <!-- Przycisk Planer dzienny -->
                     <div class="flex-grow-1 text-center">
@@ -375,20 +392,7 @@
                             @php
                                 $reqSummary = $weekData['requirements_summary'] ?? [];
                                 $totalNeeded = $reqSummary['total_needed'] ?? 0;
-                                $totalAssignedMin = $reqSummary['total_assigned_min'] ?? ($reqSummary['total_assigned'] ?? 0);
-                                $totalAssignedMax = $reqSummary['total_assigned_max'] ?? ($reqSummary['total_assigned'] ?? 0);
-                                $isAssignedStable = $reqSummary['is_stable'] ?? ($totalAssignedMin === $totalAssignedMax);
                                 $roleDetails = $reqSummary['role_details'] ?? [];
-                                $summary = new \App\ViewModels\WeeklyProjectSummary($weekData);
-
-                                if ($isAssignedStable) {
-                                    $centerAssignedLabel = (string) (int) $totalAssignedMax;
-                                } else {
-                                    $centerAvg = ($totalAssignedMin + $totalAssignedMax) / 2;
-                                    $centerAssignedLabel = fmod($centerAvg, 1) === 0.0
-                                        ? (string) (int) $centerAvg
-                                        : rtrim(rtrim(number_format($centerAvg, 1, '.', ''), '0'), '.');
-                                }
 
                                 $demandPalette = [
                                     '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#64748b',
@@ -411,46 +415,75 @@
                                 $demandChartValues = $demandChartItems->pluck('value')->all();
                                 $demandChartColors = $demandChartItems->pluck('color')->all();
 
-                                // Gauge data per role (assigned vs needed)
-                                $gaugeItems = collect($roleDetails)
+                                $senioritySliceMeta = [
+                                    4 => ['label' => '4 Ekspert', 'color' => '#a855f7'],
+                                    3 => ['label' => '3 Fachowiec', 'color' => '#10b981'],
+                                    2 => ['label' => '2 Podstawowy', 'color' => '#3b82f6'],
+                                    1 => ['label' => '1 Przyuczenie', 'color' => '#f59e0b'],
+                                    0 => ['label' => '? Nieustalone', 'color' => '#64748b'],
+                                ];
+
+                                $fulfillItems = collect($roleDetails)
                                     ->filter(fn ($rd) => ($rd['needed'] ?? 0) > 0)
                                     ->values()
-                                    ->map(function ($rd, $index) use ($demandPalette) {
+                                    ->map(function ($rd) use ($senioritySliceMeta) {
                                         $needed = (int) ($rd['needed'] ?? 0);
-                                        $assigned = $rd['assigned'] ?? null;
-                                        $assignedMin = (int) ($rd['assigned_min'] ?? ($assigned ?? 0));
-                                        $assignedMax = (int) ($rd['assigned_max'] ?? ($assigned ?? 0));
-                                        $isStable = $rd['is_stable'] ?? ($assignedMin === $assignedMax);
-                                        $assignedVal = $assigned !== null
-                                            ? (float) $assigned
-                                            : (float) ($assignedMin + $assignedMax) / 2;
-                                        $pct = $needed > 0 ? min(round(($assignedVal / $needed) * 100), 200) : 0;
-                                        $color = $pct >= 100 ? '#10b981' : ($pct >= 70 ? '#f59e0b' : '#ef4444');
+                                        $mix = ($rd['seniority_mix'] ?? []) + [4 => 0, 3 => 0, 2 => 0, 1 => 0, 0 => 0];
+                                        $assigned = (int) array_sum($mix);
+                                        $empty = max(0, $needed - $assigned);
                                         $role = $rd['role'] ?? null;
-                                        $countLabel = $isStable
-                                            ? $assignedMax . '/' . $needed
-                                            : $assignedMin . '-' . $assignedMax . '/' . $needed;
+
+                                        $legend = [];
+                                        $chartSlices = [];
+                                        foreach ([4, 3, 2, 1, 0] as $level) {
+                                            $count = (int) $mix[$level];
+                                            if ($count <= 0) {
+                                                continue;
+                                            }
+                                            $meta = $senioritySliceMeta[$level];
+                                            $slice = [
+                                                'label' => $meta['label'],
+                                                'value' => $count,
+                                                'color' => $meta['color'],
+                                                'gap' => false,
+                                            ];
+                                            $legend[] = $slice;
+                                            $chartSlices[] = $slice;
+                                        }
+                                        if ($empty > 0) {
+                                            $chartSlices[] = [
+                                                'label' => 'Brak',
+                                                'value' => $empty,
+                                                'color' => 'rgba(255,255,255,0.08)',
+                                                'gap' => true,
+                                            ];
+                                        }
+
+                                        $isStable = $rd['is_stable'] ?? true;
+                                        $assignedMin = (int) ($rd['assigned_min'] ?? $assigned);
+                                        $assignedMax = (int) ($rd['assigned_max'] ?? $assigned);
+                                        $centerLabel = $isStable
+                                            ? $assignedMax.'/'.$needed
+                                            : $assignedMin.'–'.$assignedMax.'/'.$needed;
 
                                         return [
-                                            'label'       => $role?->name ?? '—',
-                                            'role_id'     => $role?->id,
-                                            'assigned'    => $assignedVal,
-                                            'needed'      => $needed,
-                                            'count_label' => $countLabel,
-                                            'pct'         => $pct,
-                                            'color'       => $color,
-                                            'bg_color'    => $demandPalette[$index % count($demandPalette)],
+                                            'label' => $role?->name ?? '—',
+                                            'role_id' => $role?->id,
+                                            'center' => $centerLabel,
+                                            'legend' => $legend,
+                                            'chart_labels' => collect($chartSlices)->pluck('label')->all(),
+                                            'chart_values' => collect($chartSlices)->pluck('value')->all(),
+                                            'chart_colors' => collect($chartSlices)->pluck('color')->all(),
+                                            'chart_gaps' => collect($chartSlices)->pluck('gap')->all(),
                                         ];
                                     });
                             @endphp
 
                             @if(!empty($demandChartLabels))
                                 <div class="row g-4 align-items-start">
-                                    {{-- Lewa: donut + legenda --}}
-                                    <div class="col-12 col-md-6">
-                                        <div class="d-flex align-items-center gap-3 flex-wrap">
-                                            {{-- Donut --}}
-                                            <div style="position:relative;width:180px;height:180px;flex-shrink:0;">
+                                    <div class="col-12 col-lg-5">
+                                        <div class="wo-demand">
+                                            <div class="wo-demand__donut">
                                                 <canvas
                                                     class="wo-demand-chart"
                                                     style="width:100%;height:100%;"
@@ -458,13 +491,12 @@
                                                     data-values='@json($demandChartValues)'
                                                     data-colors='@json($demandChartColors)'
                                                 ></canvas>
-                                                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:2;line-height:1.2;">
-                                                    <div class="fw-bold" style="font-size:1.6rem;">{{ $centerAssignedLabel }}</div>
-                                                    <div class="text-muted" style="font-size:0.75rem;">z {{ $totalNeeded }} potrzeb</div>
+                                                <div class="wo-demand__center">
+                                                    <div class="wo-demand__total">{{ $totalNeeded }}</div>
+                                                    <div class="wo-demand__caption">potrzebnych</div>
                                                 </div>
                                             </div>
-                                            {{-- Legenda --}}
-                                            <ul class="list-unstyled mb-0" style="flex:1;min-width:130px;">
+                                            <ul class="wo-demand__legend list-unstyled mb-0">
                                                 @foreach($demandChartItems as $item)
                                                     @php
                                                         $legendUrl = $item['role_id']
@@ -476,69 +508,71 @@
                                                             ])
                                                             : null;
                                                     @endphp
-                                                    <li class="d-flex align-items-center gap-2" style="padding:0.3rem 0;">
-                                                        <span style="width:12px;height:12px;border-radius:3px;background:{{ $item['color'] }};flex-shrink:0;display:inline-block;border:1px solid rgba(255,255,255,0.3);"></span>
+                                                    <li>
+                                                        <span style="background:{{ $item['color'] }};"></span>
                                                         @if($legendUrl)
-                                                            <a href="{{ $legendUrl }}" class="text-decoration-none small" style="color:var(--text-main);">
-                                                                {{ $item['label'] }} <span style="color:var(--text-muted);">{{ $item['value'] }}</span>
-                                                            </a>
+                                                            <a href="{{ $legendUrl }}" class="text-decoration-none" style="color:inherit;">{{ $item['label'] }}</a>
                                                         @else
-                                                            <span class="small">{{ $item['label'] }} <span style="color:var(--text-muted);">{{ $item['value'] }}</span></span>
+                                                            {{ $item['label'] }}
                                                         @endif
+                                                        <em>{{ $item['value'] }}</em>
                                                     </li>
                                                 @endforeach
                                             </ul>
                                         </div>
                                     </div>
 
-                                    {{-- Prawa: Wykonanie (gauge'e na rolę) --}}
-                                    <div class="col-12 col-md-6">
-                                        <div class="small text-muted fw-semibold mb-3" style="text-transform:uppercase;letter-spacing:.05em;font-size:0.7rem;">Wykonanie</div>
-                                        <div class="d-flex flex-wrap gap-3">
-                                            @foreach($gaugeItems as $gauge)
+                                    <div class="col-12 col-lg-7">
+                                        <div class="wo-fulfill__heading">Wykonanie</div>
+                                        <div class="wo-fulfill">
+                                            @foreach($fulfillItems as $fulfill)
                                                 @php
-                                                    $gaugeUrl = $gauge['role_id']
+                                                    $fulfillUrl = $fulfill['role_id']
                                                         ? route('project-assignments.create', [
                                                             'project_id' => $project->id,
                                                             'start_date' => $weeks[0]['start']->format('Y-m-d'),
                                                             'end_date'   => $weeks[0]['end']->format('Y-m-d'),
-                                                            'role_id'    => $gauge['role_id'],
+                                                            'role_id'    => $fulfill['role_id'],
                                                         ])
                                                         : null;
-                                                    $gaugeLabel = Str::limit($gauge['label'], 12);
                                                 @endphp
-                                                <div class="text-center" style="width:80px;">
-                                                    <div style="position:relative;width:80px;height:80px;margin:0 auto;">
+                                                <div class="wo-fulfill__item">
+                                                    <div class="wo-fulfill__donut">
                                                         <canvas
-                                                            class="wo-gauge-chart"
+                                                            class="wo-fulfill-chart"
                                                             style="width:100%;height:100%;"
-                                                            data-pct="{{ $gauge['pct'] }}"
-                                                            data-color="{{ $gauge['color'] }}"
+                                                            data-labels='@json($fulfill['chart_labels'])'
+                                                            data-values='@json($fulfill['chart_values'])'
+                                                            data-colors='@json($fulfill['chart_colors'])'
+                                                            data-gaps='@json($fulfill['chart_gaps'])'
                                                         ></canvas>
-                                                        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:2;line-height:1.1;">
-                                                            <span class="fw-bold" style="font-size:0.82rem;color:{{ $gauge['color'] }};">{{ $gauge['pct'] }}%</span>
+                                                        <div class="wo-fulfill__center">
+                                                            <div class="wo-fulfill__total">{{ $fulfill['center'] }}</div>
+                                                            @if($fulfillUrl)
+                                                                <a href="{{ $fulfillUrl }}" class="wo-fulfill__caption text-decoration-none" title="{{ $fulfill['label'] }}">{{ Str::limit($fulfill['label'], 16) }}</a>
+                                                            @else
+                                                                <div class="wo-fulfill__caption" title="{{ $fulfill['label'] }}">{{ Str::limit($fulfill['label'], 16) }}</div>
+                                                            @endif
                                                         </div>
                                                     </div>
-                                                    @if($gaugeUrl)
-                                                        <a href="{{ $gaugeUrl }}" class="text-decoration-none d-block mt-1 small text-truncate" style="max-width:80px;color:var(--text-muted);font-size:0.72rem;" title="{{ $gauge['label'] }}">{{ $gaugeLabel }}</a>
-                                                    @else
-                                                        <div class="small text-muted text-truncate mt-1" style="font-size:0.72rem;" title="{{ $gauge['label'] }}">{{ $gaugeLabel }}</div>
-                                                    @endif
-                                                    <div class="small fw-semibold mt-1" style="font-size:0.75rem;color:{{ $gauge['color'] }};">{{ $gauge['count_label'] }}</div>
+                                                    <ul class="wo-fulfill__legend list-unstyled mb-0">
+                                                        @forelse($fulfill['legend'] as $slice)
+                                                            <li>
+                                                                <span style="background:{{ $slice['color'] }};"></span>
+                                                                {{ $slice['label'] }}
+                                                                <em>{{ $slice['value'] }}</em>
+                                                            </li>
+                                                        @empty
+                                                            <li class="text-muted">Brak przypisań</li>
+                                                        @endforelse
+                                                    </ul>
                                                 </div>
                                             @endforeach
                                         </div>
                                     </div>
                                 </div>
                             @else
-                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                    <div>
-                                        <span class="small text-muted">Przypisanych: </span>
-                                        <span class="fw-semibold">{{ $centerAssignedLabel }}</span>
-                                        <span class="small text-muted"> z {{ $totalNeeded }} potrzeb</span>
-                                    </div>
-                                    <p class="text-muted small mb-0">Brak zapotrzebowania na role</p>
-                                </div>
+                                <p class="text-muted small mb-0">Brak zapotrzebowania na role</p>
                             @endif
                         </x-ui.card>
                     </div>
@@ -741,7 +775,18 @@
                     </div>
 
                     <div class="collapse show" id="{{ $assignedCollapseId }}">
+                        @include('weekly-overview.partials.site-lead-panel')
                         @if($assignedList->isNotEmpty())
+                        @php
+                            $crewRows = $assignedList
+                                ->sortBy(function ($row) {
+                                    $lead = ($row['is_site_lead'] ?? false) ? '0' : '1';
+                                    $name = mb_strtolower($row['employee']->last_name.' '.$row['employee']->first_name);
+
+                                    return $lead.'-'.$name;
+                                })
+                                ->values();
+                        @endphp
                         <div class="table-responsive">
                             <table class="table align-middle weekly-overview-assigned-table">
                                 <thead>
@@ -785,110 +830,8 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($assignedList as $employeeData)
-                                        @php
-                                            $dateRange = $employeeData['date_range'] ?? 'cały tydzień';
-                                            $isFullWeek = ($dateRange === 'cały tydzień' || $dateRange === 'pon-nie');
-                                        @endphp
-                                        <tr>
-                                            <td data-label="Pracownik" data-sort-value="{{ mb_strtolower($employeeData['employee']->last_name.' '.$employeeData['employee']->first_name) }}">
-                                                <x-employee-cell :employee="$employeeData['employee']"  />
-                                            </td>
-                                            <td data-label="Rola w projekcie" data-sort-value="{{ mb_strtolower($employeeData['role']->name ?? '') }}">
-                                                @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])
-                                                    <x-ui.badge variant="warning" title="Rola zmienia się w trakcie tygodnia">
-                                                        <i class="bi bi-arrow-left-right"></i> Zmienna
-                                                    </x-ui.badge>
-                                                @elseif(isset($employeeData['assignment']) && $employeeData['assignment'])
-                                                    @php
-                                                        $assignment = $employeeData['assignment'];
-                                                        $assignmentId = is_object($assignment) ? $assignment->id : $assignment;
-                                                        $editUrl = route('project-assignments.edit', $assignmentId);
-                                                        $roleName = $employeeData['role']->name ?? '-';
-                                                        $roleDisplay = Str::limit($roleName, 24);
-                                                    @endphp
-                                                    <x-ui.clickable-badge variant="accent" :href="$editUrl" title="{{ $roleName }}" class="wo-cell-truncate">
-                                                        {{ $roleDisplay }}
-                                                    </x-ui.clickable-badge>
-                                                @else
-                                                    @php
-                                                        $roleName = $employeeData['role']->name ?? '-';
-                                                        $roleDisplay = Str::limit($roleName, 24);
-                                                    @endphp
-                                                    <x-ui.badge variant="info" title="{{ $roleName }}" class="wo-cell-truncate">{{ $roleDisplay }}</x-ui.badge>
-                                                @endif
-                                            </td>
-                                            <td class="text-center {{ !$isFullWeek ? 'bg-danger bg-opacity-25' : '' }}" data-label="Pokrycie" data-sort-value="{{ $isFullWeek ? 1 : 0 }}">
-                                                <span class="fw-semibold small">{{ $dateRange }}</span>
-                                            </td>
-                                            <td data-label="Auto" data-sort-value="{{ mb_strtolower($employeeData['vehicle']->registration_number ?? '') }}">
-                                                @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
-                                                    <x-ui.clickable-badge variant="success" route="vehicle-assignments.show" :routeParams="['vehicle_assignment' => $employeeData['vehicle_assignment']]" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
-                                                        <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
-                                                    </x-ui.clickable-badge>
-                                                @elseif($employeeData['has_vehicle_in_week'] ?? false)
-                                                    <x-ui.badge variant="success">
-                                                        <i class="bi bi-car-front"></i> Tak
-                                                    </x-ui.badge>
-                                                @else
-                                                    <x-ui.clickable-badge variant="danger" route="vehicle-assignments.create" :routeParams="['employee_id' => $employeeData['employee']->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]">
-                                                        <i class="bi bi-x-circle"></i> Brak
-                                                    </x-ui.clickable-badge>
-                                                @endif
-                                            </td>
-                                            <td data-label="Dom" data-sort-value="{{ mb_strtolower($employeeData['accommodation']->name ?? '') }}">
-                                                @if(isset($employeeData['accommodation']) && $employeeData['accommodation'])
-                                                    @php
-                                                        $accommodationName = $employeeData['accommodation']->name;
-                                                        $accommodationDisplay = Str::limit($accommodationName, 32);
-                                                    @endphp
-                                                    <x-ui.clickable-badge variant="info" route="accommodation-assignments.show" :routeParams="['accommodation_assignment' => $employeeData['accommodation_assignment']]" title="{{ $accommodationName }}" class="wo-cell-truncate">
-                                                        <i class="bi bi-house"></i> {{ $accommodationDisplay }}
-                                                    </x-ui.clickable-badge>
-                                                @else
-                                                    <x-ui.clickable-badge variant="danger" route="accommodation-assignments.create" :routeParams="['employee_id' => $employeeData['employee']->id, 'date_from' => $weeks[0]['start']->format('Y-m-d'), 'date_to' => $weeks[0]['end']->format('Y-m-d')]">
-                                                        <i class="bi bi-x-circle"></i> Brak
-                                                    </x-ui.clickable-badge>
-                                                @endif
-                                            </td>
-                                            <td data-label="Do rotacji" data-sort-value="{{ $employeeData['rotation']['days_left'] ?? 999999 }}">
-                                                @if(isset($employeeData['rotation']) && $employeeData['rotation'])
-                                                    @php
-                                                        $rotation = $employeeData['rotation']['rotation'] ?? null;
-                                                        $rotationId = $employeeData['rotation']['id'] ?? null;
-                                                        $daysLeft = $employeeData['rotation']['days_left'] ?? null;
-                                                        $employee = $employeeData['employee'];
-                                                    @endphp
-                                                    @if($rotation && $daysLeft !== null)
-                                                        @if($rotationId)
-                                                            <x-ui.clickable-badge variant="warning" route="employees.rotations.edit" :routeParams="['employee' => $employee, 'rotation' => $rotation]">
-                                                                <i class="bi bi-arrow-repeat"></i> 
-                                                                @if($daysLeft >= 0)
-                                                                    {{ $daysLeft }} {{ $daysLeft == 1 ? 'dzień' : 'dni' }}
-                                                                @else
-                                                                    {{ abs($daysLeft) }} {{ abs($daysLeft) == 1 ? 'dzień' : 'dni' }} temu
-                                                                @endif
-                                                            </x-ui.clickable-badge>
-                                                        @else
-                                                            <x-ui.badge variant="warning">
-                                                                <i class="bi bi-arrow-repeat"></i> 
-                                                                @if($daysLeft >= 0)
-                                                                    {{ $daysLeft }} {{ $daysLeft == 1 ? 'dzień' : 'dni' }}
-                                                                @else
-                                                                    {{ abs($daysLeft) }} {{ abs($daysLeft) == 1 ? 'dzień' : 'dni' }} temu
-                                                                @endif
-                                                            </x-ui.badge>
-                                                        @endif
-                                                    @else
-                                                        <x-ui.badge variant="warning">
-                                                            <i class="bi bi-arrow-repeat"></i> Rotacja
-                                                        </x-ui.badge>
-                                                    @endif
-                                                @else
-                                                    <span class="text-muted small">-</span>
-                                                @endif
-                                            </td>
-                                        </tr>
+                                    @foreach($crewRows as $employeeData)
+                                        @include('weekly-overview.partials.assigned-employee-row')
                                     @endforeach
                                 </tbody>
                             </table>
@@ -961,7 +904,7 @@
                 Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
                 Chart.defaults.font.size = 11;
 
-                // Main demand donut
+                // Main demand donut (roles × needed only)
                 document.querySelectorAll('.wo-demand-chart').forEach(canvas => {
                     const labels = JSON.parse(canvas.dataset.labels || '[]');
                     const values = JSON.parse(canvas.dataset.values || '[]');
@@ -996,28 +939,38 @@
                     });
                 });
 
-                // Per-role gauge donuts
-                document.querySelectorAll('.wo-gauge-chart').forEach(canvas => {
-                    const pct   = parseFloat(canvas.dataset.pct) || 0;
-                    const color = canvas.dataset.color || '#10b981';
-                    const filled  = Math.min(pct, 100);
-                    const rest    = Math.max(0, 100 - filled);
+                // Fulfillment donuts: assigned seniority slices + empty remainder to needed
+                document.querySelectorAll('.wo-fulfill-chart').forEach(canvas => {
+                    const labels = JSON.parse(canvas.dataset.labels || '[]');
+                    const values = JSON.parse(canvas.dataset.values || '[]');
+                    const colors = JSON.parse(canvas.dataset.colors || '[]');
+                    const gaps = JSON.parse(canvas.dataset.gaps || '[]');
+                    if (!values.length) return;
                     new Chart(canvas.getContext('2d'), {
                         type: 'doughnut',
                         data: {
+                            labels,
                             datasets: [{
-                                data: [filled, rest],
-                                backgroundColor: [mkAlpha(color, 0.75), 'rgba(255,255,255,0.07)'],
-                                borderColor:     [color,                 'transparent'],
-                                borderWidth: [2, 0],
+                                data: values,
+                                backgroundColor: colors.map((c, i) => gaps[i] ? c : mkAlpha(c, 0.7)),
+                                borderColor: colors.map((c, i) => gaps[i] ? 'transparent' : c),
+                                borderWidth: colors.map((_, i) => gaps[i] ? 0 : 2),
+                                hoverOffset: colors.map((_, i) => gaps[i] ? 0 : 4),
                             }],
                         },
                         options: {
                             responsive: false,
                             maintainAspectRatio: false,
-                            cutout: '72%',
-                            plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                            events: [],
+                            cutout: '70%',
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    filter: (item) => !gaps[item.dataIndex],
+                                    callbacks: {
+                                        label: ctx => ` ${ctx.label}: ${ctx.raw}`,
+                                    },
+                                },
+                            },
                         },
                     });
                 });

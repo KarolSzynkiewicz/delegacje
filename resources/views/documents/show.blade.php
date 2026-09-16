@@ -26,8 +26,21 @@
                 <h5 class="fw-bold mb-3">Opis</h5>
                 <p>{{ $document->description ?? 'Brak opisu' }}</p>
                 <hr style="border-color: var(--glass-border);">
+                <h5 class="fw-bold mb-3">Na spółkę pracownika</h5>
+                <p>{{ $document->is_company_scoped ? 'Tak — spółkę wybierasz przy wpisie u pracownika' : 'Nie — jeden wpis bez spółki' }}</p>
+                <hr style="border-color: var(--glass-border);">
                 <h5 class="fw-bold mb-3">Dokument okresowy</h5>
                 <p>{{ $document->is_periodic ? 'Tak' : 'Nie' }}</p>
+                <hr style="border-color: var(--glass-border);">
+                <h5 class="fw-bold mb-3">Ikona w plannerze</h5>
+                @if($document->planner_icon)
+                    <p class="mb-0 d-flex align-items-center gap-2">
+                        <span class="doc-chip"><i class="bi {{ $document->planner_icon }}"></i></span>
+                        <span>Widoczna przy pracownikach z ważnym dokumentem</span>
+                    </p>
+                @else
+                    <p class="text-muted mb-0">Brak — dokument nie pokazuje się w plannerze</p>
+                @endif
             </x-ui.card>
 
             <x-ui.card label="Przypisane dokumenty pracowników ({{ $document->employee_documents_count }})">
@@ -37,6 +50,7 @@
                             <thead>
                                 <tr>
                                     <th>Pracownik</th>
+                                    <th>Spółka</th>
                                     <th>Ważny od</th>
                                     <th>Ważny do</th>
                                     <th>Status</th>
@@ -49,6 +63,7 @@
                                         <td>
                                             <x-employee-cell :employee="$employeeDocument->employee"  />
                                         </td>
+                                        <td>{{ $employeeDocument->company?->name ?? '—' }}</td>
                                         <td>{{ $employeeDocument->valid_from->format('Y-m-d') }}</td>
                                         <td>
                                             @if($employeeDocument->kind === 'bezokresowy')

@@ -40,6 +40,7 @@
                 <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">Nazwa</x-livewire.sortable-header>
                 <th class="text-start d-none d-md-table-cell">Klient</th>
                 <th class="text-start">Lokalizacja</th>
+                <th class="text-start d-none d-lg-table-cell">Kierownik</th>
                 <x-livewire.sortable-header field="start_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">Data od</x-livewire.sortable-header>
                 <x-livewire.sortable-header field="end_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">Data do</x-livewire.sortable-header>
                 <th class="text-start">Stan</th>

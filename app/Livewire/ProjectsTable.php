@@ -72,7 +72,7 @@ class ProjectsTable extends Component
 
     public function render()
     {
-        $query = Project::with('location');
+        $query = Project::with(['location', 'currentSiteLead.employee']);
 
         if ($this->filterProjectIds && is_array($this->filterProjectIds) && ! empty($this->filterProjectIds)) {
             $query->whereIn('id', $this->filterProjectIds);

@@ -474,9 +474,26 @@
 
     @if(!$isPublicTransportDeparture)
         @php
-            $routeStops = $departure->getRouteStopsForDetailView();
+            $routeEstablished = $departure->hasEstablishedRoute();
+            $routeStops = $routeEstablished ? $departure->getRouteStopsForDetailView() : collect();
+            $canEditRoute = $departure->status !== \App\Enums\LogisticsEventStatus::CANCELLED;
         @endphp
         <x-ui.card label="Przebieg trasy" class="mb-0">
+            @if(! $routeEstablished)
+                <x-ui.empty-state icon="signpost-split" message="Ustal trasę">
+                    <p class="small text-muted mt-2 mb-0" style="line-height: 1.55; max-width: 28rem; margin-inline: auto;">
+                        Kolejność przystanków, dystans i czas jazdy dopiszesz tutaj — teraz albo później.
+                    </p>
+                    @if($canEditRoute)
+                        <livewire:departure-route-editor
+                            :departure="$departure"
+                            trigger-label="Ustal trasę"
+                            trigger-variant="primary"
+                            :key="'dep-route-empty-'.$departure->id"
+                        />
+                    @endif
+                </x-ui.empty-state>
+            @else
             <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
                 <p class="small text-muted mb-0" style="line-height: 1.55; max-width: 42rem;">
                     Kolejność z planu wyjazdu: start z bazy, przystanki po drodze (mieszkania i ewentualne lokalizacje dodane ręcznie), na końcu adres docelowy zapisany przy wyjeździe.
@@ -488,7 +505,7 @@
                        rel="noopener">
                         <i class="bi bi-file-earmark-pdf me-1"></i>PDF dla kierowcy
                     </a>
-                    @if($departure->status !== \App\Enums\LogisticsEventStatus::CANCELLED)
+                    @if($canEditRoute)
                         <livewire:departure-route-editor :departure="$departure" :key="'dep-route-'.$departure->id" />
                     @endif
                 </div>
@@ -601,6 +618,7 @@
                     </div>
                 </div>
             </div>
+            @endif
         </x-ui.card>
     @endif
 

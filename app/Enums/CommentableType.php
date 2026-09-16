@@ -4,6 +4,7 @@ namespace App\Enums;
 
 use App\Models\Accommodation;
 use App\Models\ApprovalRequest;
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\ForumPost;
 use App\Models\Location;
@@ -25,6 +26,7 @@ enum CommentableType: string
     case LOGISTICS_EVENT = 'logistics_event';
     case LOCATION = 'location';
     case EMPLOYEE = 'employee';
+    case COMPANY = 'company';
     case RECRUITMENT_PROCESS = 'recruitment_process';
     case RECRUITMENT_CANDIDATE = 'recruitment_candidate';
     case SPRINT = 'sprint';
@@ -41,6 +43,7 @@ enum CommentableType: string
             self::LOGISTICS_EVENT => LogisticsEvent::class,
             self::LOCATION => Location::class,
             self::EMPLOYEE => Employee::class,
+            self::COMPANY => Company::class,
             self::RECRUITMENT_PROCESS => RecruitmentProcess::class,
             self::RECRUITMENT_CANDIDATE => RecruitmentCandidate::class,
             self::SPRINT => Sprint::class,
@@ -59,6 +62,7 @@ enum CommentableType: string
             LogisticsEvent::class => self::LOGISTICS_EVENT,
             Location::class => self::LOCATION,
             Employee::class => self::EMPLOYEE,
+            Company::class => self::COMPANY,
             RecruitmentProcess::class => self::RECRUITMENT_PROCESS,
             RecruitmentCandidate::class => self::RECRUITMENT_CANDIDATE,
             Sprint::class => self::SPRINT,

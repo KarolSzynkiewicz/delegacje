@@ -23,10 +23,15 @@
                                     name="document_id" 
                                     label="Typ dokumentu"
                                     required
+                                    id="document_id"
                                 >
                                     <option value="">-- Wybierz dokument --</option>
                                     @foreach($documents as $document)
-                                        <option value="{{ $document->id }}" {{ old('document_id', $employeeDocument->document_id) == $document->id ? 'selected' : '' }}>
+                                        <option
+                                            value="{{ $document->id }}"
+                                            data-company-scoped="{{ $document->is_company_scoped ? '1' : '0' }}"
+                                            {{ old('document_id', $employeeDocument->document_id) == $document->id ? 'selected' : '' }}
+                                        >
                                             {{ $document->name }}
                                         </option>
                                     @endforeach
@@ -34,6 +39,23 @@
                                 <small class="text-muted d-block mt-1">
                                     <a href="{{ route('documents.create') }}" target="_blank" class="text-primary">Dodaj nowy typ dokumentu</a>
                                 </small>
+                            </div>
+
+                            <div class="mb-3" id="company-field">
+                                <x-ui.input
+                                    type="select"
+                                    name="company_id"
+                                    label="Spółka"
+                                    id="company_id"
+                                >
+                                    <option value="">-- Wybierz spółkę --</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}" {{ (string) old('company_id', $employeeDocument->company_id) === (string) $company->id ? 'selected' : '' }}>
+                                            {{ $company->name }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.input>
+                                <small class="text-muted d-block mt-1">Wymagane dla umowy o pracę, A1 i innych typów „na spółkę”.</small>
                             </div>
 
                             <div class="row">
@@ -132,5 +154,15 @@
 
         // Wywołaj przy załadowaniu strony
         document.getElementById('is_okresowy').dispatchEvent(new Event('change'));
+
+        const documentSelect = document.getElementById('document_id');
+        const companySelect = document.getElementById('company_id');
+        const syncCompanyRequired = function () {
+            const option = documentSelect.options[documentSelect.selectedIndex];
+            const scoped = option && option.dataset.companyScoped === '1';
+            companySelect.required = scoped;
+        };
+        documentSelect.addEventListener('change', syncCompanyRequired);
+        syncCompanyRequired();
     </script>
 </x-app-layout>

@@ -20,6 +20,9 @@ class DocumentFactory extends Factory
             'name' => fake()->words(2, true),
             'description' => fake()->sentence(),
             'is_periodic' => fake()->boolean(),
+            'is_required' => false,
+            'is_company_scoped' => false,
+            'planner_icon' => null,
         ];
     }
 }

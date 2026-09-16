@@ -100,7 +100,7 @@ class ProjectTabs extends Component
             'comments',
         ]);
 
-        $this->project->load(['location', 'demands']);
+        $this->project->load(['location', 'demands', 'siteLeads.employee']);
 
         $tabsForComponent = [];
         foreach ($this->availableTabs as $tabKey => $tab) {

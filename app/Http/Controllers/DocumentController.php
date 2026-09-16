@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DocumentPlannerIcon;
 use App\Models\Document;
-use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class DocumentController extends Controller
 {
@@ -17,7 +19,7 @@ class DocumentController extends Controller
         $documents = Document::withCount('employeeDocuments')
             ->orderBy('name')
             ->paginate(20);
-        
+
         return view('documents.index', compact('documents'));
     }
 
@@ -34,16 +36,7 @@ class DocumentController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:documents,name',
-            'description' => 'nullable|string',
-            'is_periodic' => 'required|in:0,1',
-            'is_required' => 'nullable|in:0,1',
-        ]);
-        
-        // Konwertuj string na boolean
-        $validated['is_periodic'] = (bool) $validated['is_periodic'];
-        $validated['is_required'] = isset($validated['is_required']) ? (bool) $validated['is_required'] : false;
+        $validated = $this->validatedDocument($request);
 
         Document::create($validated);
 
@@ -56,8 +49,9 @@ class DocumentController extends Controller
      */
     public function show(Document $document): View
     {
-        $document->load(['employeeDocuments.employee']);
+        $document->load(['employeeDocuments.employee', 'employeeDocuments.company']);
         $document->loadCount('employeeDocuments');
+
         return view('documents.show', compact('document'));
     }
 
@@ -74,16 +68,7 @@ class DocumentController extends Controller
      */
     public function update(Request $request, Document $document): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:documents,name,' . $document->id,
-            'description' => 'nullable|string',
-            'is_periodic' => 'required|in:0,1',
-            'is_required' => 'nullable|in:0,1',
-        ]);
-        
-        // Konwertuj string na boolean
-        $validated['is_periodic'] = (bool) $validated['is_periodic'];
-        $validated['is_required'] = isset($validated['is_required']) ? (bool) $validated['is_required'] : false;
+        $validated = $this->validatedDocument($request, $document);
 
         $document->update($validated);
 
@@ -106,5 +91,32 @@ class DocumentController extends Controller
 
         return redirect()->route('documents.index')
             ->with('success', 'Dokument został usunięty.');
+    }
+
+    protected function validatedDocument(Request $request, ?Document $document = null): array
+    {
+        $nameRule = Rule::unique('documents', 'name');
+
+        if ($document) {
+            $nameRule->ignore($document);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', $nameRule],
+            'description' => 'nullable|string',
+            'is_periodic' => 'required|in:0,1',
+            'is_required' => 'nullable|in:0,1',
+            'is_company_scoped' => 'nullable|in:0,1',
+            'planner_icon' => ['nullable', 'string', 'max:64', Rule::in(array_merge([''], array_map(fn (DocumentPlannerIcon $icon) => $icon->value, DocumentPlannerIcon::cases())))],
+        ], [
+            'name.unique' => 'Dokument o tej nazwie już istnieje.',
+        ]);
+
+        $validated['is_periodic'] = (bool) $validated['is_periodic'];
+        $validated['is_required'] = isset($validated['is_required']) ? (bool) $validated['is_required'] : false;
+        $validated['is_company_scoped'] = isset($validated['is_company_scoped']) ? (bool) $validated['is_company_scoped'] : false;
+        $validated['planner_icon'] = ($validated['planner_icon'] ?? null) ?: null;
+
+        return $validated;
     }
 }

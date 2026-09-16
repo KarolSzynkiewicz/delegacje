@@ -133,6 +133,7 @@ class AppServiceProvider extends ServiceProvider
             'logistics_event' => \App\Models\LogisticsEvent::class,
             'location' => \App\Models\Location::class,
             'employee' => \App\Models\Employee::class,
+            'company' => \App\Models\Company::class,
             'recruitment_process' => \App\Models\RecruitmentProcess::class,
             'recruitment_candidate' => \App\Models\RecruitmentCandidate::class,
             'warehouse_dispatch' => \App\Models\WarehouseDispatch::class,

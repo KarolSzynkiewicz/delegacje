@@ -44,6 +44,13 @@
                         <i class="bi bi-exclamation-octagon me-1"></i>Komornik
                     </x-ui.badge>
                 @endif
+                @foreach($employee->currentSiteLeads as $lead)
+                    @if($lead->project)
+                        <x-ui.badge variant="warning">
+                            <i class="bi bi-person-badge me-1"></i>Kierownik · {{ $lead->project->name }}
+                        </x-ui.badge>
+                    @endif
+                @endforeach
                 <span class="emp-hero__id font-mono">#{{ $employee->id }}</span>
             </div>
 
@@ -70,11 +77,17 @@
         <div class="emp-hero__roles">
             @if($employee->roles->count() > 0)
                 @foreach($employee->roles as $role)
-                    <x-ui.badge variant="accent">{{ $role->name }}</x-ui.badge>
+                    <x-role-seniority-badge :role="$role" />
                 @endforeach
             @else
-                <span class="text-muted">Brak przypisanych ról</span>
+                <span class="text-muted">Brak przypisanych zawodów</span>
             @endif
+            @php
+                $plannerDocs = $employee->relationLoaded('employeeDocuments')
+                    ? $employee->employeeDocuments->filter(fn ($doc) => $doc->document?->showsInPlanner() && $doc->isCurrentlyValid())
+                    : collect();
+            @endphp
+            <x-planner-document-icons :documents="$plannerDocs" />
         </div>
 
         <div class="emp-hero__location">

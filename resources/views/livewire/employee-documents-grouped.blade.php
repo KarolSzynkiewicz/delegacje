@@ -36,7 +36,7 @@
                         >
                             <option value="">Wszystkie dokumenty</option>
                             @foreach($allDocuments as $doc)
-                                <option value="{{ $doc->id }}">{{ $doc->name }}</option>
+                                <option value="{{ $doc->id }}">{{ $doc->label() }}</option>
                             @endforeach
                         </x-ui.input>
                     </div>
@@ -96,7 +96,7 @@
                             @foreach($group['documents'] as $docStatus)
                                 <tr>
                                     <td class="align-top">
-                                        <strong>{{ $docStatus['document']->name }}</strong>
+                                        <strong>{{ $docStatus['document']->label() }}</strong>
                                         @if($docStatus['document']->description)
                                             <br><small class="text-muted">{{ $docStatus['document']->description }}</small>
                                         @endif
@@ -164,6 +164,12 @@
                                                         <div class="text-muted small" style="width:6.5rem;flex-shrink:0">
                                                             {{ $ed->kind === 'okresowy' ? 'Okresowy' : 'Bezokresowy' }}
                                                         </div>
+
+                                                        @if($ed->company)
+                                                            <div class="small fw-medium me-2" style="width:8rem;flex-shrink:0">
+                                                                {{ $ed->company->name }}
+                                                            </div>
+                                                        @endif
 
                                                         {{-- slot 3: daty --}}
                                                         <div class="small text-muted d-flex align-items-center gap-2">

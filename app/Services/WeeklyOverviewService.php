@@ -4,14 +4,18 @@ namespace App\Services;
 
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
+use App\Enums\RoleSeniority;
 use App\Enums\VehiclePosition;
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
+use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EmployeeDocument;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectDemand;
+use App\Models\ProjectSiteLead;
 use App\Models\Rotation;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
@@ -118,7 +122,7 @@ class WeeklyOverviewService
 
         $assignments = ProjectAssignment::whereIn('project_id', $projectIds)
             ->overlappingWith($weekStart, $weekEnd)
-            ->with(['employee.roles', 'role', 'project'])
+            ->with(['employee.roles', 'employee.latestEvaluation.createdBy', 'role', 'project'])
             ->get();
 
         $employeeIds = $assignments->pluck('employee_id')->unique()->filter()->values();
@@ -218,6 +222,14 @@ class WeeklyOverviewService
             ->orderBy('start_date')
             ->get();
 
+        $siteLeads = ProjectSiteLead::whereIn('project_id', $projectIds)
+            ->overlappingWith($weekStart, $weekEnd)
+            ->with('employee')
+            ->orderBy('start_date')
+            ->get();
+
+        $plannerDocumentsByEmployee = $this->loadPlannerDocumentsByEmployee($employeeIds);
+
         return [
             'demands' => $demands,
             'assignments' => $assignments,
@@ -232,6 +244,8 @@ class WeeklyOverviewService
             'transfer_events_by_vehicle' => $transferEventsByVehicle,
             'rotations' => $rotations,
             'service_repairs' => $serviceRepairs,
+            'site_leads' => $siteLeads->groupBy('project_id'),
+            'planner_documents_by_employee' => $plannerDocumentsByEmployee,
         ];
     }
 
@@ -254,6 +268,8 @@ class WeeklyOverviewService
             'transfer_events_by_vehicle' => collect(),
             'rotations' => collect(),
             'service_repairs' => collect(),
+            'site_leads' => collect(),
+            'planner_documents_by_employee' => collect(),
         ];
     }
 
@@ -279,6 +295,15 @@ class WeeklyOverviewService
         $vehicles = $this->buildVehiclesForWeek($assignments, $ctx);
         $assignedEmployees = $this->buildAssignedEmployeesDetails($assignments, $weekStart, $weekEnd, $ctx);
 
+        $siteLeads = ($ctx['site_leads']->get($project->id) ?? collect())->values();
+        $siteLeadEmployeeIds = $siteLeads->pluck('employee_id')->map(fn ($id) => (int) $id);
+
+        $assignedEmployees = $assignedEmployees->map(function ($row) use ($siteLeadEmployeeIds) {
+            $row['is_site_lead'] = $siteLeadEmployeeIds->contains((int) $row['employee']->id);
+
+            return $row;
+        });
+
         $serviceRepairs = $ctx['service_repairs']
             ->where('project_id', $project->id)
             ->map(function (VehicleRepair $repair) {
@@ -300,8 +325,9 @@ class WeeklyOverviewService
             'accommodations' => $accommodations,
             'vehicles' => $vehicles,
             'assigned_employees' => $assignedEmployees,
+            'site_leads' => $siteLeads,
             'service_repairs' => $serviceRepairs,
-            'has_data' => $demands->isNotEmpty() || $assignments->isNotEmpty(),
+            'has_data' => $demands->isNotEmpty() || $assignments->isNotEmpty() || $siteLeads->isNotEmpty(),
         ];
     }
 
@@ -403,6 +429,7 @@ class WeeklyOverviewService
                 'is_stable' => $isStable,
                 'missing' => max(0, $needed - ($assigned ?? $assignedMax)),
                 'excess' => max(0, ($assigned ?? $assignedMin) - $needed),
+                'seniority_mix' => $this->seniorityMixForRole($roleAssignments, (int) $roleId),
             ];
         }
 
@@ -428,6 +455,7 @@ class WeeklyOverviewService
                 'is_stable' => true,
                 'missing' => 0,
                 'excess' => $uniqueCount,
+                'seniority_mix' => $this->seniorityMixForRole($roleAssignments, (int) $roleId),
             ];
         }
 
@@ -486,6 +514,56 @@ class WeeklyOverviewService
         }
 
         return $days;
+    }
+
+    /**
+     * @return array<int, int> keyed 4,3,2,1,0 (0 = nieustalone)
+     */
+    protected function seniorityMixForRole(Collection $roleAssignments, int $roleId): array
+    {
+        $mix = [4 => 0, 3 => 0, 2 => 0, 1 => 0, 0 => 0];
+        $seen = [];
+
+        foreach ($roleAssignments as $assignment) {
+            $employeeId = (int) $assignment->employee_id;
+            if (isset($seen[$employeeId])) {
+                continue;
+            }
+            $seen[$employeeId] = true;
+
+            $level = $assignment->employee?->seniorityFor($roleId);
+            $key = $level instanceof RoleSeniority ? $level->value : 0;
+            $mix[$key]++;
+        }
+
+        return $mix;
+    }
+
+    /**
+     * @param  Collection<int, int|string>  $employeeIds
+     */
+    protected function loadPlannerDocumentsByEmployee(Collection $employeeIds): Collection
+    {
+        if ($employeeIds->isEmpty()) {
+            return collect();
+        }
+
+        $plannerDocumentIds = Document::query()
+            ->whereNotNull('planner_icon')
+            ->where('planner_icon', '!=', '')
+            ->pluck('id');
+
+        if ($plannerDocumentIds->isEmpty()) {
+            return collect();
+        }
+
+        return EmployeeDocument::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereIn('document_id', $plannerDocumentIds)
+            ->with('document')
+            ->get()
+            ->filter(fn (EmployeeDocument $doc) => $doc->isCurrentlyValid())
+            ->groupBy('employee_id');
     }
 
     /**
@@ -741,6 +819,12 @@ class WeeklyOverviewService
                 'employee' => $employee,
                 'role' => $firstAssignment->role,
                 'role_stable' => $isRoleStable,
+                'seniority' => $employee?->seniorityFor($firstAssignment->role_id),
+                'planner_documents' => ($ctx['planner_documents_by_employee']->get($employeeId) ?? collect())
+                    ->unique('document_id')
+                    ->values(),
+                'latest_evaluation' => $employee?->latestEvaluation,
+                'latest_evaluation_score' => $employee?->latestEvaluation?->average_score,
                 'accommodation' => $accommodationAssignment?->accommodation,
                 'accommodation_assignment' => $accommodationAssignment,
                 'vehicle' => $vehicleAssignment?->vehicle,

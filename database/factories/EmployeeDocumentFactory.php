@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Models\Employee;
 use App\Models\Document;
+use App\Models\Employee;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -25,6 +25,7 @@ class EmployeeDocumentFactory extends Factory
         return [
             'employee_id' => Employee::factory(),
             'document_id' => Document::factory(),
+            'company_id' => null,
             'valid_from' => $validFrom,
             'valid_to' => $validTo,
             'kind' => $kind,

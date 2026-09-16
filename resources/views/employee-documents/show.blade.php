@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="fw-semibold fs-4 mb-0">
-            {{ $employeeDocument->document->name ?? 'Dokument pracownika' }}
+            {{ $employeeDocument->label() }}
         </h2>
         <p class="text-muted small mb-0">Podgląd — bez edycji</p>
     </x-slot>
@@ -29,6 +29,9 @@
                                     <span class="text-muted small">(ID typu: <span class="font-monospace">{{ $employeeDocument->document_id }}</span>)</span>
                                 @endif
                             </dd>
+
+                            <dt class="col-sm-4 text-muted small">Spółka</dt>
+                            <dd class="col-sm-8">{{ $employeeDocument->company?->name ?? '—' }}</dd>
 
                             <dt class="col-sm-4 text-muted small">Rodzaj</dt>
                             <dd class="col-sm-8">

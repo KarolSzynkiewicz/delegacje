@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreEmployeeDocumentRequest;
+use App\Models\Company;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -31,7 +33,7 @@ class EmployeeDocumentController extends Controller
             abort(403, 'Nie masz uprawnień do podglądu tego dokumentu.');
         }
 
-        $employeeDocument->load(['document', 'employee']);
+        $employeeDocument->load(['document', 'company', 'employee']);
 
         $otherDocumentsOfSameType = EmployeeDocument::query()
             ->where('employee_id', $employeeDocument->employee_id)
@@ -61,9 +63,17 @@ class EmployeeDocumentController extends Controller
 
         $employee = Employee::findOrFail($employeeId);
         $documents = Document::orderBy('name')->get();
+        $companies = Company::orderBy('name')->get();
         $selectedDocumentId = $request->query('document_id');
+        $defaultCompanyId = old('company_id', $employee->currentCompanyAssignment()?->company_id);
 
-        return view('employee-documents.create', compact('employee', 'documents', 'selectedDocumentId'));
+        return view('employee-documents.create', compact(
+            'employee',
+            'documents',
+            'companies',
+            'selectedDocumentId',
+            'defaultCompanyId'
+        ));
     }
 
     /**
@@ -76,6 +86,7 @@ class EmployeeDocumentController extends Controller
 
             $validated = $request->validated();
             unset($validated['employee_id']);
+            $validated['company_id'] = $request->filled('company_id') ? (int) $request->input('company_id') : null;
 
             // Ustaw kind na podstawie checkboxa
             $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy')
@@ -118,10 +129,11 @@ class EmployeeDocumentController extends Controller
     public function edit(EmployeeDocument $employeeDocument): View
     {
         $employee = $employeeDocument->employee;
-        $employeeDocument->load('document');
+        $employeeDocument->load(['document', 'company']);
         $documents = Document::orderBy('name')->get();
+        $companies = Company::orderBy('name')->get();
 
-        return view('employee-documents.edit', compact('employee', 'employeeDocument', 'documents'));
+        return view('employee-documents.edit', compact('employee', 'employeeDocument', 'documents', 'companies'));
     }
 
     /**
@@ -134,12 +146,15 @@ class EmployeeDocumentController extends Controller
 
             $validated = $request->validate([
                 'document_id' => 'required|exists:documents,id',
+                'company_id' => $this->companyIdRules($request),
                 'valid_from' => 'required|date',
                 'valid_to' => 'nullable|date|after_or_equal:valid_from',
                 'is_okresowy' => 'nullable|boolean',
                 'notes' => 'nullable|string',
                 'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
                 'remove_file' => 'nullable|boolean',
+            ], [
+                'company_id.required' => 'Wybierz spółkę dla tego dokumentu.',
             ]);
 
             // Ustaw kind na podstawie checkboxa
@@ -174,6 +189,7 @@ class EmployeeDocumentController extends Controller
             }
 
             unset($validated['remove_file']);
+            $validated['company_id'] = $request->filled('company_id') ? (int) $request->input('company_id') : null;
             $employeeDocument->update($validated);
 
             return redirect()->route('employees.show', $employee)
@@ -259,5 +275,20 @@ class EmployeeDocumentController extends Controller
 
         return redirect()->route('employees.show', $employee)
             ->with('success', 'Dokument został usunięty.');
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    protected function companyIdRules(Request $request): array
+    {
+        $document = Document::find($request->input('document_id'));
+
+        return [
+            Rule::requiredIf(fn () => (bool) $document?->is_company_scoped),
+            'nullable',
+            'integer',
+            'exists:companies,id',
+        ];
     }
 }

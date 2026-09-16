@@ -98,10 +98,17 @@
                                             <tr>
                                                 <td>
                                                     <x-employee-cell :employee="$employeeData['employee']"  />
+                                                    @if($employeeData['is_site_lead'] ?? false)
+                                                        <x-project-site-lead-badge class="mt-1" />
+                                                    @endif
+                                                    <x-planner-document-icons :documents="$employeeData['planner_documents'] ?? []" />
                                                 </td>
                                                 <td>
                                                     @if($employeeData['role_stable'] && $employeeData['role'])
-                                                        <span class="badge bg-primary">{{ $employeeData['role']->name }}</span>
+                                                        <x-role-seniority-badge
+                                                            :role="$employeeData['role']"
+                                                            :seniority="$employeeData['seniority'] ?? null"
+                                                        />
                                                     @else
                                                         <span class="badge bg-warning" title="Rola zmienia się w trakcie tygodnia">
                                                             <i class="bi bi-arrow-left-right"></i> Zmienne

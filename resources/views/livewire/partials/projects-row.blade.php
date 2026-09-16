@@ -55,6 +55,18 @@
             <span class="text-muted">—</span>
         @endif
     </td>
+    <td class="d-none d-lg-table-cell">
+        @if($project->currentSiteLead?->employee)
+            <div class="d-flex align-items-center gap-1">
+                <x-project-site-lead-badge compact />
+                <a href="{{ route('employees.show', $project->currentSiteLead->employee) }}" class="text-decoration-none">
+                    {{ $project->currentSiteLead->employee->full_name }}
+                </a>
+            </div>
+        @else
+            <span class="text-muted">—</span>
+        @endif
+    </td>
     <td class="text-nowrap">
         {{ $project->start_date?->format('d.m.Y') ?? '—' }}
     </td>

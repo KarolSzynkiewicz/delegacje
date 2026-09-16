@@ -2,9 +2,9 @@
 
 namespace App\Livewire;
 
+use App\Enums\LocationPurposeType;
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
-use App\Enums\LocationPurposeType;
 use App\Enums\ProjectStatus;
 use App\Models\Accommodation;
 use App\Models\Location;
@@ -23,6 +23,10 @@ class DepartureRouteEditor extends Component
     public int $departureId;
 
     public bool $showModal = false;
+
+    public string $triggerLabel = 'Edytuj trasę';
+
+    public string $triggerVariant = 'outline';
 
     /** @var list<string> */
     public array $routeWaypoints = [];

@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Services\EmployeeLifecycleService;
+use App\Services\EmployeeRoleSeniorityService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -17,7 +18,8 @@ class EmployeeController extends Controller
     use HandlesImageUpload;
 
     public function __construct(
-        protected EmployeeLifecycleService $employeeLifecycle
+        protected EmployeeLifecycleService $employeeLifecycle,
+        protected EmployeeRoleSeniorityService $roleSeniority
     ) {}
 
     /**
@@ -48,13 +50,14 @@ class EmployeeController extends Controller
         $validated = $this->processImageUpload($request->validated(), $request, 'employees');
 
         $roles = $validated['roles'] ?? [];
-        unset($validated['roles']);
+        $seniority = $validated['role_seniority'] ?? [];
+        unset($validated['roles'], $validated['role_seniority']);
 
         // Jedna transakcja: jeśli powiązanie kandydata / zapis cyklu życia się nie powiedzie,
         // cofamy też utworzenie pracownika i ról.
-        $employee = DB::transaction(function () use ($validated, $roles) {
+        $employee = DB::transaction(function () use ($validated, $roles, $seniority) {
             $employee = Employee::create($validated);
-            $employee->roles()->attach($roles);
+            $this->roleSeniority->syncRoles($employee, $roles, $seniority);
 
             $this->employeeLifecycle->recordHireOutsideProcess($employee);
 
@@ -93,10 +96,11 @@ class EmployeeController extends Controller
         $validated = $this->processImageUpload($request->validated(), $request, 'employees', $employee->image_path);
 
         $roles = $validated['roles'] ?? [];
-        unset($validated['roles']);
+        $seniority = $validated['role_seniority'] ?? [];
+        unset($validated['roles'], $validated['role_seniority']);
 
         $employee->update($validated);
-        $employee->roles()->sync($roles);
+        $this->roleSeniority->syncRoles($employee, $roles, $seniority);
 
         return redirect()->route('employees.show', $employee)->with('success', 'Pracownik został zaktualizowany.');
     }

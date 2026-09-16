@@ -327,12 +327,21 @@
                     >
                         ← Wróć do poprzedniej karty
                     </x-ui.button>
-                    <x-ui.button 
-                        variant="primary" 
-                        wire:click="$dispatch('go-to-step', { step: 4 })"
+                    <button
+                        type="button"
+                        class="btn btn-primary"
+                        wire:click="$dispatch('save-departure')"
+                        wire:loading.attr="disabled"
+                        wire:loading.class="opacity-75"
                     >
-                        Przejdź do następnej karty →
-                    </x-ui.button>
+                        <span wire:loading.remove>
+                            <i class="bi bi-floppy me-1"></i> Zapisz wyjazd
+                        </span>
+                        <span wire:loading>
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Zapisywanie...
+                        </span>
+                    </button>
                 @endif
             </div>
         </div>

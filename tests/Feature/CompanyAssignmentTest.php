@@ -78,4 +78,14 @@ class CompanyAssignmentTest extends TestCase
         $response->assertSessionHasErrors('employee_id');
         $this->assertDatabaseCount('company_assignments', 1);
     }
+
+    public function test_company_show_page_loads_with_comments(): void
+    {
+        $company = Company::create(['name' => 'Alpha', 'nip' => '1111111111']);
+
+        $this->actingAs($this->user)
+            ->get(route('companies.show', $company))
+            ->assertOk()
+            ->assertSee('Alpha');
+    }
 }

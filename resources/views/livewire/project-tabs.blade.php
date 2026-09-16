@@ -58,6 +58,12 @@
                 </x-ui.detail-list>
             </x-ui.card>
 
+            <x-project-site-leads-panel
+                :project="$project"
+                :site-leads="$project->siteLeads"
+                :can-manage="! $isMineView && auth()->user()->hasPermission('projects.update')"
+            />
+
             @if(!$isMineView && $project->demands && $project->demands->isNotEmpty())
             <x-ui.card label="Zapotrzebowanie" class="mt-4">
                 @foreach($project->demands as $demand)
@@ -111,6 +117,9 @@
                                             <a href="{{ route('employees.show', $assignment->employee) }}" class="text-primary text-decoration-none">
                                                 <x-employee-cell :employee="$assignment->employee" />
                                             </a>
+                                            @if($project->siteLeads->contains(fn ($lead) => $lead->employee_id === $assignment->employee_id && $lead->isCurrentlyActive()))
+                                                <x-project-site-lead-badge class="mt-1" />
+                                            @endif
                                         </td>
                                         <td>
                                             <x-ui.badge variant="info">{{ $assignment->role->name }}</x-ui.badge>

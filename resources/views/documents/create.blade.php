@@ -27,7 +27,7 @@
                             name="name" 
                             label="Nazwa dokumentu"
                             value="{{ old('name') }}"
-                            placeholder="np. Prawo jazdy, Licencja, Dowód osobisty"
+                            placeholder="np. Prawo jazdy, A1, Dowód osobisty"
                             required="true"
                         />
                     </div>
@@ -63,8 +63,20 @@
                             label="Dokument wymagany"
                             checked="{{ old('is_required') ? true : false }}"
                         />
-                        <small class="form-text text-muted d-block mt-1">Zaznacz, jeśli dokument jest wymagany dla wszystkich pracowników</small>
+                        <small class="form-text text-muted d-block mt-1">Bez „na spółkę”: wszyscy. Z „na spółkę”: tylko gdy pracownik ma wtedy spółkę — i musi mieć wpis na tę spółkę.</small>
                     </div>
+
+                    <div class="mb-4">
+                        <x-ui.input
+                            type="checkbox"
+                            name="is_company_scoped"
+                            label="Na spółkę pracownika"
+                            checked="{{ old('is_company_scoped') ? true : false }}"
+                        />
+                        <small class="form-text text-muted d-block mt-1">Umowa o pracę, A1 — jedna pozycja w słowniku. Spółkę wybierasz przy wpisie u człowieka (jak seniority przy zawodzie).</small>
+                    </div>
+
+                    <x-document-icon-picker />
 
                     <div class="d-flex justify-content-end align-items-center gap-2">
                         <x-ui.button 

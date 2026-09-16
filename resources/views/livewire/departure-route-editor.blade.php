@@ -1,11 +1,23 @@
 <div>
     @if($this->canEdit)
-        <button type="button"
-                class="btn btn-sm btn-outline-info"
+        @if($triggerVariant === 'primary')
+            <x-ui.button
+                variant="primary"
+                type="button"
+                class="btn-sm mt-3"
                 wire:click="openModal"
-                wire:loading.attr="disabled">
-            <i class="bi bi-signpost-split me-1"></i>Edytuj trasę
-        </button>
+                wire:loading.attr="disabled"
+            >
+                <i class="bi bi-signpost-split me-1"></i>{{ $triggerLabel }}
+            </x-ui.button>
+        @else
+            <button type="button"
+                    class="btn btn-sm btn-outline-info"
+                    wire:click="openModal"
+                    wire:loading.attr="disabled">
+                <i class="bi bi-signpost-split me-1"></i>{{ $triggerLabel }}
+            </button>
+        @endif
     @endif
 
     @if($showModal)

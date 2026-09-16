@@ -86,29 +86,12 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Role *</label>
-                        <div class="border rounded p-3 @error('roles') border-danger @enderror">
-                            @foreach ($roles as $role)
-                                <div class="form-check @error('roles') is-invalid @enderror">
-                                    <input 
-                                        type="checkbox" 
-                                        id="role_{{ $role->id }}" 
-                                        name="roles[]" 
-                                        value="{{ $role->id }}"
-                                        {{ in_array($role->id, old('roles', $employee->roles->pluck('id')->toArray())) ? 'checked' : '' }}
-                                        class="@error('roles') is-invalid @enderror"
-                                    />
-                                    <label for="role_{{ $role->id }}">
-                                        {{ $role->name }}
-                                        @if($role->description)
-                                            <small class="text-muted d-block">({{ $role->description }})</small>
-                                        @endif
-                                    </label>
-                                </div>
-                            @endforeach
-                        </div>
-                        @error('roles') <span class="invalid-feedback d-block">{{ $message }}</span> @enderror
-                        <small class="form-text text-muted">Wybierz przynajmniej jedną rolę. Pracownik może mieć wiele ról jednocześnie.</small>
+                        <label class="form-label">Zawody *</label>
+                        <x-employee-role-fields
+                            :roles="$roles"
+                            :selected="$employee->roles->pluck('id')"
+                            :seniority="$employee->roles->mapWithKeys(fn ($role) => [$role->id => $role->pivot->seniority])->all()"
+                        />
                     </div>
 
                     <div class="mb-3">

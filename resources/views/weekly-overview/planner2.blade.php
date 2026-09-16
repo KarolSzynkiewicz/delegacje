@@ -74,6 +74,23 @@
                                         {{ $project->name }}
                                     </a>
                                 </h4>
+                                @php
+                                    $weekSiteLeads = $weekData['site_leads'] ?? collect();
+                                @endphp
+                                @if($weekSiteLeads->isNotEmpty())
+                                    <div class="d-flex flex-column gap-1 mb-3">
+                                        @foreach($weekSiteLeads as $siteLead)
+                                            @if($siteLead->employee)
+                                                <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                    <x-project-site-lead-badge />
+                                                    <a href="{{ route('employees.show', $siteLead->employee) }}" class="small text-decoration-none">
+                                                        {{ $siteLead->employee->full_name }}
+                                                    </a>
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endif
                                 
                                 @if($project->location)
                                     <p class="text-muted small mb-3">

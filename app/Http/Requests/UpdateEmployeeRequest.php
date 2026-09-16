@@ -32,6 +32,8 @@ class UpdateEmployeeRequest extends FormRequest
             'has_komornik' => ['boolean'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['exists:roles,id'],
+            'role_seniority' => ['nullable', 'array'],
+            'role_seniority.*' => ['nullable', 'integer', 'in:1,2,3,4'],
             'notes' => ['nullable', 'string'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
         ];
@@ -41,6 +43,9 @@ class UpdateEmployeeRequest extends FormRequest
     {
         $this->merge([
             'has_komornik' => $this->boolean('has_komornik'),
+            'role_seniority' => collect($this->input('role_seniority', []))
+                ->map(fn ($value) => $value === '' || $value === null ? null : (int) $value)
+                ->all(),
         ]);
     }
 

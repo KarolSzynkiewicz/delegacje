@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Project extends Model
 {
@@ -120,11 +121,60 @@ class Project extends Model
     }
 
     /**
+     * Field / site leads (employees) for this project, with date ranges.
+     * Distinct from managers() — those are system users with /mine access.
+     */
+    public function siteLeads(): HasMany
+    {
+        return $this->hasMany(ProjectSiteLead::class)->orderByDesc('start_date');
+    }
+
+    /**
+     * The employee currently leading the crew on site (today).
+     */
+    public function currentSiteLead(): HasOne
+    {
+        $today = now()->toDateString();
+
+        return $this->hasOne(ProjectSiteLead::class)->ofMany(
+            ['start_date' => 'max'],
+            function ($query) use ($today) {
+                $query->whereDate('start_date', '<=', $today)
+                    ->where(function ($inner) use ($today) {
+                        $inner->whereNull('end_date')
+                            ->orWhereDate('end_date', '>=', $today);
+                    });
+            }
+        );
+    }
+
+    /**
      * Scope a query to only include active projects.
      */
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');
+    }
+
+    /**
+     * Unique, unterminated employees whose assignment overlaps the date range.
+     *
+     * @return \Illuminate\Support\Collection<int, Employee>
+     */
+    public function employeesAssignedInDateRange($startDate, $endDate): \Illuminate\Support\Collection
+    {
+        return $this->assignments()
+            ->overlappingWith($startDate, $endDate)
+            ->with('employee')
+            ->get()
+            ->pluck('employee')
+            ->filter(fn ($employee) => $employee && $employee->terminated_at === null)
+            ->unique('id')
+            ->sortBy([
+                ['last_name', 'asc'],
+                ['first_name', 'asc'],
+            ])
+            ->values();
     }
 
     /**

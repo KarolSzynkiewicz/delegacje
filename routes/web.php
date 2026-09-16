@@ -217,6 +217,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         // Projects + nested demands + assignments
         Route::resource('projects', ProjectController::class);
 
+        Route::group(['defaults' => ['resource' => 'projects']], function () {
+            Route::resource('projects.site-leads', \App\Http\Controllers\ProjectSiteLeadController::class)
+                ->except(['index', 'show'])
+                ->parameters(['site-leads' => 'siteLead']);
+        });
+
         // Project tabs - usunięte, teraz przez Livewire ProjectTabs z query string
 
         // Project files

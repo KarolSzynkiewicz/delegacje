@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\EmployeeLifecycleEventType;
 use App\Enums\EmployeeTerminationReason;
+use App\Enums\RoleSeniority;
 use App\Traits\HasComments;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -105,7 +106,27 @@ class Employee extends Model
      */
     public function roles(): BelongsToMany
     {
-        return $this->belongsToMany(Role::class, 'employee_role')->withTimestamps();
+        return $this->belongsToMany(Role::class, 'employee_role')
+            ->withPivot('seniority')
+            ->withTimestamps();
+    }
+
+    public function seniorityChanges(): HasMany
+    {
+        return $this->hasMany(EmployeeRoleSeniorityChange::class)->latest('created_at')->latest('id');
+    }
+
+    public function seniorityFor(?int $roleId): ?RoleSeniority
+    {
+        if (! $roleId) {
+            return null;
+        }
+
+        $role = $this->relationLoaded('roles')
+            ? $this->roles->firstWhere('id', $roleId)
+            : $this->roles()->where('roles.id', $roleId)->first();
+
+        return RoleSeniority::fromPivot($role?->pivot?->seniority);
     }
 
     /**
@@ -184,11 +205,72 @@ class Employee extends Model
     }
 
     /**
+     * Periods when this employee was the on-site lead of a project.
+     */
+    public function siteLeads(): HasMany
+    {
+        return $this->hasMany(ProjectSiteLead::class)->orderByDesc('start_date');
+    }
+
+    /**
+     * Currently active on-site lead periods (an employee may lead one project at a time,
+     * but history is per project).
+     */
+    public function currentSiteLeads(): HasMany
+    {
+        return $this->siteLeads()->active();
+    }
+
+    /**
      * Get the currently active company assignment (today's date).
      */
     public function currentCompanyAssignment(): ?CompanyAssignment
     {
         return $this->companyAssignments()->active()->orderByDesc('start_date')->first();
+    }
+
+    /**
+     * Company IDs this employee is assigned to at any point in the date range.
+     *
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    public function companyIdsAssignedInDateRange($startDate, $endDate)
+    {
+        $startDate = \Carbon\Carbon::parse($startDate)->startOfDay();
+        $endDate = \Carbon\Carbon::parse($endDate)->endOfDay();
+
+        if ($this->relationLoaded('companyAssignments')) {
+            return $this->companyAssignments
+                ->filter(function (CompanyAssignment $assignment) use ($startDate, $endDate) {
+                    if ($assignment->start_date->gt($endDate)) {
+                        return false;
+                    }
+
+                    return $assignment->end_date === null || $assignment->end_date->gte($startDate);
+                })
+                ->pluck('company_id')
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+        }
+
+        return $this->companyAssignments()
+            ->overlappingWith($startDate, $endDate)
+            ->pluck('company_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Required dictionary documents that apply to this employee in the date range.
+     * Company-scoped types (umowa, A1) apply only when the employee has a company then.
+     */
+    public function requiredDocumentsInDateRange($startDate, $endDate)
+    {
+        return Document::requiredTypes()->filter(
+            fn (Document $document) => $document->isRequiredForEmployeeDuring($this, $startDate, $endDate)
+        )->values();
     }
 
     /**
@@ -350,6 +432,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeEvaluation::class);
     }
 
+    public function latestEvaluation(): HasOne
+    {
+        return $this->hasOne(EmployeeEvaluation::class)->latestOfMany();
+    }
+
     /**
      * Get all rotations for this employee.
      */
@@ -475,15 +562,21 @@ class Employee extends Model
     /**
      * Czy pracownik ma co najmniej jeden wpis danego typu dokumentu, którego okres ważności
      * nachodzi na podany zakres dat (przecięcie przedziałów; nie musi pokrywać całego zakresu).
+     * Dla typów na spółkę podaj $companyId — wtedy liczy się tylko wpis z tą spółką.
      */
-    public function hasDocumentTypeActiveInDateRange(int $documentTypeId, $startDate, $endDate): bool
+    public function hasDocumentTypeActiveInDateRange(int $documentTypeId, $startDate, $endDate, ?int $companyId = null): bool
     {
         $startDate = \App\Services\DateRangeService::normalizeDate($startDate);
         $endDate = \App\Services\DateRangeService::normalizeDate($endDate);
 
         if ($this->relationLoaded('employeeDocuments')) {
-            return $this->employeeDocuments
-                ->where('document_id', $documentTypeId)
+            $docs = $this->employeeDocuments->where('document_id', $documentTypeId);
+
+            if ($companyId !== null) {
+                $docs = $docs->where('company_id', $companyId);
+            }
+
+            return $docs
                 ->filter(function ($doc) use ($startDate, $endDate) {
                     if ($doc->kind === 'bezokresowy') {
                         return $doc->valid_from && $doc->valid_from->lte($endDate);
@@ -497,8 +590,14 @@ class Employee extends Model
                 ->isNotEmpty();
         }
 
-        return $this->employeeDocuments()
-            ->where('document_id', $documentTypeId)
+        $query = $this->employeeDocuments()
+            ->where('document_id', $documentTypeId);
+
+        if ($companyId !== null) {
+            $query->where('company_id', $companyId);
+        }
+
+        return $query
             ->where(function ($q) use ($startDate, $endDate) {
                 $q->where(function ($q2) use ($endDate) {
                     $q2->where('kind', 'bezokresowy')
@@ -516,28 +615,37 @@ class Employee extends Model
     }
 
     /**
+     * Czy ten typ wymagania jest pokryty w zakresie: dla typów na spółkę — osobno
+     * dla każdej spółki, do której pracownik jest wtedy przypisany.
+     */
+    public function hasDocumentRequirementCovered(Document $document, $startDate, $endDate): bool
+    {
+        if ($document->is_company_scoped) {
+            foreach ($this->companyIdsAssignedInDateRange($startDate, $endDate) as $companyId) {
+                if (! $this->hasDocumentTypeActiveInDateRange($document->id, $startDate, $endDate, (int) $companyId)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return $this->hasDocumentTypeActiveInDateRange($document->id, $startDate, $endDate);
+    }
+
+    /**
      * Check if employee has all required documents active in date range.
      */
     public function hasAllDocumentsActiveInDateRange($startDate, $endDate): bool
     {
-        // Sprawdź czy kolumna is_required istnieje w tabeli documents
-        $hasIsRequiredColumn = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
+        $requiredDocuments = $this->requiredDocumentsInDateRange($startDate, $endDate);
 
-        // Jeśli kolumna nie istnieje, nie ma wymaganych dokumentów - wszystko OK
-        if (! $hasIsRequiredColumn) {
-            return true;
-        }
-
-        // Pobierz tylko wymagane dokumenty (is_required = true)
-        $requiredDocuments = \App\Models\Document::where('is_required', true)->pluck('id');
-
-        // Jeśli nie ma żadnych wymaganych dokumentów, uznajemy że dokumenty są OK
         if ($requiredDocuments->isEmpty()) {
             return true;
         }
 
-        foreach ($requiredDocuments as $documentTypeId) {
-            if (! $this->hasDocumentTypeActiveInDateRange($documentTypeId, $startDate, $endDate)) {
+        foreach ($requiredDocuments as $document) {
+            if (! $this->hasDocumentRequirementCovered($document, $startDate, $endDate)) {
                 return false;
             }
         }
@@ -569,107 +677,96 @@ class Employee extends Model
             $this->load('employeeDocuments.document');
         }
 
-        // Cache statycznych danych na czas trwania requestu (bez N×Schema/Document queries w pętlach)
-        static $hasIsRequiredColumnCache = null;
-        static $requiredDocumentsCache = null;
+        $requiredDocuments = $this->requiredDocumentsInDateRange($startDate, $endDate);
 
-        if ($hasIsRequiredColumnCache === null) {
-            $hasIsRequiredColumnCache = \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required');
-        }
-        $hasIsRequiredColumn = $hasIsRequiredColumnCache;
-
-        if ($requiredDocumentsCache === null) {
-            $requiredDocumentsCache = $hasIsRequiredColumn
-                ? \App\Models\Document::where('is_required', true)->get()
-                : \App\Models\Document::all();
-        }
-        $requiredDocuments = $requiredDocumentsCache;
-
-        // Jeśli nie ma żadnych wymaganych dokumentów, nie sprawdzaj nic
-        if ($hasIsRequiredColumn && $requiredDocuments->isEmpty()) {
-            // Nie ma wymaganych dokumentów - wszystko OK
-        } elseif (! $this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
+        if ($requiredDocuments->isNotEmpty() && ! $this->hasAllDocumentsActiveInDateRange($startDate, $endDate)) {
             $available = false;
 
+            $companyIds = $this->companyIdsAssignedInDateRange($startDate, $endDate);
+            $companiesById = $companyIds->isEmpty()
+                ? collect()
+                : Company::query()->whereIn('id', $companyIds)->get()->keyBy('id');
+
             foreach ($requiredDocuments as $document) {
-                $employeeDoc = $this->employeeDocuments->where('document_id', $document->id)->first();
+                $targets = $document->is_company_scoped
+                    ? $companyIds->map(fn ($id) => ['company_id' => (int) $id, 'company' => $companiesById->get($id)])
+                    : collect([['company_id' => null, 'company' => null]]);
 
-                if (! $employeeDoc) {
-                    $missingDocuments[] = [
-                        'document_id' => $document->id,
-                        'document_name' => $document->name,
-                        'problem' => 'Brak dokumentu',
-                        'kind' => null,
-                        'valid_from' => null,
-                        'valid_to' => null,
-                        'is_required' => $hasIsRequiredColumn ? $document->is_required : true,
-                    ];
+                foreach ($targets as $target) {
+                    $companyId = $target['company_id'];
+                    $label = $document->requirementLabelForCompany($target['company']);
 
-                    continue;
-                }
-
-                // Sprawdź czy dokument jest aktywny w całym zakresie
-                $isValid = false;
-                $problem = '';
-
-                // Przygotuj przedział ważności dokumentu
-                $docValidFrom = $employeeDoc->valid_from ? $employeeDoc->valid_from->format('Y-m-d') : null;
-                $docValidTo = $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null;
-
-                if ($employeeDoc->kind === 'bezokresowy') {
-                    if ($employeeDoc->valid_from > $endDate) {
-                        $isValid = false;
-                        $problem = $docValidTo
-                            ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
-                            : "Dokument ważny od: {$docValidFrom}";
-                    } else {
-                        $isValid = true;
+                    $employeeDocs = $this->employeeDocuments->where('document_id', $document->id);
+                    if ($companyId !== null) {
+                        $employeeDocs = $employeeDocs->where('company_id', $companyId);
                     }
-                } else {
-                    // Dokument okresowy
-                    if ($employeeDoc->valid_from > $startDate) {
-                        $isValid = false;
-                        $problem = $docValidTo
-                            ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
-                            : "Dokument ważny od: {$docValidFrom}";
-                    } elseif ($employeeDoc->valid_to && $employeeDoc->valid_to < $endDate) {
-                        $isValid = false;
-                        $problem = $docValidFrom
-                            ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
-                            : "Dokument ważny do: {$docValidTo}";
+                    $employeeDoc = $employeeDocs->first();
+
+                    if (! $employeeDoc) {
+                        $missingDocuments[] = [
+                            'document_id' => $document->id,
+                            'document_name' => $label,
+                            'problem' => 'Brak dokumentu',
+                            'kind' => null,
+                            'valid_from' => null,
+                            'valid_to' => null,
+                            'is_required' => true,
+                        ];
+
+                        continue;
+                    }
+
+                    // Sprawdź czy dokument jest aktywny w całym zakresie
+                    $isValid = false;
+                    $problem = '';
+
+                    // Przygotuj przedział ważności dokumentu
+                    $docValidFrom = $employeeDoc->valid_from ? $employeeDoc->valid_from->format('Y-m-d') : null;
+                    $docValidTo = $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null;
+
+                    if ($employeeDoc->kind === 'bezokresowy') {
+                        if ($employeeDoc->valid_from > $endDate) {
+                            $isValid = false;
+                            $problem = $docValidTo
+                                ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
+                                : "Dokument ważny od: {$docValidFrom}";
+                        } else {
+                            $isValid = true;
+                        }
                     } else {
-                        $isValid = true;
+                        // Dokument okresowy
+                        if ($employeeDoc->valid_from > $startDate) {
+                            $isValid = false;
+                            $problem = $docValidTo
+                                ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
+                                : "Dokument ważny od: {$docValidFrom}";
+                        } elseif ($employeeDoc->valid_to && $employeeDoc->valid_to < $endDate) {
+                            $isValid = false;
+                            $problem = $docValidFrom
+                                ? "Dokument ważny w przedziale: {$docValidFrom} - {$docValidTo}"
+                                : "Dokument ważny do: {$docValidTo}";
+                        } else {
+                            $isValid = true;
+                        }
+                    }
+
+                    if (! $isValid) {
+                        $missingDocuments[] = [
+                            'document_id' => $document->id,
+                            'document_name' => $label,
+                            'problem' => $problem,
+                            'kind' => $employeeDoc->kind,
+                            'valid_from' => $employeeDoc->valid_from->format('Y-m-d'),
+                            'valid_to' => $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null,
+                            'employee_document_id' => $employeeDoc->id,
+                            'is_required' => true,
+                        ];
                     }
                 }
-
-                if (! $isValid) {
-                    $missingDocuments[] = [
-                        'document_id' => $document->id,
-                        'document_name' => $document->name,
-                        'problem' => $problem,
-                        'kind' => $employeeDoc->kind,
-                        'valid_from' => $employeeDoc->valid_from->format('Y-m-d'),
-                        'valid_to' => $employeeDoc->valid_to ? $employeeDoc->valid_to->format('Y-m-d') : null,
-                        'employee_document_id' => $employeeDoc->id,
-                        'is_required' => $hasIsRequiredColumn ? $document->is_required : true,
-                    ];
-                }
-            }
-
-            // Filtruj tylko wymagane dokumenty jeśli kolumna istnieje
-            if ($hasIsRequiredColumn) {
-                $missingDocuments = array_filter($missingDocuments, function ($doc) {
-                    return isset($doc['is_required']) && $doc['is_required'] === true;
-                });
             }
 
             if (! empty($missingDocuments)) {
-                // Sprawdź czy kolumna is_required istnieje, aby dostosować komunikat
-                if ($hasIsRequiredColumn) {
-                    $reasons[] = 'Brak wszystkich wymaganych dokumentów aktywnych w tym okresie';
-                } else {
-                    $reasons[] = 'Brak wszystkich dokumentów aktywnych w tym okresie';
-                }
+                $reasons[] = 'Brak wszystkich wymaganych dokumentów aktywnych w tym okresie';
             }
         }
 

@@ -2049,6 +2049,49 @@
         </div>
         <hr>
 
+        {{-- weekly-overview assigned row: ocena | uprawnienia + pasek kierownika --}}
+        <div class="mb-4">
+            <h4 class="fw-semibold">Przypisany pracownik — ocena i uprawnienia</h4>
+            <p class="text-muted small">
+                Pod nazwą jeden pasek: ocena <code>|</code> uprawnienia (stack ikon jak uczestnicy wyjazdu).
+                Kierownik: lewy pasek i tag <code>wo-lead-tag</code>, bez osobnej ramki.
+            </p>
+            <table class="table align-middle weekly-overview-assigned-table mb-0">
+                <tbody>
+                    <tr class="wo-assigned-row is-site-lead">
+                        <td>
+                            <div class="wo-emp">
+                                <span class="wo-lead-tag">Kierownik</span>
+                                <x-ui.person :user="(object)['name' => 'Magdalena Jaworski']" :show-email="false" avatar-size="40px" />
+                                <div class="wo-emp-meta">
+                                    <x-ui.rating :score="8.8" />
+                                    <span class="wo-emp-meta__rule" aria-hidden="true"></span>
+                                    <span class="doc-chip-stack">
+                                        <span class="doc-chip" title="Prawo jazdy"><i class="bi bi-car-front"></i></span>
+                                        <span class="doc-chip" title="A1"><i class="bi bi-file-earmark-text"></i></span>
+                                        <span class="doc-chip" title="Umowa"><i class="bi bi-file-earmark-check"></i></span>
+                                    </span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="wo-assigned-row">
+                        <td>
+                            <div class="wo-emp">
+                                <x-ui.person :user="(object)['name' => 'Maria Dudek']" :show-email="false" avatar-size="40px" />
+                                <div class="wo-emp-meta">
+                                    <x-ui.rating :show-empty="true" />
+                                    <span class="wo-emp-meta__rule" aria-hidden="true"></span>
+                                    <x-planner-document-icons :show-empty="true" stacked />
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <hr>
+
         {{-- x-ui.progress --}}
         <div class="mb-4">
             <h4 class="fw-semibold">x-ui.progress</h4>

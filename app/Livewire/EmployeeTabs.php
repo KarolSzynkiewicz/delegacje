@@ -3,9 +3,11 @@
 namespace App\Livewire;
 
 use App\Enums\EmployeeTerminationReason;
+use App\Enums\RoleSeniority;
 use App\Models\Employee;
 use App\Models\EquipmentIssue;
 use App\Services\EmployeeLifecycleService;
+use App\Services\EmployeeRoleSeniorityService;
 use Livewire\Component;
 
 class EmployeeTabs extends Component
@@ -22,11 +24,18 @@ class EmployeeTabs extends Component
 
     public string $terminationNote = '';
 
+    /** @var array<int, string> */
+    public array $seniorityLevels = [];
+
+    /** @var array<int, string> */
+    public array $seniorityComments = [];
+
     protected $queryString = ['activeTab' => ['except' => 'info', 'as' => 'tab']];
 
     public function mount(Employee $employee)
     {
         $this->employee = $employee;
+        $this->hydrateSeniorityDrafts();
         $this->buildAvailableTabs();
         $this->validateActiveTab();
     }
@@ -85,6 +94,46 @@ class EmployeeTabs extends Component
         session()->flash('success', 'Zwolnienie zostało cofnięte.');
     }
 
+    public function saveSeniority(int $roleId): void
+    {
+        if (! auth()->user()->hasPermission('employees.update')) {
+            return;
+        }
+
+        $raw = $this->seniorityLevels[$roleId] ?? '';
+        $level = ($raw === '' || $raw === null) ? null : (int) $raw;
+        $comment = $this->seniorityComments[$roleId] ?? null;
+
+        $this->validate([
+            "seniorityComments.{$roleId}" => ['nullable', 'string', 'max:255'],
+        ]);
+
+        app(EmployeeRoleSeniorityService::class)->setLevel(
+            $this->employee,
+            $roleId,
+            $level,
+            is_string($comment) && $comment !== '' ? $comment : null,
+            auth()->user()
+        );
+
+        $this->employee = $this->employee->fresh();
+        $this->hydrateSeniorityDrafts();
+        $this->seniorityComments[$roleId] = '';
+
+        session()->flash('success', 'Zapisano poziom seniority.');
+    }
+
+    protected function hydrateSeniorityDrafts(): void
+    {
+        $this->employee->load('roles');
+        $this->seniorityLevels = [];
+        foreach ($this->employee->roles as $role) {
+            $level = RoleSeniority::fromPivot($role->pivot->seniority);
+            $this->seniorityLevels[$role->id] = $level ? (string) $level->value : '';
+            $this->seniorityComments[$role->id] ??= '';
+        }
+    }
+
     protected function buildAvailableTabs()
     {
         // Definicja wszystkich możliwych tabów z przypisanym permission i ikonami
@@ -133,7 +182,7 @@ class EmployeeTabs extends Component
     {
         // Filtracja przez relacje hasMany - bez osobnych route
         return match ($this->activeTab) {
-            'documents' => $this->employee->employeeDocuments()->with('document')->get(),
+            'documents' => $this->employee->employeeDocuments()->with(['document', 'company'])->get(),
             'payrolls' => $this->employee->payrolls()->orderBy('period_start', 'desc')->get(),
             'employee-rates' => \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->orderBy('start_date', 'desc')->get(),
             'bank' => $this->employee->bankAccounts()->orderBy('start_date', 'desc')->get(),
@@ -167,7 +216,16 @@ class EmployeeTabs extends Component
             ]),
         ]);
 
-        $this->employee->load(['roles', 'lifecycleEvents.recruitmentProcess', 'candidate.processes']);
+        $this->employee->load([
+            'roles',
+            'lifecycleEvents.recruitmentProcess',
+            'candidate.processes',
+            'currentSiteLeads.project',
+            'seniorityChanges.role',
+            'seniorityChanges.changedBy',
+            'employeeDocuments.document',
+            'employeeDocuments.company',
+        ]);
 
         // Load employee rates count manually
         $employeeRatesCount = \App\Models\EmployeeRate::where('employee_id', $this->employee->id)->count();

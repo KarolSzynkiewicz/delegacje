@@ -44,9 +44,9 @@
                         </div>
                         <div class="modal-body">
                             @if($pendingTransportMode === 'public')
-                                <p class="mb-0">Przejście na transport publiczny wyzeruje: wybór pojazdu wyjazdu, miejsca w aucie, przypisania pojazdów w kroku 3 (dojazdy) oraz dane trasy z kroku 4.</p>
+                                <p class="mb-0">Przejście na transport publiczny wyzeruje: wybór pojazdu wyjazdu, miejsca w aucie oraz przypisania pojazdów w kroku 3 (dojazdy).</p>
                             @else
-                                <p class="mb-0">Przejście na transport własny wyzeruje: bilety lotnicze, lotniska, konfigurację transferu oraz dane trasy z kroku 4.</p>
+                                <p class="mb-0">Przejście na transport własny wyzeruje: bilety lotnicze, lotniska oraz konfigurację transferu.</p>
                             @endif
                             <p class="fw-semibold mt-3 mb-0">Kontynuować?</p>
                         </div>
@@ -73,7 +73,7 @@
                             <button type="button" class="btn-close btn-close-white" wire:click="cancelDateChange" aria-label="Zamknij"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="mb-0">Zmiana daty wyjazdu lub zakończenia unieważnia dotychczasowe przypisania: inne dostępności mieszkań, inne okna przypisań do projektów i przeliczenia zapotrzebowań. Zostaną wyzerowane m.in. przypisania w krokach 1–3, bilety, konfiguracja transferu oraz dane trasy z kroku 4.</p>
+                            <p class="mb-0">Zmiana daty wyjazdu lub zakończenia unieważnia dotychczasowe przypisania: inne dostępności mieszkań, inne okna przypisań do projektów i przeliczenia zapotrzebowań. Zostaną wyzerowane m.in. przypisania w krokach 1–3, bilety oraz konfiguracja transferu.</p>
                             <p class="fw-semibold mt-3 mb-0">Kontynuować?</p>
                             @error('departureDate')
                                 <div class="text-danger small mt-2 mb-0">{{ $message }}</div>
@@ -92,7 +92,7 @@
         @endteleport
     @endif
 
-    @if($currentStep === 4 && $errors->any())
+    @if($errors->any())
         <x-ui.alert variant="danger" title="Nie można zapisać wyjazdu" dismissible class="mb-4">
             <div class="fw-semibold mb-2">Popraw poniższe błędy i spróbuj ponownie:</div>
             <ul class="mb-0 ps-3">
@@ -155,11 +155,6 @@
                 'wireClick' => 'goToStep(3)',
                 'warning' => $this->step3TabIncomplete,
             ],
-            4 => [
-                'label' => 'Krok 4: Planowanie trasy',
-                'wireClick' => 'goToStep(4)',
-                'warning' => $this->step4TabIncomplete,
-            ],
         ];
     @endphp
     <x-ui.tabs 
@@ -167,49 +162,6 @@
         :activeTab="$currentStep"
         id="departureStepsTabs"
     />
-
-    @if($currentStep === 4 && ($this->step2TabIncomplete || $this->step3TabIncomplete))
-        @php
-            $prevStepsBadge = $this->step2TabIncomplete && $this->step3TabIncomplete
-                ? 'Uzupełnij mieszkania i pojazdy dojazdu'
-                : ($this->step2TabIncomplete
-                    ? 'Uzupełnij przypisania do mieszkań'
-                    : 'Uzupełnij pojazdy dojazdowe');
-        @endphp
-        <div class="mb-4 rounded-3 px-2 py-2 px-md-3 transition-all"
-             style="border: 1px solid rgba(239,68,68,0.55) !important; background: rgba(239,68,68,0.07); box-shadow: 0 0 0 1px rgba(239,68,68,0.12);">
-            <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-                <i class="bi bi-house-exclamation text-danger" style="font-size:0.9rem;"></i>
-                <span class="small fw-semibold text-danger">Wcześniejsze kroki</span>
-                <span class="badge rounded-pill" style="font-size: 0.65rem; background: rgba(239,68,68,0.2); color: #fecaca; border: 1px solid rgba(239,68,68,0.4);">
-                    {{ $prevStepsBadge }}
-                </span>
-            </div>
-            <p class="small text-muted mb-2 mb-0" style="font-size: 0.8rem;">
-                @if($this->step2TabIncomplete)
-                    <span class="text-danger fw-semibold">Krok 2:</span> część osób nie ma przypisanego mieszkania.
-                @endif
-                @if($this->step2TabIncomplete && $this->step3TabIncomplete)
-                    <span class="text-muted"> · </span>
-                @endif
-                @if($this->step3TabIncomplete)
-                    <span class="text-danger fw-semibold">Krok 3:</span> część osób nie ma przypisanego pojazdu dojazdowego.
-                @endif
-            </p>
-            <div class="d-flex flex-wrap gap-2 mt-2">
-                @if($this->step2TabIncomplete)
-                    <button type="button" class="btn btn-sm btn-outline-light border-opacity-25" wire:click="goToStep(2)">
-                        <i class="bi bi-arrow-left-circle me-1"></i>Otwórz krok 2
-                    </button>
-                @endif
-                @if($this->step3TabIncomplete)
-                    <button type="button" class="btn btn-sm btn-outline-light border-opacity-25" wire:click="goToStep(3)">
-                        <i class="bi bi-arrow-left-circle me-1"></i>Otwórz krok 3
-                    </button>
-                @endif
-            </div>
-        </div>
-    @endif
 
     <!-- Step Content -->
     @if($currentStep === 1)
@@ -241,30 +193,6 @@
             :accommodation-assignments="$accommodationAssignments"
             :vehicle-assignments="$vehicleAssignments"
             key="step3-{{ $departureDate }}-{{ $vehicleId }}-{{ md5(json_encode($assignments)) }}-{{ md5(json_encode($assignmentRanges)) }}-{{ md5(json_encode($vehicleAssignments)) }}"
-        />
-    @elseif($currentStep === 4)
-        <livewire:steps.step4-route-planning
-            :departure-date="$departureDate"
-            :end-date="$endDate"
-            :transport-mode="$transportMode"
-            :vehicle-id="$vehicleId"
-            :accommodation-assignments="$accommodationAssignments"
-            :assignment-ranges="$assignmentRanges"
-            :vehicle-assignments="$vehicleAssignments"
-            :vehicle-seats="$vehicleSeats"
-            :shared-start-airport-location-id="$sharedStartAirportLocationId"
-            :shared-end-airport-location-id="$sharedEndAirportLocationId"
-            :initial-route-waypoints="data_get($routeData, 'route_waypoints', [])"
-            :initial-location-stop-notes="data_get($routeData, 'location_stop_notes', [])"
-            :initial-route-distance="data_get($routeData, 'route_distance')"
-            :initial-route-duration="data_get($routeData, 'route_duration')"
-            :initial-route-manual="data_get($routeData, 'route_distance_is_manual', false)"
-            :initial-transfer-config="$transferConfig"
-            :initial-route-segments="$routeSegments"
-            :selected-employee-ids="$this->selectedEmployeeIds"
-            :ticket-costs-by-employee="$ticketCostsByEmployee"
-            {{-- Nie wpinaj transferConfig do key: sync trasy (waypoints) aktualizuje go w rodzicu i remount zamykałby modal kroku 4. --}}
-            key="step4-{{ $departureDate }}-{{ $endDate }}-{{ $vehicleId }}-{{ $transportMode }}-{{ md5(json_encode($accommodationAssignments)) }}"
         />
     @endif
 </div>

@@ -21,6 +21,7 @@
                                         <th class="text-start small fw-bold">Rola</th>
                                         <th class="text-center small fw-bold">Potrzebnych</th>
                                         <th class="text-center small fw-bold">Przypisanych</th>
+                                        <th class="text-start small fw-bold">Skład</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -42,6 +43,11 @@
                                             <td class="text-center small fw-semibold text-primary">
                                                 {{ $assignedMax }}
                                             </td>
+                                            <td>
+                                                @if(!empty($roleDetail['seniority_mix']))
+                                                    <x-seniority-mix :mix="$roleDetail['seniority_mix']" />
+                                                @endif
+                                            </td>
                                         </tr>
                                     @endforeach
                                     <tr class="fw-bold">
@@ -50,6 +56,7 @@
                                         <td class="text-center small">
                                             {{ $weekData['requirements_summary']['total_assigned_max'] ?? 0 }}
                                         </td>
+                                        <td></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -100,19 +107,30 @@
                                         @foreach($weekData['assigned_employees'] as $employeeData)
                                             <tr>
                                                 <td>
-                                                    <x-employee-cell :employee="$employeeData['employee']"  />
+                                                    <div class="d-flex align-items-start gap-2 flex-wrap">
+                                                        <x-employee-cell :employee="$employeeData['employee']"  />
+                                                        @if($employeeData['is_site_lead'] ?? false)
+                                                            <x-project-site-lead-badge class="mt-1" />
+                                                        @endif
+                                                        <x-planner-document-icons :documents="$employeeData['planner_documents'] ?? []" />
+                                                    </div>
                                                 </td>
                                                 <td>
                                                     @if(isset($employeeData['role_stable']) && !$employeeData['role_stable'])
                                                         <x-ui.badge variant="warning" title="Rola zmienia się w trakcie tygodnia">
                                                             <i class="bi bi-arrow-left-right"></i> Zmienna
                                                         </x-ui.badge>
-                                                    @elseif(isset($employeeData['assignment']))
-                                                        <a href="{{ route('project-assignments.show', $employeeData['assignment']) }}" class="text-decoration-none">
-                                                            <x-ui.badge variant="accent">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
-                                                        </a>
-                                                    @else
-                                                        <x-ui.badge variant="info">{{ $employeeData['role']->name ?? '-' }}</x-ui.badge>
+                                                    @elseif(($employeeData['role'] ?? null) && isset($employeeData['assignment']))
+                                                        <x-role-seniority-badge
+                                                            :role="$employeeData['role']"
+                                                            :seniority="$employeeData['seniority'] ?? null"
+                                                            :href="route('project-assignments.show', $employeeData['assignment'])"
+                                                        />
+                                                    @elseif($employeeData['role'] ?? null)
+                                                        <x-role-seniority-badge
+                                                            :role="$employeeData['role']"
+                                                            :seniority="$employeeData['seniority'] ?? null"
+                                                        />
                                                     @endif
                                                 </td>
                                                 @php
