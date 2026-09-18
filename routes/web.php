@@ -275,6 +275,8 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
                 ->name('tasks.home');
             Route::post('tasks/default-view', [\App\Http\Controllers\TaskController::class, 'setDefaultView'])
                 ->name('tasks.default-view');
+            Route::get('plan', [\App\Http\Controllers\PlanController::class, 'index'])
+                ->name('work-items.plan');
             Route::get('tasks2', [\App\Http\Controllers\TaskController::class, 'grid'])
                 ->name('tasks.grid');
             Route::get('tasks/grid', [\App\Http\Controllers\TaskController::class, 'grid'])

@@ -655,6 +655,7 @@ class TasksGrid extends Component
             'created_by' => ['label' => 'Utworzono przez', 'sortable' => false],
             'priority' => ['label' => 'Priorytet', 'sortable' => true],
             'due_date' => ['label' => 'Termin', 'sortable' => true],
+            'blocks' => ['label' => 'Bloki', 'sortable' => false],
             'subtasks' => ['label' => 'Podzadania', 'sortable' => false],
             'comments' => ['label' => 'Komentarze', 'sortable' => false],
             'created_at' => ['label' => 'Utworzono', 'sortable' => true],
@@ -4327,6 +4328,7 @@ class TasksGrid extends Component
                 'assignedTo',
                 'createdBy',
                 'sprint',
+                'timeBlocks',
                 'source' => function (MorphTo $morphTo) use ($subtaskCounts) {
                     $morphTo->morphWith([
                         ProjectTask::class => ['procedureRun.subject', 'recruitmentProcess', 'subject'],

@@ -411,6 +411,22 @@
     </td>
     @break
 
+    {{-- ── Time blocks ── --}}
+    @case('blocks')
+    <td style="min-width:110px">
+        @php $pills = $isWorkItem ? $task->schedulePills() : []; @endphp
+        @if($pills !== [])
+            <div class="d-flex flex-column gap-1">
+                @foreach($pills as $pill)
+                    <span class="font-mono" style="font-size:.72rem;color:var(--text-muted)">{{ $pill }}</span>
+                @endforeach
+            </div>
+        @else
+            <span class="tg-mono" style="font-size:.78rem;color:rgba(255,255,255,.25)">brak</span>
+        @endif
+    </td>
+    @break
+
     {{-- ── Subtasks progress ── --}}
     @case('subtasks')
     <td style="min-width:80px">

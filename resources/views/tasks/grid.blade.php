@@ -2,6 +2,9 @@
     <x-slot name="header">
         <x-ui.page-header title="Backlog">
             <x-slot name="right">
+                <a href="{{ route('work-items.plan') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-calendar2-week me-1"></i>Plan
+                </a>
                 <a href="{{ route('sprints.index') }}" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-calendar3 me-1"></i>Sprinty
                 </a>

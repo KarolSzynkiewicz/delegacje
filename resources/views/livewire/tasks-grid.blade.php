@@ -1500,7 +1500,7 @@
                     @endif
 
                     {{-- Empty cells for read-only columns --}}
-                    @foreach(['subtasks','comments','created_by','created_at','updated_at'] as $_ec)
+                    @foreach(['blocks','subtasks','comments','created_by','created_at','updated_at'] as $_ec)
                         @if(in_array($_ec, $visibleColumns))<td></td>@endif
                     @endforeach
                 </tr>

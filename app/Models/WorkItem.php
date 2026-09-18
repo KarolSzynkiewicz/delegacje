@@ -12,6 +12,7 @@ use App\WorkItems\StatusWidget;
 use App\WorkItems\WorkItemCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 
@@ -61,6 +62,39 @@ class WorkItem extends Model
     public function sprint(): BelongsTo
     {
         return $this->belongsTo(Sprint::class);
+    }
+
+    public function timeBlocks(): HasMany
+    {
+        return $this->hasMany(WorkItemTimeBlock::class);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function schedulePills(): array
+    {
+        if ($this->type === WorkItemType::Meeting) {
+            $source = $this->source;
+            if ($source instanceof ProjectTask && $source->starts_at) {
+                $label = $source->starts_at->format('d.m H:i');
+                if ($source->ends_at) {
+                    $label .= '–'.$source->ends_at->format('H:i');
+                }
+
+                return [$label];
+            }
+        }
+
+        if (! $this->relationLoaded('timeBlocks')) {
+            return [];
+        }
+
+        return $this->timeBlocks
+            ->sortBy('starts_at')
+            ->values()
+            ->map(fn (WorkItemTimeBlock $block) => $block->label())
+            ->all();
     }
 
     public function handler(): HandlesWorkItem

@@ -25,6 +25,13 @@ return [
         'label' => 'Zadania',
     ],
 
+    'plan' => [
+        'route' => 'work-items.plan',
+        'icon' => 'bi bi-calendar2-week',
+        'label' => 'Plan',
+        'permission' => 'tasks.view',
+    ],
+
     'sprints' => [
         'route' => 'sprints.index',
         'icon' => 'bi bi-calendar3',

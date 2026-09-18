@@ -404,6 +404,20 @@
         </div>
     @endif
 
+    @if(in_array('blocks', $visibleColumns))
+        <div class="dt-card__row">
+            <span class="dt-card__label">Bloki</span>
+            <span class="dt-card__value">
+                @php $pills = $isWorkItem ? $task->schedulePills() : []; @endphp
+                @if($pills !== [])
+                    <span class="font-mono" style="font-size:.78rem">{{ implode(' · ', $pills) }}</span>
+                @else
+                    <span class="text-muted">brak</span>
+                @endif
+            </span>
+        </div>
+    @endif
+
     @if(in_array('subtasks', $visibleColumns))
         <div class="dt-card__row">
             <span class="dt-card__label">Podzadania</span>

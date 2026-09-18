@@ -106,6 +106,11 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\TimeLog::class, 'employee_id');
     }
 
+    public function timeBlocks(): HasMany
+    {
+        return $this->hasMany(WorkItemTimeBlock::class);
+    }
+
     /**
      * Check if user is an admin.
      */

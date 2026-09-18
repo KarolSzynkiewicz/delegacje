@@ -4,6 +4,7 @@ return [
     'calendar',
     'weekly_overview',
     'tasks',
+    'plan',
     'procedures',
 
     [
