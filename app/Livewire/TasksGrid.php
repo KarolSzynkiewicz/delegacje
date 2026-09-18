@@ -463,10 +463,26 @@ class TasksGrid extends Component
         return in_array($id, $this->normalizedSelectedIds(), true);
     }
 
+    public function rowSelectable(object $record): bool
+    {
+        if (! $this->isPlanQueue()) {
+            return true;
+        }
+
+        return ! ($record instanceof WorkItem && $record->isMeetingItem());
+    }
+
     public function toggleSelected(int $id): void
     {
         if ($id < 1) {
             return;
+        }
+
+        if ($this->isPlanQueue()) {
+            $item = WorkItem::query()->find($id);
+            if (! $item || $item->isMeetingItem()) {
+                return;
+            }
         }
 
         $ids = $this->normalizedSelectedIds();
@@ -4797,9 +4813,15 @@ class TasksGrid extends Component
 
         $this->rememberWorkItemList($tasks, $groupedTasks);
         $this->hydrateExpandedSubtasks($tasks, $groupedTasks);
-        $this->listedIds = $groupedTasks instanceof Collection
-            ? $groupedTasks->flatten(1)->pluck('id')->map(fn ($id) => (int) $id)->all()
-            : ($tasks?->pluck('id')->map(fn ($id) => (int) $id)->all() ?? []);
+        $listedRecords = $groupedTasks instanceof Collection
+            ? $groupedTasks->flatten(1)
+            : collect($tasks instanceof Collection ? $tasks : ($tasks?->items() ?? []));
+        $this->listedIds = $listedRecords
+            ->filter(fn ($record) => $this->rowSelectable($record))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
 
         $needsSprintOptions = $this->showAddRow
             || $this->editingField === 'sprint'

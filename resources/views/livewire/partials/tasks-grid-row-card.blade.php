@@ -94,9 +94,11 @@
                     <i class="bi bi-chevron-right" style="font-size:0.75rem"></i>
                 </button>
             @endif
-            <span class="tg-dt-hit" @pointerdown.stop>
-                @include('livewire.partials.tasks-grid-select')
-            </span>
+            @if($this->rowSelectable($task))
+                <span class="tg-dt-hit" @pointerdown.stop>
+                    @include('livewire.partials.tasks-grid-select')
+                </span>
+            @endif
             @if($canAddSubtask && $subtaskTotal > 0 && (! $this->isPlanQueue() || in_array('subtasks', $visibleColumns, true)))
                 <span class="tg-card-subtask-badge" data-tg-sub-stats="{{ $task->id }}" title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                     {{ $subtaskDone }}/{{ $subtaskTotal }}

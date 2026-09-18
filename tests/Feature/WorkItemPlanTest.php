@@ -294,6 +294,37 @@ class WorkItemPlanTest extends TestCase
             ->assertDontSee('Kartka z kolejki Planu');
     }
 
+    public function test_plan_queue_meetings_have_no_selection_checkbox(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Wymienic rolety w sypialni');
+        $meeting = ProjectTask::query()->create([
+            'name' => 'Spotkanie: urodziny Szymona i Aldony',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $meetingItem = WorkItem::query()
+            ->where('source_type', 'project_task')
+            ->where('source_id', $meeting->id)
+            ->firstOrFail();
+        $this->assertTrue($meetingItem->isMeetingItem());
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class, [
+                'planQueue' => true,
+                'planUserId' => $this->user->id,
+            ])
+            ->assertSee('Wymienic rolety w sypialni')
+            ->assertSee('Spotkanie: urodziny Szymona i Aldony')
+            ->assertSeeHtml('wire:click.stop="toggleSelected('.$item->id.')"')
+            ->assertDontSeeHtml('toggleSelected('.$meetingItem->id.')')
+            ->call('toggleSelected', $meetingItem->id)
+            ->assertSet('selectedIds', [])
+            ->call('toggleSelectVisible')
+            ->assertSet('selectedIds', [$item->id]);
+    }
+
     public function test_opening_a_queue_item_embeds_the_task_card(): void
     {
         $this->actingAs($this->user);
