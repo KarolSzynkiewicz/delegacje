@@ -4,7 +4,6 @@ namespace App\Livewire;
 
 use App\Enums\ProcedureSubjectType;
 use App\Enums\WorkItemTimeBlockKind;
-use App\Enums\WorkItemType;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
 use App\Models\User;
@@ -17,6 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -61,6 +61,14 @@ class WorkItemPlan extends Component
     /** @var array{token: string, message: string, type: string, payload: array<string, mixed>}|null */
     public ?array $undo = null;
 
+    public ?string $openKind = null;
+
+    public ?int $openId = null;
+
+    public ?int $openMemberId = null;
+
+    public int $queueNonce = 0;
+
     public function mount(): void
     {
         $service = app(WorkItemPlanService::class);
@@ -104,13 +112,14 @@ class WorkItemPlan extends Component
             if (! $item || (int) $item->assignee_id !== (int) $user->id) {
                 return;
             }
-            if ($allDay && $item->type === WorkItemType::Meeting) {
+            if ($allDay && $item->isMeetingItem()) {
                 return;
             }
             $service->placeFromQueue($item, $user, $actor, $starts, $allDay);
             if ($this->pinId && (int) $this->pinId === (int) $item->id) {
                 $this->pinId = null;
             }
+            $this->refreshPlanQueue();
 
             return;
         }
@@ -129,6 +138,7 @@ class WorkItemPlan extends Component
             $service->moveBlock($block, $starts, $allDay);
             $block->refresh();
             $this->offerUndo($this->movedMessage($block->starts_at, (bool) $block->all_day), 'restore_block', $snapshot);
+            $this->refreshPlanQueue();
 
             return;
         }
@@ -138,7 +148,7 @@ class WorkItemPlan extends Component
                 return;
             }
             $item = $this->workItem($id);
-            if (! $item || $item->type !== WorkItemType::Meeting) {
+            if (! $item || ! $item->isMeetingItem()) {
                 return;
             }
             $source = $item->source;
@@ -153,6 +163,7 @@ class WorkItemPlan extends Component
                 'restore_meeting',
                 $snapshot,
             );
+            $this->refreshPlanQueue();
         }
     }
 
@@ -181,7 +192,7 @@ class WorkItemPlan extends Component
 
         if ($kind === 'meeting') {
             $item = $this->workItem($id);
-            if (! $item || $item->type !== WorkItemType::Meeting) {
+            if (! $item || ! $item->isMeetingItem()) {
                 return;
             }
             $source = $item->source;
@@ -203,11 +214,59 @@ class WorkItemPlan extends Component
     {
         $block = $this->blockForUser($blockId, $this->calendarUser()->id);
         if (! $block) {
+            $this->closeEvent();
+
             return;
         }
         $snapshot = $this->blockSnapshot($block);
         app(WorkItemPlanService::class)->deleteBlock($block);
+        $this->closeEvent();
         $this->offerUndo('Odplanowano', 'recreate_block', $snapshot);
+        $this->refreshPlanQueue();
+    }
+
+    public function openEvent(string $kind, int $id): void
+    {
+        if ($this->composerOpen) {
+            $this->closeComposer();
+        }
+
+        if (! in_array($kind, ['block', 'meeting', 'item'], true) || $id < 1) {
+            $this->closeEvent();
+
+            return;
+        }
+
+        $this->openKind = $kind;
+        $this->openId = $id;
+        $this->openMemberId = null;
+    }
+
+    public function openSessionMember(int $itemId): void
+    {
+        if ($this->openKind !== 'block' || ! $this->openId || $itemId < 1) {
+            return;
+        }
+
+        $this->openMemberId = $itemId;
+    }
+
+    public function closeSessionMember(): void
+    {
+        $this->openMemberId = null;
+    }
+
+    public function closeEvent(): void
+    {
+        $this->openKind = null;
+        $this->openId = null;
+        $this->openMemberId = null;
+    }
+
+    #[On('task-title-updated')]
+    public function refreshAfterNestedTaskEdit(): void
+    {
+        // Occupancy titles refresh on the next parent render.
     }
 
     public function dismissUndo(): void
@@ -235,6 +294,7 @@ class WorkItemPlan extends Component
                 'ends_at' => $payload['ends_at'],
                 'all_day' => $payload['all_day'],
             ]);
+            $this->refreshPlanQueue();
 
             return;
         }
@@ -253,6 +313,7 @@ class WorkItemPlan extends Component
             if ($payload['kind'] === WorkItemTimeBlockKind::Session->value && $payload['item_ids'] !== []) {
                 $block->items()->sync($payload['item_ids']);
             }
+            $this->refreshPlanQueue();
 
             return;
         }
@@ -268,6 +329,7 @@ class WorkItemPlan extends Component
                 'ends_at' => $payload['ends_at'],
                 'due_date' => $payload['due_date'],
             ]);
+            $this->refreshPlanQueue();
         }
     }
 
@@ -284,6 +346,7 @@ class WorkItemPlan extends Component
         if ($this->pinId && (int) $this->pinId === (int) $item->id) {
             $this->pinId = null;
         }
+        $this->refreshPlanQueue();
     }
 
     public function removeFromSession(int $blockId, int $itemId): void
@@ -294,10 +357,15 @@ class WorkItemPlan extends Component
         }
 
         app(WorkItemPlanService::class)->removeFromSession($block, $itemId);
+        if ($this->openMemberId && (int) $this->openMemberId === $itemId) {
+            $this->openMemberId = null;
+        }
+        $this->refreshPlanQueue();
     }
 
     public function openComposer(string $date, int $startMinutes, int $endMinutes, bool $allDay = false): void
     {
+        $this->closeEvent();
         $this->resetErrorBag();
         $start = min($startMinutes, $endMinutes);
         $end = max($startMinutes, $endMinutes);
@@ -318,6 +386,7 @@ class WorkItemPlan extends Component
 
     public function openUnscheduledMeeting(): void
     {
+        $this->closeEvent();
         $this->resetErrorBag();
         $this->composerDate = '';
         $this->composerStart = 0;
@@ -388,6 +457,7 @@ class WorkItemPlan extends Component
                 ],
             );
             $this->closeComposer();
+            $this->refreshPlanQueue();
 
             return;
         }
@@ -417,6 +487,7 @@ class WorkItemPlan extends Component
         }
 
         $this->closeComposer();
+        $this->refreshPlanQueue();
     }
 
     public function procedureComposerSubjectType(): ?ProcedureSubjectType
@@ -443,10 +514,9 @@ class WorkItemPlan extends Component
         $user = $this->calendarUser();
         $now = now();
         $occupancy = $service->occupancy($user, $weekStart, $now);
-        $queue = $service->queue($user, $now);
-        if ($this->pinId) {
-            $queue = $queue->where('id', $this->pinId)->values();
-        }
+        $pinnedTitle = $this->pinId
+            ? WorkItem::query()->whereKey($this->pinId)->value('title')
+            : null;
 
         return view('livewire.work-item-plan', [
             'calendarUser' => $user,
@@ -455,7 +525,7 @@ class WorkItemPlan extends Component
             'weekLabel' => $weekStart->format('d.m').'–'.$weekStart->addDays(6)->format('d.m.Y'),
             'days' => $service->weekDays($weekStart),
             'hours' => range(WorkItemPlanService::GRID_START_HOUR, WorkItemPlanService::GRID_END_HOUR - 1),
-            'queue' => $queue,
+            'pinnedTitle' => $pinnedTitle,
             'eventsByDay' => $occupancy['timed'],
             'allDayByDay' => $occupancy['allDay'],
             'dueFlags' => $service->dueFlags($user, $weekStart),
@@ -468,6 +538,7 @@ class WorkItemPlan extends Component
             'procedureTemplates' => ProcedureTemplate::query()->orderBy('name')->get(['id', 'name', 'subject_type']),
             'procedureSubjectType' => $this->procedureComposerSubjectType(),
             'procedureSubjectOptions' => $this->procedureComposerSubjectOptions(),
+            'openCard' => $this->resolveOpenCard(),
         ]);
     }
 
@@ -568,6 +639,12 @@ class WorkItemPlan extends Component
         ];
     }
 
+    protected function refreshPlanQueue(): void
+    {
+        $this->queueNonce++;
+        $this->dispatch('plan-queue-refresh')->to(TasksGrid::class);
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -635,6 +712,201 @@ class WorkItemPlan extends Component
         $end = CarbonImmutable::parse($ends)->locale('pl');
 
         return 'Wydarzenie zostało przełożone na '.$start->translatedFormat('j M, H:i').'–'.$end->format('H:i');
+    }
+
+    /**
+     * @return array{
+     *     key: string,
+     *     timeLabel: string,
+     *     typeLabel: string,
+     *     typeIcon: string,
+     *     title: string,
+     *     url: string,
+     *     canUnschedule: bool,
+     *     isSession: bool,
+     *     viewingMember: bool,
+     *     members: list<array{id: int, title: string, url: string, typeLabel: string, typeIcon: string, dueLabel: ?string, dueLate: bool}>,
+     *     task: ?ProjectTask,
+     *     showSubtasks: bool,
+     *     description: string,
+     *     blockId: ?int
+     * }|null
+     */
+    protected function resolveOpenCard(): ?array
+    {
+        if (! $this->openKind || ! $this->openId) {
+            return null;
+        }
+
+        if ($this->openKind === 'meeting') {
+            return $this->resolveOpenMeetingCard($this->openId);
+        }
+
+        if ($this->openKind === 'item') {
+            return $this->resolveOpenQueueItemCard($this->openId);
+        }
+
+        return $this->resolveOpenBlockCard($this->openId);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function resolveOpenQueueItemCard(int $workItemId): ?array
+    {
+        $item = $this->workItem($workItemId);
+        if (! $item || (int) $item->assignee_id !== (int) $this->calendarUser()->id) {
+            return null;
+        }
+
+        $item->loadMissing('source');
+
+        return $this->cardFromWorkItem($item, 'Bez godziny', false, false, false, [], null);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function resolveOpenMeetingCard(int $workItemId): ?array
+    {
+        $item = $this->workItem($workItemId);
+        $source = $item?->source;
+        if (! $item || ! $item->isMeetingItem() || ! $source instanceof ProjectTask) {
+            return null;
+        }
+
+        $userId = (int) $this->calendarUser()->id;
+        $participants = array_map('intval', $source->participant_ids ?? []);
+        if ((int) $item->assignee_id !== $userId && ! in_array($userId, $participants, true)) {
+            return null;
+        }
+
+        $starts = $source->starts_at ? CarbonImmutable::parse($source->starts_at) : null;
+        $ends = $source->ends_at ? CarbonImmutable::parse($source->ends_at) : null;
+        $timeLabel = $starts
+            ? $this->planSlotLabel($starts, $ends ?? $starts->addMinutes(WorkItemPlanService::DEFAULT_MINUTES), false)
+            : 'Bez godziny';
+
+        return $this->cardFromWorkItem($item, $timeLabel, false, false, false, [], null);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function resolveOpenBlockCard(int $blockId): ?array
+    {
+        $block = $this->blockForUser($blockId, $this->calendarUser()->id);
+        if (! $block) {
+            return null;
+        }
+
+        $block->loadMissing(['workItem.source', 'items']);
+        $timeLabel = $this->planSlotLabel(
+            CarbonImmutable::parse($block->starts_at),
+            CarbonImmutable::parse($block->ends_at),
+            (bool) $block->all_day,
+        );
+
+        if ($block->isSession()) {
+            $members = $this->sessionMemberRows($block);
+            $member = $this->openMemberId
+                ? $block->items->firstWhere('id', $this->openMemberId)
+                : null;
+            if ($member instanceof WorkItem) {
+                return $this->cardFromWorkItem($member, $timeLabel, false, true, true, [], $block->id);
+            }
+
+            return [
+                'key' => 'session:'.$block->id,
+                'timeLabel' => $timeLabel,
+                'typeLabel' => WorkItemTimeBlockKind::Session->label(),
+                'typeIcon' => WorkItemTimeBlockKind::Session->icon(),
+                'title' => trim((string) $block->title),
+                'url' => '',
+                'canUnschedule' => true,
+                'isSession' => true,
+                'viewingMember' => false,
+                'members' => $members,
+                'task' => null,
+                'showSubtasks' => false,
+                'description' => '',
+                'blockId' => $block->id,
+            ];
+        }
+
+        $item = $block->workItem;
+        if (! $item) {
+            return null;
+        }
+        $item->loadMissing('source');
+
+        return $this->cardFromWorkItem($item, $timeLabel, true, false, false, [], $block->id);
+    }
+
+    /**
+     * @param  list<array{id: int, title: string, url: string, typeLabel: string, typeIcon: string, dueLabel: ?string, dueLate: bool}>  $members
+     * @return array<string, mixed>
+     */
+    protected function cardFromWorkItem(
+        WorkItem $item,
+        string $timeLabel,
+        bool $canUnschedule,
+        bool $isSession,
+        bool $viewingMember,
+        array $members,
+        ?int $blockId,
+    ): array {
+        $task = $item->editableProjectTask();
+        if ($task) {
+            $task->loadMissing(['assignedTo', 'createdBy', 'sprint', 'attachments.uploader']);
+        }
+
+        return [
+            'key' => ($viewingMember ? 'session-member:' : 'item:').$item->id,
+            'timeLabel' => $timeLabel,
+            'typeLabel' => $item->type->label(),
+            'typeIcon' => $item->type->icon(),
+            'title' => $item->title,
+            'url' => $item->openUrl(),
+            'canUnschedule' => $canUnschedule,
+            'isSession' => $isSession,
+            'viewingMember' => $viewingMember,
+            'members' => $members,
+            'task' => $task,
+            'showSubtasks' => $task && ! $task->isProcedure() && ! $task->isCallback() && ! $task->isMeeting(),
+            'description' => $item->plainDescription(),
+            'blockId' => $blockId,
+        ];
+    }
+
+    /**
+     * @return list<array{id: int, title: string, url: string, typeLabel: string, typeIcon: string, dueLabel: ?string, dueLate: bool}>
+     */
+    protected function sessionMemberRows(WorkItemTimeBlock $block): array
+    {
+        return $block->items
+            ->map(fn (WorkItem $item) => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'url' => $item->openUrl(),
+                'typeLabel' => $item->type->label(),
+                'typeIcon' => $item->type->icon(),
+                'dueLabel' => $item->due_at?->format('d.m'),
+                'dueLate' => (bool) $item->due_at?->isPast(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    protected function planSlotLabel(CarbonImmutable $starts, CarbonImmutable $ends, bool $allDay): string
+    {
+        $day = $starts->locale('pl');
+        $head = Str::ucfirst($day->isoFormat('dd')).' '.$day->format('d.m');
+        if ($allDay) {
+            return $head.' · cały dzień';
+        }
+
+        return $head.' · '.$starts->format('H:i').'–'.$ends->format('H:i');
     }
 
     protected function weekStart(): CarbonImmutable

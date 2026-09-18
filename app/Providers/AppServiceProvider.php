@@ -166,5 +166,6 @@ class AppServiceProvider extends ServiceProvider
 
         Livewire::component('pulse.user-route-visits', UserRouteVisits::class);
         Livewire::component('pulse.user-route-usage', UserRouteUsage::class);
+        Livewire::componentHook(\App\Livewire\Hooks\IgnoreWireToJson::class);
     }
 }

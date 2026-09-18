@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\TaskStatus;
 use App\Enums\WorkItemTimeBlockKind;
 use App\Enums\WorkItemType;
+use App\Livewire\TasksGrid;
 use App\Livewire\WorkItemPlan;
 use App\Models\ApprovalRequest;
 use App\Models\ProcedureTemplate;
@@ -147,6 +148,39 @@ class WorkItemPlanTest extends TestCase
         $this->assertTrue($events->contains(fn ($event) => $event->kind === 'meeting' && $event->title === 'Spotkanie rekrutacyjne'));
     }
 
+    public function test_completed_task_block_is_not_on_the_grid(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Zakończone na kalendarzu');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 08:00:00',
+            'ends_at' => '2026-09-17 08:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        $task = ProjectTask::query()->findOrFail($item->source_id);
+        $task->markCompleted();
+        $item->refresh();
+        $this->assertFalse($item->status->isOpen());
+
+        $service = app(WorkItemPlanService::class);
+        $events = collect($service->occupancy($this->user, $service->weekStart(now()), now())['timed']['2026-09-17'] ?? []);
+        $this->assertFalse($events->contains(fn ($event) => $event->title === 'Zakończone na kalendarzu'));
+    }
+
+    public function test_completed_meeting_is_not_on_the_grid(): void
+    {
+        $this->actingAs($this->user);
+        $task = $this->meeting('Spotkanie rekrutacyjne', '2026-09-17 08:00:00', '2026-09-17 09:00:00');
+        $task->markCompleted();
+
+        $service = app(WorkItemPlanService::class);
+        $events = collect($service->occupancy($this->user, $service->weekStart(now()), now())['timed']['2026-09-17'] ?? []);
+        $this->assertFalse($events->contains(fn ($event) => $event->title === 'Spotkanie rekrutacyjne'));
+    }
+
     public function test_dropping_a_meeting_writes_the_source_slot(): void
     {
         $this->actingAs($this->user);
@@ -162,6 +196,39 @@ class WorkItemPlanTest extends TestCase
         $this->assertSame('2026-09-18 11:00:00', $task->starts_at->format('Y-m-d H:i:s'));
         $this->assertSame('2026-09-18 11:30:00', $task->ends_at->format('Y-m-d H:i:s'));
         $this->assertSame(0, WorkItemTimeBlock::query()->count());
+    }
+
+    public function test_dropping_a_meeting_from_the_queue_remounts_the_left_list_without_it(): void
+    {
+        $this->actingAs($this->user);
+        $task = $this->task('Spotkanie: znika z kolejki');
+        $item = WorkItem::query()->where('source_id', $task->id)->firstOrFail();
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->assertSee('data-plan-drag="queue:'.$item->id.'"', false)
+            ->call('dropOnCell', 'queue', $item->id, '2026-09-18', 11 * 60)
+            ->assertSet('queueNonce', 1)
+            ->assertDontSee('data-plan-drag="queue:'.$item->id.'"', false)
+            ->assertSee('data-plan-drag="meeting:'.$item->id.'"', false);
+    }
+
+    public function test_json_stringify_of_wire_does_not_hit_a_missing_to_json_method(): void
+    {
+        $this->actingAs($this->user);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('toJSON')
+            ->assertHasNoErrors();
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class, [
+                'planQueue' => true,
+                'planUserId' => $this->user->id,
+            ])
+            ->call('toJSON')
+            ->assertHasNoErrors();
     }
 
     public function test_pin_query_shows_only_that_queue_item(): void
@@ -180,6 +247,67 @@ class WorkItemPlanTest extends TestCase
             ->test(WorkItemPlan::class)
             ->assertSee('Spotkanie: tylko to')
             ->assertSee('Inne zadanie z kolejki');
+    }
+
+    public function test_plan_queue_embeds_backlog_cards_with_locked_overlay(): void
+    {
+        $this->actingAs($this->user);
+        $mine = $this->workItem('Kartka z kolejki Planu');
+        $blocked = $this->workItem('Z blokiem dziś — poza kolejką');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $blocked->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 08:00:00',
+            'ends_at' => '2026-09-17 08:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        $other = User::factory()->create(['name' => 'Marek']);
+        ProjectTask::query()->create([
+            'name' => 'Zadanie Marka poza overlay',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $other->id,
+            'created_by' => $other->id,
+        ]);
+
+        $this->get(route('work-items.plan'))
+            ->assertOk()
+            ->assertSeeLivewire(TasksGrid::class)
+            ->assertSee('Kartka z kolejki Planu')
+            ->assertSee('data-plan-queue-grip', false)
+            ->assertSee('data-plan-drag="queue:'.$mine->id.'"', false)
+            ->assertDontSee('Zadanie Marka poza overlay');
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class, [
+                'planQueue' => true,
+                'planUserId' => $this->user->id,
+            ])
+            ->assertSee('Kartka z kolejki Planu')
+            ->assertDontSee('Z blokiem dziś — poza kolejką')
+            ->assertDontSee('Zadanie Marka poza overlay')
+            ->call('clearFilters')
+            ->assertSee('Kartka z kolejki Planu')
+            ->assertDontSee('Z blokiem dziś — poza kolejką')
+            ->assertDontSee('Zadanie Marka poza overlay')
+            ->assertSee('Do przypięcia')
+            ->set('selectedTypes', ['meeting'])
+            ->assertDontSee('Kartka z kolejki Planu');
+    }
+
+    public function test_opening_a_queue_item_embeds_the_task_card(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Otwarte z kolejki');
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'item', $item->id)
+            ->assertHasNoErrors()
+            ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->assertSee('Otwarte z kolejki')
+            ->assertSee('Bez godziny')
+            ->assertDontSeeHtml('wire:click="unschedule');
     }
 
     public function test_unscheduled_meeting_stays_in_the_queue_until_pinned_with_hours(): void
@@ -405,9 +533,31 @@ class WorkItemPlanTest extends TestCase
         $this->assertNotNull($quarter);
         $this->assertNotNull($following);
         $this->assertTrue($quarter->isCompact());
+        $this->assertTrue($quarter->hidesTime());
         $this->assertFalse($following->isCompact());
+        $this->assertTrue($following->hidesTime());
         $this->assertEqualsWithDelta(15 / 1440 * 100, $quarter->heightPercent, 0.05);
         $this->assertLessThanOrEqual($following->topPercent + 0.01, $quarter->topPercent + $quarter->heightPercent);
+    }
+
+    public function test_calendar_event_renders_move_grip_and_resize_corner(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Kafelek z chwytem');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 10:00:00',
+            'ends_at' => '2026-09-17 11:00:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        $this->get(route('work-items.plan'))
+            ->assertOk()
+            ->assertSee('Kafelek z chwytem')
+            ->assertSee('wi-plan__grip', false)
+            ->assertSee('wi-plan__resize', false)
+            ->assertSee('beginOpen', false);
     }
 
     public function test_composer_approval_is_timed_and_can_be_unscheduled(): void
@@ -728,6 +878,117 @@ class WorkItemPlanTest extends TestCase
         $this->assertSame('2026-09-18 16:00:00', $copy->ends_at->format('Y-m-d H:i:s'));
         $this->assertEqualsCanonicalizing([$item->id], $copy->items()->pluck('work_items.id')->all());
         $this->assertEqualsCanonicalizing([$item->id], $session->fresh()->items()->pluck('work_items.id')->all());
+    }
+
+    public function test_opening_a_block_embeds_the_existing_task_card(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('auto - porysowany bok');
+        $block = WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-15 12:45:00',
+            'ends_at' => '2026-09-15 14:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'block', $block->id)
+            ->assertHasNoErrors()
+            ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->assertSeeLivewire(\App\Livewire\TaskSubtasks::class)
+            ->assertSee('Szczegóły')
+            ->assertSee('auto - porysowany bok')
+            ->assertSee('12:45–14:30')
+            ->assertSee('Odplanuj')
+            ->assertSee('Dziennik operacyjny')
+            ->assertSee('Podgląd z Planera')
+            ->assertDontSee('Poprzednie')
+            ->assertDontSee('Otwórz kartę')
+            ->call('closeEvent')
+            ->assertDontSeeLivewire(\App\Livewire\TaskShowQuickEdit::class);
+    }
+
+    public function test_opening_a_meeting_embeds_the_task_card_without_unschedule(): void
+    {
+        $this->actingAs($this->user);
+        $task = $this->meeting('Spotkanie rekrutacyjne', '2026-09-17 08:00:00', '2026-09-17 09:00:00');
+        $item = WorkItem::query()->where('source_type', 'project_task')->where('source_id', $task->id)->firstOrFail();
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'meeting', $item->id)
+            ->assertHasNoErrors()
+            ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->assertDontSeeLivewire(\App\Livewire\TaskSubtasks::class)
+            ->assertSee('Spotkanie')
+            ->assertDontSeeHtml('wire:click="unschedule');
+    }
+
+    public function test_opening_a_session_lists_members_then_opens_their_card(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('Dzwonienie', '2026-09-17 10:00:00', '2026-09-17 12:00:00');
+        $item = $this->workItem('Oddzwonić do Igi');
+        $session->items()->attach($item->id);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'block', $session->id)
+            ->assertHasNoErrors()
+            ->assertDontSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->assertSee('Oddzwonić do Igi')
+            ->assertSee('Sesja')
+            ->call('openSessionMember', $item->id)
+            ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->assertSee('Szczegóły')
+            ->assertSee('← Sesja');
+    }
+
+    public function test_unschedule_closes_the_plan_card_dialog(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Zdejmij z dialogu');
+        $block = WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 10:00:00',
+            'ends_at' => '2026-09-17 10:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'block', $block->id)
+            ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->call('unschedule', $block->id)
+            ->assertDontSeeLivewire(\App\Livewire\TaskShowQuickEdit::class);
+
+        $this->assertDatabaseMissing('work_item_time_blocks', ['id' => $block->id]);
+    }
+
+    public function test_opening_an_approval_block_falls_back_without_the_task_card(): void
+    {
+        $this->actingAs($this->user);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openComposer', '2026-09-18', 13 * 60, 15 * 60, false)
+            ->set('composerTitle', 'Faktura do podpisu')
+            ->set('composerType', 'approval')
+            ->call('submitComposer')
+            ->assertHasNoErrors();
+
+        $item = WorkItem::query()->where('type', WorkItemType::Approval)->where('title', 'Faktura do podpisu')->firstOrFail();
+        $block = WorkItemTimeBlock::query()->where('work_item_id', $item->id)->firstOrFail();
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'block', $block->id)
+            ->assertDontSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->assertSee('Faktura do podpisu')
+            ->assertSee('Otwórz kartę');
     }
 
     private function planSession(string $title, string $starts, string $ends): WorkItemTimeBlock

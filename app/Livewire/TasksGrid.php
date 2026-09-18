@@ -27,6 +27,7 @@ use App\Services\Llm\TasksFilterSummaryService;
 use App\Services\ProcedureRunService;
 use App\Services\TaskCreationService;
 use App\Services\UserMentionService;
+use App\Services\WorkItemPlanService;
 use App\Support\EdiTaskEdit;
 use App\Support\Export\TaskExport;
 use App\Support\TasksGridUrlParams;
@@ -154,6 +155,13 @@ class TasksGrid extends Component
     /** Gdy ustawione, siatka pokazuje tylko zadania tego sprintu (np. na stronie sprintu). */
     public ?int $lockedSprintId = null;
 
+    /** Kolejka Planu: karty backlogu z niewyłączalnym overlay (osoba kalendarza + bez slotu ≥ dziś). */
+    public bool $planQueue = false;
+
+    public ?int $planUserId = null;
+
+    public ?int $planPinId = null;
+
     // Expanded rows (task IDs)
     public array $expandedTasks = [];
 
@@ -269,7 +277,7 @@ class TasksGrid extends Component
 
     protected function queryString(): array
     {
-        if ($this->isLockedToSprint()) {
+        if ($this->isLockedToSprint() || $this->isPlanQueue()) {
             return [];
         }
 
@@ -319,6 +327,20 @@ class TasksGrid extends Component
 
     public function mount(): void
     {
+        if ($this->isPlanQueue()) {
+            $this->layout = 'cards';
+            $this->sortField = 'due_date';
+            $this->sortDirection = 'asc';
+            $this->groupBy = '';
+            $this->view = '';
+            $this->activeViewId = null;
+            $this->visibleColumns = ['name'];
+            $this->enforcePlanLocks();
+            $this->hideGroupedColumn();
+
+            return;
+        }
+
         $cookieLayout = request()->cookie('tg_layout');
         if ($cookieLayout === 'cards' || $cookieLayout === 'table') {
             $this->layout = $cookieLayout;
@@ -353,6 +375,13 @@ class TasksGrid extends Component
 
     public function setLayout(string $layout): void
     {
+        if ($this->isPlanQueue()) {
+            $this->layout = 'cards';
+            $this->skipRender();
+
+            return;
+        }
+
         if ($layout !== 'table' && $layout !== 'cards') {
             $this->skipRender();
 
@@ -382,6 +411,37 @@ class TasksGrid extends Component
     public function isLockedToSprint(): bool
     {
         return (int) $this->lockedSprintId > 0;
+    }
+
+    public function isPlanQueue(): bool
+    {
+        return $this->planQueue && (int) $this->planUserId > 0;
+    }
+
+    #[On('plan-queue-refresh')]
+    public function refreshPlanQueueListing(): void
+    {
+        if (! $this->isPlanQueue()) {
+            return;
+        }
+
+        $this->resetPage();
+    }
+
+    protected function enforcePlanLocks(): void
+    {
+        if (! $this->isPlanQueue()) {
+            return;
+        }
+
+        $this->layout = 'cards';
+        $userId = (string) (int) $this->planUserId;
+        $this->assignedFilter = $userId;
+        $this->assignedFilters = [$userId];
+        $this->filterOps['assignedFilter'] = 'eq';
+        $this->status = '';
+        $this->selectedStatuses = $this->defaultStatuses();
+        $this->filterOps['status'] = 'eq';
     }
 
     public function usesWorkItems(): bool
@@ -512,6 +572,12 @@ class TasksGrid extends Component
 
     public function toggleAssignedFilter(string $key): void
     {
+        if ($this->isPlanQueue()) {
+            $this->enforcePlanLocks();
+
+            return;
+        }
+
         $this->assignedFilters = $this->toggleUserFilterKey($this->assignedFilters, $key);
         if (count($this->assignedFilters) <= 1) {
             $this->assignedFilter = $this->assignedFilters[0] ?? '';
@@ -532,6 +598,12 @@ class TasksGrid extends Component
 
     public function clearAssignedFilters(): void
     {
+        if ($this->isPlanQueue()) {
+            $this->enforcePlanLocks();
+
+            return;
+        }
+
         $this->assignedFilters = [];
         $this->assignedFilter = '';
         $this->filterOps['assignedFilter'] = 'eq';
@@ -563,7 +635,10 @@ class TasksGrid extends Component
      */
     protected function rememberWorkItemList(mixed $tasks, mixed $groupedTasks): void
     {
-        if (! $this->usesWorkItems()) {
+        if ($this->isPlanQueue() || ! $this->usesWorkItems()) {
+            if ($this->isPlanQueue()) {
+                return;
+            }
             WorkItemListNavigator::forget();
 
             return;
@@ -711,17 +786,26 @@ class TasksGrid extends Component
             $this->sortField = 'sprint_position';
             $this->sortDirection = 'asc';
         }
+        if ($this->isPlanQueue()) {
+            $this->sortField = 'due_date';
+            $this->sortDirection = 'asc';
+            $this->enforcePlanLocks();
+        }
         $this->batchingViewPersist = false;
         $this->resetPage();
         $this->detachActiveView();
     }
 
     /**
-     * @return list<array{key: string, label: string}>
+     * @return list<array{key: string, label: string, locked?: bool}>
      */
     public function activeFilterChips(?string $activeViewName = null): array
     {
         $chips = [];
+
+        if ($this->isPlanQueue()) {
+            $chips[] = ['key' => 'planQueue', 'label' => 'Do przypięcia', 'locked' => true];
+        }
 
         if ($this->view !== '') {
             $viewName = $activeViewName
@@ -762,13 +846,21 @@ class TasksGrid extends Component
         // wskazówki, że coś jest odfiltrowane.
         if (! $this->selectsAllStatuses() || $this->filterOp('status') === 'neq') {
             $statusLabel = $this->statusChipLabel();
-            $chips[] = ['key' => 'status', 'label' => 'Status: '.($this->filterOp('status') === 'neq' ? '≠ ' : '').$statusLabel];
+            $chips[] = [
+                'key' => 'status',
+                'label' => 'Status: '.($this->filterOp('status') === 'neq' ? '≠ ' : '').$statusLabel,
+                'locked' => $this->isPlanQueue(),
+            ];
         }
 
         $assignedKeys = $this->assignedFilterKeys();
         if ($assignedKeys !== []) {
             $neg = $this->filterOp('assignedFilter') === 'neq' ? '≠ ' : '';
-            $chips[] = ['key' => 'assignedFilter', 'label' => 'Przypisany: '.$neg.$this->userFilterChipLabel($assignedKeys)];
+            $chips[] = [
+                'key' => 'assignedFilter',
+                'label' => 'Przypisany: '.$neg.$this->userFilterChipLabel($assignedKeys),
+                'locked' => $this->isPlanQueue(),
+            ];
         }
 
         $createdKeys = $this->createdByFilterKeys();
@@ -815,6 +907,12 @@ class TasksGrid extends Component
 
     public function clearFilter(string $key): void
     {
+        if ($this->isPlanQueue() && in_array($key, ['planQueue', 'assignedFilter', 'status'], true)) {
+            $this->enforcePlanLocks();
+
+            return;
+        }
+
         if ($key === 'groupBy') {
             $this->setGroupBy('');
 
@@ -1470,6 +1568,10 @@ class TasksGrid extends Component
 
     public function startAdd(string $kind): void
     {
+        if ($this->isPlanQueue()) {
+            return;
+        }
+
         if (! in_array($kind, ['task', 'procedure', 'approval', 'meeting'], true)) {
             return;
         }
@@ -3067,6 +3169,7 @@ class TasksGrid extends Component
         $this->hideGroupedColumn();
         $this->batchingViewPersist = false;
         $this->resetPage();
+        $this->enforcePlanLocks();
     }
 
     /**
@@ -4126,8 +4229,30 @@ class TasksGrid extends Component
     {
         $query = WorkItem::query();
         $this->applyGridFilters($query);
+        $this->applyPlanQueueConstraints($query);
 
         return $query;
+    }
+
+    protected function applyPlanQueueConstraints(Builder $query): void
+    {
+        if (! $this->isPlanQueue()) {
+            return;
+        }
+
+        $user = User::query()->find((int) $this->planUserId);
+        if (! $user) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        app(WorkItemPlanService::class)->applyQueueConstraints(
+            $query,
+            $user,
+            now(),
+            $this->planPinId && (int) $this->planPinId > 0 ? (int) $this->planPinId : null,
+        );
     }
 
     /**
@@ -4293,9 +4418,10 @@ class TasksGrid extends Component
 
     public function render()
     {
+        $this->enforcePlanLocks();
         $this->sanitizeRemovedProjectField();
 
-        $savedViews = (! $this->isLockedToSprint() && $this->gridViewsTableExists())
+        $savedViews = (! $this->isLockedToSprint() && ! $this->isPlanQueue() && $this->gridViewsTableExists())
             ? TaskGridView::query()
                 ->visibleTo(auth()->user())
                 ->orderByDesc('is_global')

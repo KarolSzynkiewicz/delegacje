@@ -1,4 +1,4 @@
-<div class="xuiv2-tasks{{ $this->isEdiReviewing() ? ' is-edi-review' : '' }}" id="xuiv2Tasks"
+<div class="xuiv2-tasks{{ $this->isEdiReviewing() ? ' is-edi-review' : '' }}{{ $this->isPlanQueue() ? ' is-plan-queue' : '' }}" id="xuiv2Tasks"
      x-data="{
          filterOpen: false,
          filterMode: 'all',
@@ -781,6 +781,45 @@
         }
     }
 
+    /* Plan queue: one compact row — Filtry + Kolumny. No views, Chrono, search, or chip strip. */
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__row {
+        flex-wrap: nowrap;
+        align-items: stretch;
+        gap: 0.4rem;
+    }
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__search,
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__views,
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__home,
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__meta,
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__chrono,
+    .xuiv2-tasks.is-plan-queue .tg-active-filters {
+        display: none !important;
+    }
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__controls {
+        flex: 1 1 auto;
+        width: 100%;
+        display: flex;
+        gap: 0.4rem;
+    }
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__filters,
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__columns {
+        flex: 1 1 0;
+        min-width: 0;
+        display: block;
+    }
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__filters .btn,
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__columns .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__filters .bi-chevron-down {
+        display: none !important;
+    }
+    .xuiv2-tasks.is-plan-queue .tg-toolbar .btn { padding: 4px 8px !important; font-size: 0.72rem !important; }
+    .xuiv2-tasks.is-plan-queue .card.mb-2 { margin-bottom: 0.35rem !important; }
+    .xuiv2-tasks.is-plan-queue .tg-toolbar.card-body,
+    .xuiv2-tasks.is-plan-queue .card-body.tg-toolbar { padding: 0.35rem 0.45rem !important; }
+
     /* ── Karty zadań (mobile) — ten sam szkielet label/wartość co /rotations ── */
     .tg-dt-card.card {
         border-left-width: 3px !important;
@@ -967,6 +1006,9 @@
 @php
     $filteredTaskCount = (int) ($chronoItemCount ?? 0);
     $filteredTaskHint = $filteredTaskCount === 1 ? '1 zadanie' : $filteredTaskCount.' zadań';
+    $filterBadgeCount = $this->isPlanQueue()
+        ? count(array_filter($filterChips, fn (array $chip) => empty($chip['locked'])))
+        : count($filterChips);
 @endphp
 <div class="card mb-2 border-0 shadow-sm">
     <div class="card-body py-2 px-3 tg-toolbar">
@@ -987,10 +1029,10 @@
             <div class="tg-toolbar__filters">
                 <button type="button"
                         @click.stop="toggleAllFilters($el)"
-                        class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ count($filterChips) > 0 ? 'is-on' : '' }}">
+                        class="btn btn-sm btn-outline-secondary tg-quiet-btn {{ $filterBadgeCount > 0 ? 'is-on' : '' }}">
                     <i class="bi bi-sliders me-1"></i>Filtry
-                    @if(count($filterChips) > 0)
-                        <span class="tg-quiet-count">{{ count($filterChips) }}</span>
+                    @if($filterBadgeCount > 0)
+                        <span class="tg-quiet-count">{{ $filterBadgeCount }}</span>
                     @endif
                     <i class="bi bi-chevron-down ms-1 d-none d-md-inline" style="font-size:.6rem"></i>
                 </button>
@@ -1015,7 +1057,7 @@
             </div>
 
             {{-- Zapisane widoki (pigułki) — na mobile tylko aktualny, w menu zakładki --}}
-            @unless($this->isLockedToSprint())
+            @unless($this->isLockedToSprint() || $this->isPlanQueue())
                 <div class="tg-toolbar__views d-flex align-items-center gap-2 flex-wrap">
                     @foreach($savedViews as $savedView)
                         @php $isActiveView = $activeViewId === $savedView->id; @endphp
@@ -1038,7 +1080,7 @@
             </div>
 
             <div class="ms-auto d-flex align-items-center gap-2 tg-toolbar__meta">
-                @unless($this->isLockedToSprint())
+                @unless($this->isLockedToSprint() || $this->isPlanQueue())
                     {{-- Zapisz / zarządzaj widokami — na mobile pokazuje nazwę aktualnego widoku --}}
                     <div class="tg-toolbar__view-menu" x-data="{ open: false, top: 0, left: 0, pw: 300 }">
                         <button type="button"
@@ -1123,6 +1165,7 @@
                         </template>
                     </div>
 
+                    @unless($this->isPlanQueue())
                     {{-- Domyślny widok w menu --}}
                     <button type="button"
                             wire:click="setAsMenuDefaultView"
@@ -1130,8 +1173,10 @@
                             title="{{ $isMenuDefaultView ? 'Ten widok (z filtrami) otwiera się z menu' : 'Ustaw bieżący widok i filtry jako domyślne w menu' }}">
                         <i class="bi bi-house{{ $isMenuDefaultView ? '-fill' : '' }}"></i>
                     </button>
+                    @endunless
                 @endunless
 
+                @unless($this->isPlanQueue())
                 <x-chrono.trigger
                     target="openChronoModal"
                     class="tg-toolbar__chrono"
@@ -1141,6 +1186,7 @@
                     hint-loading="Otwieram…"
                     title="Chrono Assist — {{ $filteredTaskHint }} w bieżącym filtrze. Argus podsumuje, Impek zaimportuje, Chrono utworzy, Edi poprawi"
                 />
+                @endunless
 
                 {{-- Liczba zadań jest w chipie Chrono Assist --}}
                 @if($groupBy)
@@ -1153,19 +1199,21 @@
     </div>
 </div>
 
-@if(count($filterChips) > 0)
+@if(count($filterChips) > 0 && ! $this->isPlanQueue())
     <div class="rp-active-filters tg-active-filters mb-2 px-1">
         <span class="rp-active-filters__label">Filtry:</span>
         <div class="tg-active-filters__chips">
             @foreach($filterChips as $chip)
-                <span class="rp-active-filters__chip">
+                <span class="rp-active-filters__chip{{ ! empty($chip['locked']) ? ' is-locked' : '' }}">
                     <span class="rp-active-filters__chip-text">{{ $chip['label'] }}</span>
+                    @if(empty($chip['locked']))
                     <button type="button"
                             wire:click="clearFilter('{{ $chip['key'] }}')"
                             class="rp-active-filters__chip-remove"
                             title="Usuń filtr">
                         <i class="bi bi-x"></i>
                     </button>
+                    @endif
                 </span>
             @endforeach
         </div>
@@ -1609,7 +1657,9 @@
         <div class="text-center text-muted py-4">
             <i class="bi bi-inbox display-5 d-block mb-2 opacity-30"></i>
             <div>Brak zadań spełniających kryteria</div>
-            @if($searchTask || $searchCategory || $searchAssignedTo)
+            @if($this->isPlanQueue())
+                <div class="small mt-1">Nic do przypięcia — wszystko ma slot od dziś albo filtr nic nie zostawił.</div>
+            @elseif($searchTask || $searchCategory || $searchAssignedTo)
                 <button wire:click="clearFilters" class="btn btn-sm btn-link mt-1">Wyczyść filtry</button>
             @endif
         </div>
@@ -1705,6 +1755,7 @@
         </div>
     </x-ui.card>
     @else
+    @unless($this->isPlanQueue())
     <div class="tg-add-actions">
         <button type="button" wire:click="startAdd('task')" class="btn">
             <i class="bi bi-plus-circle" aria-hidden="true"></i>
@@ -1725,6 +1776,7 @@
         </button>
         @endif
     </div>
+    @endunless
     @endif
 
     {{-- Pagination (only in flat view) --}}
@@ -1737,6 +1789,7 @@
 @endif
 
 <script>
+@unless($this->isPlanQueue())
     (function () {
         if (window._tgDndAbort) {
             try { window._tgDndAbort.abort(); } catch (e) {}
@@ -2067,6 +2120,7 @@
         if (mq.addEventListener) mq.addEventListener('change', sync);
         else mq.addListener(sync);
     })();
+@endunless
 
     (function () {
         const pending = new Map();

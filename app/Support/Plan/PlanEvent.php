@@ -52,6 +52,11 @@ final class PlanEvent
         return ! $this->allDay && $this->durationMinutes() <= 15;
     }
 
+    public function hidesTime(): bool
+    {
+        return ! $this->allDay && $this->durationMinutes() <= 30;
+    }
+
     /**
      * @return array<string, mixed>
      */

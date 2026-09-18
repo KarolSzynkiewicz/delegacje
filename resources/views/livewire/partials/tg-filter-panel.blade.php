@@ -17,8 +17,24 @@
         <span class="rp-filter-hint">Kilka wartości w jednej sekcji = <strong>lub</strong> (Marek lub Krzyś). Między sekcjami zawsze <strong>i</strong> (przypisany i status).</span>
     </div>
 
+    @if($this->isPlanQueue())
+        <div class="rp-filter-locks" x-show="filterMode === 'all'">
+            <span class="rp-filter-hint">Zablokowane w Planie</span>
+            <div class="d-flex flex-column gap-1 mt-1 mb-2">
+                @foreach($filterChips as $chip)
+                    @if(! empty($chip['locked']))
+                        <span class="rp-active-filters__chip is-locked">
+                            <span class="rp-active-filters__chip-text">{{ $chip['label'] }}</span>
+                        </span>
+                    @endif
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- Każdy widget raz. Filtry (mode=all) i Filtruj na kolumnie (mode=klucz) pokazują ten sam węzeł. --}}
 
+    @unless($this->isPlanQueue())
     <div class="rp-filter-section" x-show="filterMode === 'all' || filterMode === 'status'" data-tg-col-filter="status">
         <button type="button" x-show="filterMode === 'all'" @click="openStatus = !openStatus" class="rp-filter-section__head">
             <span><i class="bi bi-flag me-1 opacity-75"></i>Status zadań</span>
@@ -28,6 +44,7 @@
             @include('livewire.partials.tg-filter-status')
         </div>
     </div>
+    @endunless
 
     <div class="rp-filter-section" x-show="filterMode === 'all' || filterMode === 'assigned_to' || filterMode === 'created_by'">
         <button type="button" x-show="filterMode === 'all'" @click="openVisibility = !openVisibility" class="rp-filter-section__head">
@@ -35,6 +52,7 @@
             <i class="bi" :class="openVisibility ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
         </button>
         <div class="rp-filter-section__body" x-show="filterMode === 'assigned_to' || filterMode === 'created_by' || (filterMode === 'all' && openVisibility)">
+            @unless($this->isPlanQueue())
             <div x-show="filterMode === 'all' || filterMode === 'assigned_to'" data-tg-col-filter="assigned_to">
                 <span class="rp-filter-hint">Przypisany do</span>
                 @include('livewire.partials.tg-filter-people', [
@@ -47,6 +65,7 @@
                 <span class="rp-filter-hint mt-2 d-block">Szukaj po osobie</span>
                 @include('livewire.partials.tg-filter-search-person')
             </div>
+            @endunless
             <div class="mt-2" x-show="filterMode === 'all' || filterMode === 'created_by'" data-tg-col-filter="created_by">
                 <span class="rp-filter-hint">Utworzono przez</span>
                 @include('livewire.partials.tg-filter-people', [

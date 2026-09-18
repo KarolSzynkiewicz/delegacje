@@ -16,6 +16,7 @@ use App\Models\WorkItemTimeBlock;
 use App\Support\Plan\PlanEvent;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -58,9 +59,26 @@ class WorkItemPlanService
      *
      * @return Collection<int, WorkItem>
      */
-    public function queue(User $calendarUser, CarbonInterface $now): Collection
+    public function queue(User $calendarUser, CarbonInterface $now, ?int $pinId = null): Collection
+    {
+        return $this->applyQueueConstraints(WorkItem::query()->with('source'), $calendarUser, $now, $pinId)
+            ->orderByRaw('due_at IS NULL')
+            ->orderBy('due_at')
+            ->orderByDesc('priority')
+            ->orderBy('id')
+            ->limit(80)
+            ->get();
+    }
+
+    /**
+     * Overlay kolejki Planu: osoba kalendarza, status aktywny,
+     * bez bloku / sesji / slotu na źródle (spotkanie) ≥ dziś.
+     * `pinId` zawęża do jednego WI (silniejszy lock z `?pin=`).
+     */
+    public function applyQueueConstraints(Builder $query, User $calendarUser, CarbonInterface $now, ?int $pinId = null): Builder
     {
         $today = CarbonImmutable::parse($now)->startOfDay();
+        $meetingMorph = (new ProjectTask)->getMorphClass();
 
         $blockedIds = WorkItemTimeBlock::query()
             ->where('user_id', $calendarUser->id)
@@ -69,8 +87,8 @@ class WorkItemPlanService
             ->pluck('work_item_id');
 
         $sessionItemIds = WorkItem::query()
-            ->whereHas('sessionBlocks', function ($query) use ($calendarUser, $today) {
-                $query->where('user_id', $calendarUser->id)
+            ->whereHas('sessionBlocks', function ($sessionQuery) use ($calendarUser, $today) {
+                $sessionQuery->where('user_id', $calendarUser->id)
                     ->where('kind', WorkItemTimeBlockKind::Session->value)
                     ->where('starts_at', '>=', $today);
             })
@@ -78,19 +96,24 @@ class WorkItemPlanService
 
         $hideIds = $blockedIds->merge($sessionItemIds)->unique()->filter()->values();
 
-        return WorkItem::query()
-            ->with('source')
-            ->where('assignee_id', $calendarUser->id)
-            ->whereIn('status', [WorkItemStatus::Pending->value, WorkItemStatus::InProgress->value])
-            ->when($hideIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $hideIds))
-            ->orderByRaw('due_at IS NULL')
-            ->orderBy('due_at')
-            ->orderByDesc('priority')
-            ->orderBy('id')
-            ->limit(80)
-            ->get()
-            ->filter(fn (WorkItem $item) => ! $this->hasActiveMeetingSlot($item, $today))
-            ->values();
+        $query
+            ->where('work_items.assignee_id', $calendarUser->id)
+            ->whereIn('work_items.status', [WorkItemStatus::Pending->value, WorkItemStatus::InProgress->value])
+            ->when($hideIds->isNotEmpty(), fn (Builder $q) => $q->whereNotIn('work_items.id', $hideIds))
+            ->whereNotExists(function ($sub) use ($today, $meetingMorph) {
+                $sub->selectRaw('1')
+                    ->from('project_tasks')
+                    ->whereColumn('project_tasks.id', 'work_items.source_id')
+                    ->where('work_items.source_type', $meetingMorph)
+                    ->whereNotNull('project_tasks.starts_at')
+                    ->where('project_tasks.starts_at', '>=', $today);
+            });
+
+        if ($pinId && $pinId > 0) {
+            $query->where('work_items.id', $pinId);
+        }
+
+        return $query;
     }
 
     /**
@@ -109,6 +132,15 @@ class WorkItemPlanService
             ->where('user_id', $calendarUser->id)
             ->where('starts_at', '<', $end)
             ->where('ends_at', '>', $start)
+            ->where(function (Builder $query) {
+                $query->where('kind', WorkItemTimeBlockKind::Session->value)
+                    ->orWhereHas('workItem', function (Builder $items) {
+                        $items->whereIn('status', [
+                            WorkItemStatus::Pending->value,
+                            WorkItemStatus::InProgress->value,
+                        ]);
+                    });
+            })
             ->orderBy('starts_at')
             ->get();
 
@@ -128,7 +160,7 @@ class WorkItemPlanService
 
         $meetings = ProjectTask::query()
             ->whereNotNull('starts_at')
-            ->where('status', '!=', TaskStatus::CANCELLED->value)
+            ->whereNotIn('status', [TaskStatus::COMPLETED->value, TaskStatus::CANCELLED->value])
             ->where('starts_at', '<', $end)
             ->where(function ($query) use ($start) {
                 $query->where('ends_at', '>', $start)
@@ -140,6 +172,7 @@ class WorkItemPlanService
 
         $meetingItemBySource = WorkItem::query()
             ->where('type', WorkItemType::Meeting)
+            ->whereIn('status', [WorkItemStatus::Pending->value, WorkItemStatus::InProgress->value])
             ->where('source_type', (new ProjectTask)->getMorphClass())
             ->whereIn('source_id', $meetings->pluck('id'))
             ->get()
@@ -208,7 +241,7 @@ class WorkItemPlanService
         bool $allDay = false,
         ?CarbonInterface $endsAt = null,
     ): void {
-        if ($item->type === WorkItemType::Meeting) {
+        if ($item->isMeetingItem()) {
             if ($allDay) {
                 return;
             }
@@ -320,7 +353,7 @@ class WorkItemPlanService
 
     public function addToSession(WorkItemTimeBlock $block, WorkItem $item): void
     {
-        if (! $block->isSession() || $item->type === WorkItemType::Meeting) {
+        if (! $block->isSession() || $item->isMeetingItem()) {
             return;
         }
         if ((int) $item->assignee_id !== (int) $block->user_id) {
@@ -631,19 +664,6 @@ class WorkItemPlanService
         return max(self::SNAP_MINUTES, $snapped);
     }
 
-    private function hasActiveMeetingSlot(WorkItem $item, CarbonImmutable $today): bool
-    {
-        if ($item->type !== WorkItemType::Meeting) {
-            return false;
-        }
-        $source = $item->source;
-        if (! $source instanceof ProjectTask || $source->starts_at === null) {
-            return false;
-        }
-
-        return CarbonImmutable::parse($source->starts_at)->toDateString() >= $today->toDateString();
-    }
-
     private function meetingInvolves(ProjectTask $task, int $userId): bool
     {
         if ((int) $task->assigned_to === $userId) {
@@ -734,6 +754,7 @@ class WorkItemPlanService
         $start = CarbonImmutable::parse($block->starts_at);
         $end = CarbonImmutable::parse($block->ends_at);
         $members = $block->items
+            ->filter(fn (WorkItem $item) => $item->status->isOpen())
             ->map(fn (WorkItem $item) => [
                 'id' => $item->id,
                 'title' => $item->title,
@@ -769,6 +790,10 @@ class WorkItemPlanService
 
     private function eventFromBlock(WorkItemTimeBlock $block, WorkItem $item, CarbonImmutable $today): ?PlanEvent
     {
+        if (! $item->status->isOpen()) {
+            return null;
+        }
+
         $start = CarbonImmutable::parse($block->starts_at);
         $end = CarbonImmutable::parse($block->ends_at);
         $past = $start->toDateString() < $today->toDateString();
@@ -795,6 +820,10 @@ class WorkItemPlanService
 
     private function eventFromMeeting(ProjectTask $task, WorkItem $item, CarbonImmutable $today): ?PlanEvent
     {
+        if (! $item->status->isOpen() || ! $task->isOpenMeeting()) {
+            return null;
+        }
+
         $start = CarbonImmutable::parse($task->starts_at);
         $end = $task->ends_at
             ? CarbonImmutable::parse($task->ends_at)

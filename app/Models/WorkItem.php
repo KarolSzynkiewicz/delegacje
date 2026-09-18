@@ -104,6 +104,15 @@ class WorkItem extends Model
             ->all();
     }
 
+    public function isMeetingItem(): bool
+    {
+        if ($this->type === WorkItemType::Meeting) {
+            return true;
+        }
+
+        return $this->source instanceof ProjectTask && $this->source->isMeeting();
+    }
+
     public function handler(): HandlesWorkItem
     {
         return WorkItemCatalog::handler($this->type);

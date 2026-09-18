@@ -69,13 +69,22 @@
 @endphp
 
 <x-ui.card
-    class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}"
+    class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}{{ $this->isPlanQueue() && (int) $this->planPinId === (int) $task->id ? ' is-pin' : '' }}"
     wire:key="tg-card-{{ $task->id }}"
     style="border-left-color: {{ $borderColor }}"
+    data-plan-drag="{{ $this->isPlanQueue() && $isWorkItem ? 'queue:'.$task->id : '' }}"
+    data-plan-title="{{ $this->isPlanQueue() && $isWorkItem ? $task->name : '' }}"
+    data-plan-type="{{ $this->isPlanQueue() && $isWorkItem ? $task->type->value : '' }}"
 >
+    @if($this->isPlanQueue() && $isWorkItem)
+        <span class="wi-plan__grip tg-dt-hit"
+              data-plan-queue-grip
+              title="Przesuń"
+              aria-label="Przesuń na kalendarz"></span>
+    @endif
     <div class="dt-card__title">
         <div class="tg-dt-card__heading">
-            @if($canExpand)
+            @if($canExpand && ! $this->isPlanQueue())
                 <button type="button"
                         wire:click="toggleExpand({{ $task->id }})"
                         class="tg-card-expand-btn tg-dt-hit tg-expand-btn{{ $isExpanded ? ' is-open' : '' }}"
@@ -85,7 +94,7 @@
                     <i class="bi bi-chevron-right" style="font-size:0.75rem"></i>
                 </button>
             @endif
-            @if($canAddSubtask && $subtaskTotal > 0)
+            @if($canAddSubtask && $subtaskTotal > 0 && (! $this->isPlanQueue() || in_array('subtasks', $visibleColumns, true)))
                 <span class="tg-card-subtask-badge" data-tg-sub-stats="{{ $task->id }}" title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                     {{ $subtaskDone }}/{{ $subtaskTotal }}
                 </span>
@@ -98,11 +107,19 @@
                 <input type="text" wire:model="editingValue" class="form-control form-control-sm tg-dt-hit"
                        wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                        x-data x-init="$el.focus(); $el.select()">
+            @elseif($this->isPlanQueue() && $isWorkItem)
+                <a href="{{ $openUrl }}"
+                   class="stretched-link tg-dt-card__name"
+                   title="{{ $task->name }}"
+                   wire:click.prevent="$parent.openEvent('item', {{ $task->id }})">
+                    {{ $task->name }}
+                </a>
             @else
                 <a href="{{ $openUrl }}" class="stretched-link tg-dt-card__name" title="{{ $task->name }}">
                     {{ $task->name }}
                 </a>
-                @if($this->rowWritable($task, 'name'))
+            @endif
+            @if(! $this->isPlanQueue() && ! $ediName && ! ($isEditing && $editingField === 'name') && $this->rowWritable($task, 'name'))
                     <button type="button"
                             class="tg-facet__edit tg-dt-hit"
                             wire:click.stop="startEdit({{ $task->id }}, 'name')"
@@ -110,12 +127,11 @@
                             aria-label="Edytuj tytuł">
                         <i class="bi bi-pencil"></i>
                     </button>
-                @endif
             @endif
-            @if($isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
+            @if(! $this->isPlanQueue() && $isWorkItem && $task->type === \App\Enums\WorkItemType::Approval)
                 <span class="tg-dt-hit"><x-ui.approval-decision :decision="$approvalDecision" size="sm" /></span>
             @endif
-            @if($sourceCard && ($sourceCard['url'] ?? '') !== $openUrl)
+            @if(! $this->isPlanQueue() && $sourceCard && ($sourceCard['url'] ?? '') !== $openUrl)
                 <a href="{{ $sourceCard['url'] }}"
                    class="tg-card-source-link tg-dt-hit"
                    title="{{ $sourceCard['label'] }}"
