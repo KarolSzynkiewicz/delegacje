@@ -352,8 +352,9 @@
                             $previousStatus = $currentStatus?->previousPipelineStatus();
                             $exitStatuses  = [RecruitmentStatus::Odrzucony, RecruitmentStatus::BylyPracownik];
                             $scheduledMeeting = $selected->displayMeeting();
-                            $showMeetingAction = $currentStatus === RecruitmentStatus::WTrakcieKontaktu
-                                && $reviewStatus === RecruitmentStatus::WTrakcieKontaktu;
+                            $showMeetingButton = $currentStatus === RecruitmentStatus::WTrakcieKontaktu
+                                && $reviewStatus === RecruitmentStatus::WTrakcieKontaktu
+                                && ! $scheduledMeeting;
                         @endphp
 
                         @if($candidate)
@@ -648,18 +649,16 @@
                                             <span>Zadzwoń</span>
                                         </button>
                                     </div>
-                                    @if($showMeetingAction)
-                                        @if($scheduledMeeting)
-                                            <a href="{{ route('tasks.show', $scheduledMeeting) }}" class="rp-action rp-action--meeting is-scheduled{{ $scheduledMeeting->isOpenMeeting() ? '' : ' is-done' }}">
-                                                <i class="bi bi-calendar-event{{ $scheduledMeeting->isOpenMeeting() ? '' : '-check' }}"></i>
-                                                <span>{{ $scheduledMeeting->meetingSlotLabel() }}</span>
-                                            </a>
-                                        @else
-                                            <button type="button" wire:click="openMeetingModal" class="rp-action rp-action--meeting">
-                                                <i class="bi bi-calendar-plus"></i>
-                                                <span>Umów spotkanie</span>
-                                            </button>
-                                        @endif
+                                    @if($scheduledMeeting)
+                                        <a href="{{ route('tasks.show', $scheduledMeeting) }}" class="rp-action rp-action--meeting is-scheduled{{ $scheduledMeeting->isOpenMeeting() ? '' : ' is-done' }}">
+                                            <i class="bi bi-calendar-event{{ $scheduledMeeting->isOpenMeeting() ? '' : '-check' }}"></i>
+                                            <span>{{ $scheduledMeeting->meetingSlotLabel() }}</span>
+                                        </a>
+                                    @elseif($showMeetingButton)
+                                        <button type="button" wire:click="openMeetingModal" class="rp-action rp-action--meeting">
+                                            <i class="bi bi-calendar-plus"></i>
+                                            <span>Umów spotkanie</span>
+                                        </button>
                                     @endif
 
                                     @if($showBlacklistPrompt)
@@ -1095,23 +1094,7 @@
                     <button type="button" wire:click="closeMeetingModal" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <div class="p-3">
-                    <div class="mb-2">
-                        <label class="form-label" style="font-size:.75rem;">Data <span class="text-danger">*</span></label>
-                        <input type="date" wire:model="meetingDate" class="form-control form-control-sm">
-                        @error('meetingDate') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="row g-2 mb-2">
-                        <div class="col-6">
-                            <label class="form-label" style="font-size:.75rem;">Od <span class="text-danger">*</span></label>
-                            <input type="time" wire:model="meetingStart" class="form-control form-control-sm">
-                            @error('meetingStart') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label" style="font-size:.75rem;">Do <span class="text-danger">*</span></label>
-                            <input type="time" wire:model="meetingEnd" class="form-control form-control-sm">
-                            @error('meetingEnd') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
-                        </div>
-                    </div>
+                    <p class="mb-3" style="font-size:.78rem;color:var(--text-muted);">Po zapisaniu otworzy się Plan — tam przeciągniesz spotkanie na godzinę.</p>
                     <div class="mb-2">
                         <label class="form-label" style="font-size:.75rem;">Uczestnicy <span class="text-danger">*</span></label>
                         <div class="rp-meeting-people">

@@ -24,6 +24,9 @@ class WorkItemPlan extends Component
     #[Url(as: 'u')]
     public ?int $userId = null;
 
+    #[Url(as: 'pin')]
+    public ?int $pinId = null;
+
     public bool $composerOpen = false;
 
     public string $composerType = 'task';
@@ -37,6 +40,8 @@ class WorkItemPlan extends Component
     public int $composerEnd = 0;
 
     public bool $composerAllDay = false;
+
+    public bool $composerUnscheduled = false;
 
     public string $composerLocation = '';
 
@@ -92,7 +97,13 @@ class WorkItemPlan extends Component
             if (! $item || (int) $item->assignee_id !== (int) $user->id) {
                 return;
             }
+            if ($allDay && $item->type === WorkItemType::Meeting) {
+                return;
+            }
             $service->placeFromQueue($item, $user, $actor, $starts, $allDay);
+            if ($this->pinId && (int) $this->pinId === (int) $item->id) {
+                $this->pinId = null;
+            }
 
             return;
         }
@@ -167,7 +178,26 @@ class WorkItemPlan extends Component
         $this->composerStart = $start;
         $this->composerEnd = max($start + WorkItemPlanService::SNAP_MINUTES, $end);
         $this->composerAllDay = $allDay;
+        $this->composerUnscheduled = false;
         $this->composerType = 'task';
+        $this->composerTitle = '';
+        $this->composerLocation = '';
+        $this->composerParticipantIds = [$this->calendarUser()->id];
+        $this->composerProcedureTemplateId = '';
+        $this->composerProcedureSubjectId = '';
+        $this->composerProcedureNameSuffix = '';
+        $this->composerOpen = true;
+    }
+
+    public function openUnscheduledMeeting(): void
+    {
+        $this->resetErrorBag();
+        $this->composerDate = '';
+        $this->composerStart = 0;
+        $this->composerEnd = 0;
+        $this->composerAllDay = false;
+        $this->composerUnscheduled = true;
+        $this->composerType = 'meeting';
         $this->composerTitle = '';
         $this->composerLocation = '';
         $this->composerParticipantIds = [$this->calendarUser()->id];
@@ -180,6 +210,7 @@ class WorkItemPlan extends Component
     public function closeComposer(): void
     {
         $this->composerOpen = false;
+        $this->composerUnscheduled = false;
         $this->composerTitle = '';
         $this->composerLocation = '';
         $this->composerParticipantIds = [];
@@ -192,6 +223,9 @@ class WorkItemPlan extends Component
     public function updatedComposerType(): void
     {
         $this->resetErrorBag();
+        if ($this->composerUnscheduled && $this->composerType !== 'meeting') {
+            $this->composerType = 'meeting';
+        }
         if ($this->composerType === 'meeting' && $this->composerParticipantIds === []) {
             $this->composerParticipantIds = [$this->calendarUser()->id];
         }
@@ -208,11 +242,34 @@ class WorkItemPlan extends Component
     {
         $this->validate($this->composerRules(), $this->composerMessages(), $this->composerAttributes());
 
+        if ($this->composerType === 'meeting' && $this->composerAllDay && ! $this->composerUnscheduled) {
+            throw ValidationException::withMessages([
+                'composerType' => 'Spotkanie musi mieć godzinę — narysuj slot na siatce albo dodaj je bez terminu z kolejki.',
+            ]);
+        }
+
+        $service = app(WorkItemPlanService::class);
+
+        if ($this->composerType === 'meeting' && $this->composerUnscheduled) {
+            $service->createHangingMeeting(
+                $this->composerTitle,
+                $this->calendarUser(),
+                auth()->user(),
+                [
+                    'location' => $this->composerLocation,
+                    'participant_ids' => $this->composerParticipantIds,
+                ],
+            );
+            $this->closeComposer();
+
+            return;
+        }
+
         $starts = $this->dateAt($this->composerDate, $this->composerAllDay ? 0 : $this->composerStart);
         $ends = $this->dateAt($this->composerDate, $this->composerAllDay ? 0 : $this->composerEnd);
 
         try {
-            app(WorkItemPlanService::class)->createOnCalendar(
+            $service->createOnCalendar(
                 $this->composerType,
                 $this->composerTitle,
                 $this->calendarUser(),
@@ -259,6 +316,10 @@ class WorkItemPlan extends Component
         $user = $this->calendarUser();
         $now = now();
         $occupancy = $service->occupancy($user, $weekStart, $now);
+        $queue = $service->queue($user, $now);
+        if ($this->pinId) {
+            $queue = $queue->where('id', $this->pinId)->values();
+        }
 
         return view('livewire.work-item-plan', [
             'calendarUser' => $user,
@@ -267,7 +328,7 @@ class WorkItemPlan extends Component
             'weekLabel' => $weekStart->format('d.m').'–'.$weekStart->addDays(6)->format('d.m.Y'),
             'days' => $service->weekDays($weekStart),
             'hours' => range(WorkItemPlanService::GRID_START_HOUR, WorkItemPlanService::GRID_END_HOUR - 1),
-            'queue' => $service->queue($user, $now),
+            'queue' => $queue,
             'eventsByDay' => $occupancy['timed'],
             'allDayByDay' => $occupancy['allDay'],
             'dueFlags' => $service->dueFlags($user, $weekStart),
@@ -285,6 +346,9 @@ class WorkItemPlan extends Component
 
     protected function composerRangeLabel(): string
     {
+        if ($this->composerOpen && $this->composerUnscheduled) {
+            return 'Bez terminu · kolejka Do przypięcia';
+        }
         if (! $this->composerOpen || $this->composerDate === '') {
             return '';
         }
@@ -306,8 +370,11 @@ class WorkItemPlan extends Component
     {
         $rules = [
             'composerType' => ['required', 'in:task,meeting,approval,procedure'],
-            'composerDate' => ['required', 'date'],
         ];
+
+        if (! $this->composerUnscheduled) {
+            $rules['composerDate'] = ['required', 'date'];
+        }
 
         if ($this->composerType === 'procedure') {
             $rules['composerProcedureTemplateId'] = ['required', 'exists:procedure_templates,id'];

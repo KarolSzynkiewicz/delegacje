@@ -16,6 +16,7 @@ use App\Models\RecruitmentGridView;
 use App\Models\RecruitmentProcess;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\WorkItem;
 use App\Support\PhoneNormalizer;
 use App\Support\RecruitmentBacklog;
 use Illuminate\Database\Eloquent\Builder;
@@ -258,12 +259,6 @@ class RecruitmentProcessesTable extends Component
     public string $taskDescription = '';
 
     public bool $showMeetingModal = false;
-
-    public string $meetingDate = '';
-
-    public string $meetingStart = '';
-
-    public string $meetingEnd = '';
 
     /** @var list<int|string> */
     public array $meetingParticipantIds = [];
@@ -1857,9 +1852,6 @@ class RecruitmentProcessesTable extends Component
         ))));
 
         $this->showMeetingModal = true;
-        $this->meetingDate = now()->addDay()->format('Y-m-d');
-        $this->meetingStart = '10:00';
-        $this->meetingEnd = '11:00';
         $this->meetingParticipantIds = $participantIds;
         $this->meetingNote = '';
         $this->meetingLocation = '';
@@ -1881,26 +1873,15 @@ class RecruitmentProcessesTable extends Component
             return;
         }
 
-        $this->meetingStart = ProjectTask::normalizeClock($this->meetingStart);
-        $this->meetingEnd = ProjectTask::normalizeClock($this->meetingEnd);
-
         $this->validate([
-            'meetingDate' => 'required|date',
-            'meetingStart' => 'required|date_format:H:i',
-            'meetingEnd' => 'required|date_format:H:i',
             'meetingParticipantIds' => 'required|array|min:1',
             'meetingParticipantIds.*' => 'integer|exists:users,id',
             'meetingNote' => 'nullable|string|max:2000',
             'meetingLocation' => 'nullable|string|max:4000',
         ], [
-            'meetingDate.required' => 'Podaj datę spotkania.',
-            'meetingStart.required' => 'Podaj godzinę rozpoczęcia.',
-            'meetingEnd.required' => 'Podaj godzinę zakończenia.',
             'meetingParticipantIds.required' => 'Wybierz przynajmniej jednego uczestnika.',
             'meetingParticipantIds.min' => 'Wybierz przynajmniej jednego uczestnika.',
         ]);
-
-        $window = ProjectTask::meetingWindow($this->meetingDate, $this->meetingStart, $this->meetingEnd);
 
         $participantIds = collect($this->meetingParticipantIds)
             ->map(fn ($id) => (int) $id)
@@ -1909,14 +1890,14 @@ class RecruitmentProcessesTable extends Component
             ->values()
             ->all();
 
-        ProjectTask::create([
+        $task = ProjectTask::create([
             'name' => 'Spotkanie: '.$process->full_name,
             'description' => ProjectTask::meetingDescriptionFor($process, $this->meetingNote),
             'category' => 'Rekrutacja',
             'status' => TaskStatus::PENDING->value,
-            'due_date' => $this->meetingDate,
-            'starts_at' => $window['starts_at'],
-            'ends_at' => $window['ends_at'],
+            'due_date' => null,
+            'starts_at' => null,
+            'ends_at' => null,
             'participant_ids' => $participantIds,
             'location' => trim($this->meetingLocation) !== '' ? trim($this->meetingLocation) : null,
             'assigned_to' => $participantIds[0] ?? auth()->id(),
@@ -1927,17 +1908,20 @@ class RecruitmentProcessesTable extends Component
         $process->transitionTo(RecruitmentStatus::Zaakceptowany, auth()->id());
         $this->reviewStage = '';
 
-        session()->flash('success', 'Spotkanie zostało umówione. Proces przeszedł do weryfikacji.');
+        $item = WorkItem::query()
+            ->where('source_type', $task->getMorphClass())
+            ->where('source_id', $task->id)
+            ->first();
 
-        $this->closeMeetingModal();
+        $this->redirect(route('work-items.plan', array_filter([
+            'u' => $task->assigned_to,
+            'pin' => $item?->id,
+        ])), navigate: true);
     }
 
     public function closeMeetingModal(): void
     {
         $this->showMeetingModal = false;
-        $this->meetingDate = '';
-        $this->meetingStart = '';
-        $this->meetingEnd = '';
         $this->meetingParticipantIds = [];
         $this->meetingNote = '';
         $this->meetingLocation = '';

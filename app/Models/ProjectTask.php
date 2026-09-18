@@ -127,7 +127,7 @@ class ProjectTask extends Model
             return $label;
         }
 
-        return $this->due_date?->format('d.m.Y') ?? 'Spotkanie';
+        return $this->due_date?->format('d.m.Y') ?? 'Bez terminu';
     }
 
     /**
@@ -202,6 +202,19 @@ class ProjectTask extends Model
         }
 
         return $value;
+    }
+
+    public static function meetingTitle(string $name): string
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return 'Spotkanie';
+        }
+        if (str_starts_with($name, 'Spotkanie:') || str_starts_with($name, 'Spotkanie rekrutacyjne')) {
+            return $name;
+        }
+
+        return 'Spotkanie: '.$name;
     }
 
     public static function meetingDescriptionFor(RecruitmentProcess $process, string $extra = ''): string

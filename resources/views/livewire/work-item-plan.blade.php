@@ -158,6 +158,13 @@
                 return;
             }
             if (hit.type === 'allday') {
+                const timedOnly = this.payload.kind === 'meeting' || this.payload.itemType === 'meeting';
+                if (timedOnly) {
+                    this.ghost = null;
+                    this.paintRubber();
+                    this.paintDropTargets();
+                    return;
+                }
                 this.ghost = { date: hit.date, allDay: true, start: 0, end: 0, col: hit.col };
                 this.paintRubber();
                 this.paintDropTargets();
@@ -206,13 +213,14 @@
                 return;
             }
             if (hit.type === 'allday') {
+                if (payload.kind === 'meeting' || payload.itemType === 'meeting') return;
                 $wire.dropOnCell(payload.kind, payload.id, hit.date, 0, true, copy);
                 return;
             }
             const minutes = this.slotFromY(event.clientY, hit.col);
             $wire.dropOnCell(payload.kind, payload.id, hit.date, minutes, false, copy);
         },
-        beginDrag(event, kind, id, duration, title, detail) {
+        beginDrag(event, kind, id, duration, title, detail, itemType) {
             if (this.resizing || this.drawing || !id) return;
             if (event.pointerType === 'mouse' && event.button !== 0) return;
             if (event.target.closest('.wi-plan__resize, .wi-plan__chip-off, a, button')) return;
@@ -221,6 +229,7 @@
             this.payload = {
                 kind,
                 id,
+                itemType: itemType || kind,
                 copy: !!(event.ctrlKey || event.metaKey),
                 duration: duration || this.defaultMinutes,
                 title: title || '',
@@ -380,13 +389,29 @@
         <aside class="wi-plan__queue" data-plan-queue>
             <div class="wi-plan__queue-head">
                 Do przypięcia
-                <span class="wi-plan__count">{{ $queue->count() }}</span>
+                <div class="wi-plan__queue-tools">
+                    @unless($pinId)
+                        <button type="button"
+                                class="wi-plan__nav"
+                                wire:click="openUnscheduledMeeting"
+                                title="Spotkanie bez godziny">
+                            <i class="bi bi-calendar-plus"></i>
+                        </button>
+                    @endunless
+                    <span class="wi-plan__count">{{ $queue->count() }}</span>
+                </div>
             </div>
+            @if($pinId)
+                @php $pinned = $queue->firstWhere('id', $pinId); @endphp
+                @if($pinned)
+                    <p class="wi-plan__pin-hint">Nowe: <strong>{{ $pinned->title }}</strong> — przeciągnij na godzinę w siatce.</p>
+                @endif
+            @endif
             @forelse($queue as $item)
-                <article class="wi-plan__card"
+                <article class="wi-plan__card {{ (int) $pinId === (int) $item->id ? 'is-pin' : '' }}"
                          wire:key="q-{{ $item->id }}"
                          data-plan-drag="queue:{{ $item->id }}"
-                         @pointerdown="beginDrag($event, 'queue', {{ $item->id }}, {{ $defaultMinutes }}, {{ \Illuminate\Support\Js::from($item->title) }})">
+                         @pointerdown="beginDrag($event, 'queue', {{ $item->id }}, {{ $defaultMinutes }}, {{ \Illuminate\Support\Js::from($item->title) }}, null, {{ \Illuminate\Support\Js::from($item->type->value) }})">
                     <i class="bi {{ $item->type->icon() }} wi-plan__card-icon"></i>
                     <div class="wi-plan__card-body">
                         <span class="wi-plan__card-title">{{ $item->title }}</span>
@@ -554,18 +579,23 @@
         <div class="wi-plan__composer-backdrop" wire:click="closeComposer"></div>
         <div class="wi-plan__composer" wire:click.stop>
             <div class="wi-plan__composer-head">
-                <span>Nowy wpis</span>
+                <span>{{ $composerUnscheduled ? 'Nowe spotkanie' : 'Nowy wpis' }}</span>
                 <button type="button" class="wi-plan__nav" wire:click="closeComposer">×</button>
             </div>
             <p class="wi-plan__composer-range font-mono">{{ $composerRangeLabel }}</p>
+            @unless($composerUnscheduled)
             <div class="wi-plan__types">
                 @foreach($typeOptions as $value => $meta)
+                    @if($value === 'meeting' && $composerAllDay)
+                        @continue
+                    @endif
                     <label class="{{ $composerType === $value ? 'is-on' : '' }}">
                         <input type="radio" wire:model.live="composerType" value="{{ $value }}">
                         <i class="bi {{ $meta['icon'] }}"></i>{{ $meta['label'] }}
                     </label>
                 @endforeach
             </div>
+            @endunless
 
             @if($composerType === 'procedure')
                 <select wire:model.live="composerProcedureTemplateId"
@@ -655,6 +685,7 @@
         display: flex; align-items: center; justify-content: space-between;
         font-size: .78rem; font-weight: 600; margin-bottom: .7rem; color: var(--text-main);
     }
+    .wi-plan__queue-tools { display: inline-flex; align-items: center; gap: .35rem; }
     .wi-plan__count {
         font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .68rem; color: var(--text-muted);
         background: rgba(255,255,255,.05); border-radius: 999px; padding: .1rem .5rem;
@@ -665,6 +696,14 @@
         border-radius: 10px; background: rgba(255,255,255,.03); cursor: grab;
         -webkit-user-drag: none; user-select: none; touch-action: none;
     }
+    .wi-plan__card.is-pin {
+        border-color: rgba(168, 85, 247, .55);
+        box-shadow: 0 0 0 1px rgba(59, 130, 246, .45), 0 8px 22px rgba(59, 130, 246, .18);
+    }
+    .wi-plan__pin-hint {
+        font-size: .72rem; color: var(--text-muted); margin: 0 0 .7rem; line-height: 1.35;
+    }
+    .wi-plan__pin-hint strong { color: var(--text-main); font-weight: 600; }
     .wi-plan__card-icon { color: var(--accent); margin-top: .12rem; font-size: .85rem; }
     .wi-plan__card-title { color: var(--text-main); font-size: .78rem; font-weight: 600; display: block; }
     .wi-plan__card-meta { display: flex; gap: .5rem; font-size: .66rem; color: var(--text-muted); margin-top: .12rem; }

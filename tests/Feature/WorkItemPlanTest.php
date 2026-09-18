@@ -163,6 +163,65 @@ class WorkItemPlanTest extends TestCase
         $this->assertSame(0, WorkItemTimeBlock::query()->count());
     }
 
+    public function test_pin_query_shows_only_that_queue_item(): void
+    {
+        $this->actingAs($this->user);
+        $this->workItem('Inne zadanie z kolejki');
+        $pinned = $this->workItem('Spotkanie: tylko to');
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class, ['pinId' => $pinned->id])
+            ->assertSee('Spotkanie: tylko to')
+            ->assertSee('przeciągnij na godzinę', false)
+            ->assertDontSee('Inne zadanie z kolejki');
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->assertSee('Spotkanie: tylko to')
+            ->assertSee('Inne zadanie z kolejki');
+    }
+
+    public function test_unscheduled_meeting_stays_in_the_queue_until_pinned_with_hours(): void
+    {
+        $this->actingAs($this->user);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openUnscheduledMeeting')
+            ->assertSet('composerUnscheduled', true)
+            ->set('composerTitle', 'Sync bez godziny')
+            ->call('submitComposer')
+            ->assertHasNoErrors();
+
+        $task = ProjectTask::query()->where('name', 'Spotkanie: Sync bez godziny')->first();
+        $this->assertNotNull($task);
+        $this->assertTrue($task->isMeeting());
+        $this->assertNull($task->starts_at);
+
+        $item = WorkItem::query()->where('source_id', $task->id)->first();
+        $this->assertNotNull($item);
+        $this->assertSame(WorkItemType::Meeting, $item->type);
+
+        $queue = app(WorkItemPlanService::class)->queue($this->user, now());
+        $this->assertTrue($queue->contains(fn (WorkItem $row) => $row->id === $item->id));
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('dropOnCell', 'queue', $item->id, '2026-09-17', 0, true)
+            ->assertHasNoErrors();
+
+        $this->assertNull($task->fresh()->starts_at);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('dropOnCell', 'queue', $item->id, '2026-09-17', 14 * 60)
+            ->assertHasNoErrors();
+
+        $task->refresh();
+        $this->assertSame('2026-09-17 14:00:00', $task->starts_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-09-17 14:30:00', $task->ends_at->format('Y-m-d H:i:s'));
+    }
+
     public function test_unschedule_deletes_a_block_not_the_work_item(): void
     {
         $this->actingAs($this->user);

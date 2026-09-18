@@ -199,10 +199,11 @@ class WorkItemPlanService
         ?CarbonInterface $endsAt = null,
     ): void {
         if ($item->type === WorkItemType::Meeting) {
-            $start = $allDay
-                ? CarbonImmutable::parse($startsAt)->setTime(self::VIEW_START_HOUR, 0)
-                : $startsAt;
-            $window = $endsAt && ! $allDay
+            if ($allDay) {
+                return;
+            }
+            $start = $startsAt;
+            $window = $endsAt
                 ? ['starts_at' => $this->snap($start), 'ends_at' => $this->snap($endsAt)]
                 : $this->windowFromStart($start);
             if ($window['ends_at']->lessThanOrEqualTo($window['starts_at'])) {
@@ -389,6 +390,28 @@ class WorkItemPlanService
     }
 
     /**
+     * Spotkanie bez slotu — backlog i kolejka planu, aż ktoś je przypnie z godziną.
+     *
+     * @param  array{location?: string|null, participant_ids?: list<int>}  $extra
+     */
+    public function createHangingMeeting(string $title, User $calendarUser, User $actor, array $extra = []): ProjectTask
+    {
+        $title = ProjectTask::meetingTitle($title);
+        $participants = $this->meetingParticipantIds($calendarUser, $extra['participant_ids'] ?? []);
+        $location = trim((string) ($extra['location'] ?? ''));
+
+        return app(TaskCreationService::class)->create([
+            'name' => $title,
+            'assigned_to' => $calendarUser->id,
+            'starts_at' => null,
+            'ends_at' => null,
+            'participant_ids' => $participants,
+            'location' => $location !== '' ? $location : null,
+            'due_date' => null,
+        ], $actor);
+    }
+
+    /**
      * @param  array{
      *     location?: string|null,
      *     participant_ids?: list<int>,
@@ -438,12 +461,13 @@ class WorkItemPlanService
         }
 
         if ($type === 'meeting') {
-            $start = $allDay
-                ? CarbonImmutable::parse($startsAt)->setTime(self::VIEW_START_HOUR, 0)
-                : $this->snap($startsAt);
-            $end = $allDay
-                ? $start->addMinutes(self::DEFAULT_MINUTES)
-                : $this->snap($endsAt);
+            if ($allDay) {
+                throw ValidationException::withMessages([
+                    'composerType' => 'Spotkanie musi mieć godzinę.',
+                ]);
+            }
+            $start = $this->snap($startsAt);
+            $end = $this->snap($endsAt);
             if ($end->lessThanOrEqualTo($start)) {
                 $end = $start->addMinutes(self::DEFAULT_MINUTES);
             }
