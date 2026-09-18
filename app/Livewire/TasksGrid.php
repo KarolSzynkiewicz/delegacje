@@ -162,6 +162,20 @@ class TasksGrid extends Component
 
     public ?int $planPinId = null;
 
+    /**
+     * Zaznaczone wiersze / karty (work item albo project task id).
+     *
+     * @var list<int>
+     */
+    public array $selectedIds = [];
+
+    public string $bulkField = '';
+
+    public string $bulkValue = '';
+
+    /** @var list<int> */
+    public array $listedIds = [];
+
     // Expanded rows (task IDs)
     public array $expandedTasks = [];
 
@@ -331,12 +345,14 @@ class TasksGrid extends Component
             $this->layout = 'cards';
             $this->sortField = 'due_date';
             $this->sortDirection = 'asc';
-            $this->groupBy = '';
             $this->view = '';
             $this->activeViewId = null;
             $this->visibleColumns = ['name'];
+            $this->groupBy = '';
             $this->enforcePlanLocks();
+            $this->restoreGridChromeFromCookies();
             $this->hideGroupedColumn();
+            $this->persistGridChrome();
 
             return;
         }
@@ -368,9 +384,12 @@ class TasksGrid extends Component
 
         if ($this->view !== '' && $this->gridViewsTableExists()) {
             $this->loadViewFromSlug($this->view, flash: false);
+        } else {
+            $this->restoreGridChromeFromCookies();
         }
 
         $this->hideGroupedColumn();
+        $this->persistGridChrome();
     }
 
     public function setLayout(string $layout): void
@@ -426,6 +445,183 @@ class TasksGrid extends Component
         }
 
         $this->resetPage();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function normalizedSelectedIds(): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map('intval', $this->selectedIds),
+            fn (int $id) => $id > 0
+        )));
+    }
+
+    public function isSelected(int $id): bool
+    {
+        return in_array($id, $this->normalizedSelectedIds(), true);
+    }
+
+    public function toggleSelected(int $id): void
+    {
+        if ($id < 1) {
+            return;
+        }
+
+        $ids = $this->normalizedSelectedIds();
+        if (in_array($id, $ids, true)) {
+            $this->selectedIds = array_values(array_filter($ids, fn (int $keep) => $keep !== $id));
+
+            return;
+        }
+
+        $ids[] = $id;
+        $this->selectedIds = $ids;
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selectedIds = [];
+        $this->bulkField = '';
+        $this->bulkValue = '';
+    }
+
+    #[On('plan-queue-forget-selected')]
+    public function forgetSelected(array $ids = []): void
+    {
+        if (! $this->isPlanQueue()) {
+            return;
+        }
+
+        $drop = array_map('intval', $ids);
+        $this->selectedIds = array_values(array_diff($this->normalizedSelectedIds(), $drop));
+    }
+
+    public function pageIsFullySelected(): bool
+    {
+        $visible = array_values(array_filter(array_map('intval', $this->listedIds), fn (int $id) => $id > 0));
+        if ($visible === []) {
+            return false;
+        }
+
+        $selected = $this->normalizedSelectedIds();
+
+        return collect($visible)->every(fn (int $id) => in_array($id, $selected, true));
+    }
+
+    public function toggleSelectVisible(): void
+    {
+        $visible = array_values(array_filter(array_map('intval', $this->listedIds), fn (int $id) => $id > 0));
+        $selected = $this->normalizedSelectedIds();
+        if ($visible !== [] && collect($visible)->every(fn (int $id) => in_array($id, $selected, true))) {
+            $this->selectedIds = array_values(array_diff($selected, $visible));
+
+            return;
+        }
+
+        $this->selectedIds = array_values(array_unique(array_merge($selected, $visible)));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function bulkWritableFields(): array
+    {
+        $fields = [
+            'assigned_to' => 'Przypisany',
+            'category' => 'Kategoria',
+            'status' => 'Status',
+        ];
+
+        if (! $this->isLockedToSprint()) {
+            $fields['sprint'] = 'Sprint';
+        }
+
+        $fields['priority'] = 'Priorytet';
+        $fields['due_date'] = 'Termin';
+
+        return $fields;
+    }
+
+    public function updatedBulkField(): void
+    {
+        $this->bulkValue = '';
+    }
+
+    public function bulkApply(): void
+    {
+        if ($this->isPlanQueue()) {
+            return;
+        }
+
+        $fieldKey = $this->bulkField;
+        if (! array_key_exists($fieldKey, $this->bulkWritableFields())) {
+            return;
+        }
+
+        $field = GridField::tryFrom($fieldKey);
+        if (! $field) {
+            return;
+        }
+
+        if ($fieldKey === 'status' && trim($this->bulkValue) === '') {
+            return;
+        }
+
+        $ids = $this->normalizedSelectedIds();
+        if ($ids === []) {
+            return;
+        }
+
+        $updated = 0;
+        foreach ($this->selectedRecords($ids) as $record) {
+            if (! $this->rowWritable($record, $fieldKey)) {
+                continue;
+            }
+
+            $this->applyBulkValueToRecord($record, $field, $this->bulkValue);
+            $updated++;
+        }
+
+        if ($updated > 0) {
+            $label = $this->bulkWritableFields()[$fieldKey];
+            $this->flash = $updated === 1
+                ? 'Zmieniono: '.$label.' · 1 zadanie.'
+                : 'Zmieniono: '.$label.' · '.$updated.' zadań.';
+            $this->invalidateViewCounts();
+        }
+    }
+
+    protected function applyBulkValueToRecord(WorkItem|ProjectTask $record, GridField $field, string $value): void
+    {
+        if ($record instanceof WorkItem) {
+            $record->handler()->write($record, $field, $value);
+
+            return;
+        }
+
+        app(ProjectTaskFields::class)->write($record, $field, $value);
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return Collection<int, WorkItem|ProjectTask>
+     */
+    protected function selectedRecords(array $ids): Collection
+    {
+        if ($ids === []) {
+            return collect();
+        }
+
+        if ($this->usesWorkItems() || $this->isPlanQueue()) {
+            return WorkItem::query()
+                ->with('source')
+                ->whereIn('id', $ids)
+                ->get();
+        }
+
+        return ProjectTask::query()->whereIn('id', $ids)->get();
     }
 
     protected function enforcePlanLocks(): void
@@ -794,6 +990,7 @@ class TasksGrid extends Component
         $this->batchingViewPersist = false;
         $this->resetPage();
         $this->detachActiveView();
+        $this->persistGridChrome();
     }
 
     /**
@@ -1142,6 +1339,7 @@ class TasksGrid extends Component
         $this->collapsedGroups = [];
         $this->resetPage();
         $this->detachActiveView();
+        $this->persistGridChrome();
     }
 
     public function updatingGroupBy(mixed $value): void
@@ -1161,6 +1359,9 @@ class TasksGrid extends Component
         $this->groupByBeforeUpdate = null;
         $this->collapsedGroups = [];
         $this->resetPage();
+        if (! $this->batchingViewPersist) {
+            $this->persistGridChrome();
+        }
     }
 
     public function toggleGroupCollapse(string $groupKey): void
@@ -1217,6 +1418,7 @@ class TasksGrid extends Component
         }
 
         $this->detachActiveView();
+        $this->persistGridChrome();
     }
 
     #[Renderless]
@@ -3170,6 +3372,7 @@ class TasksGrid extends Component
         $this->batchingViewPersist = false;
         $this->resetPage();
         $this->enforcePlanLocks();
+        $this->persistGridChrome();
     }
 
     /**
@@ -3524,6 +3727,89 @@ class TasksGrid extends Component
         sort($copy);
 
         return $copy;
+    }
+
+    protected function restoreGridChromeFromCookies(): void
+    {
+        if ($this->isLockedToSprint()) {
+            return;
+        }
+
+        $cols = request()->cookie($this->chromeColumnsCookie());
+        if (is_string($cols) && $cols !== '') {
+            $parsed = $this->sanitizeVisibleColumns(explode(',', $cols));
+            if ($parsed !== []) {
+                $this->visibleColumns = $parsed;
+            }
+        }
+
+        $groupFromUrl = request()->query('groupBy');
+        if (! $this->isPlanQueue() && is_string($groupFromUrl) && $groupFromUrl !== '') {
+            return;
+        }
+
+        $this->groupBy = $this->sanitizeGroupBy((string) request()->cookie($this->chromeGroupCookie(), ''));
+    }
+
+    /**
+     * @param  list<string>|array<int, mixed>  $cols
+     * @return list<string>
+     */
+    protected function sanitizeVisibleColumns(array $cols): array
+    {
+        $allowed = array_keys($this->availableColumns);
+        $out = [];
+        foreach ($cols as $col) {
+            $col = trim((string) $col);
+            if ($col !== '' && in_array($col, $allowed, true) && ! in_array($col, $out, true)) {
+                $out[] = $col;
+            }
+        }
+
+        if ($out === [] || ! in_array('name', $out, true)) {
+            array_unshift($out, 'name');
+            $out = array_values(array_unique($out));
+        }
+
+        return $out;
+    }
+
+    protected function sanitizeGroupBy(string $field): string
+    {
+        if ($field === '' || $field === 'name') {
+            return '';
+        }
+
+        if ($field === 'sprint' && $this->isLockedToSprint()) {
+            return '';
+        }
+
+        if ($field === 'type' && ! $this->usesWorkItems()) {
+            return '';
+        }
+
+        return array_key_exists($field, $this->availableColumns) ? $field : '';
+    }
+
+    protected function persistGridChrome(): void
+    {
+        if ($this->isLockedToSprint()) {
+            return;
+        }
+
+        $minutes = 60 * 24 * 365;
+        cookie()->queue($this->chromeColumnsCookie(), implode(',', $this->visibleColumns), $minutes);
+        cookie()->queue($this->chromeGroupCookie(), $this->groupBy, $minutes);
+    }
+
+    protected function chromeColumnsCookie(): string
+    {
+        return $this->isPlanQueue() ? 'tg_plan_cols' : 'tg_cols';
+    }
+
+    protected function chromeGroupCookie(): string
+    {
+        return $this->isPlanQueue() ? 'tg_plan_group' : 'tg_group';
     }
 
     protected function hideGroupedColumn(): void
@@ -4163,6 +4449,7 @@ class TasksGrid extends Component
         array_splice($order, $toIdx, 0, [$from]);
         $this->visibleColumns = array_values($order);
         $this->detachActiveView();
+        $this->persistGridChrome();
         $this->skipRender();
     }
 
@@ -4510,8 +4797,13 @@ class TasksGrid extends Component
 
         $this->rememberWorkItemList($tasks, $groupedTasks);
         $this->hydrateExpandedSubtasks($tasks, $groupedTasks);
+        $this->listedIds = $groupedTasks instanceof Collection
+            ? $groupedTasks->flatten(1)->pluck('id')->map(fn ($id) => (int) $id)->all()
+            : ($tasks?->pluck('id')->map(fn ($id) => (int) $id)->all() ?? []);
 
-        $needsSprintOptions = $this->showAddRow || $this->editingField === 'sprint';
+        $needsSprintOptions = $this->showAddRow
+            || $this->editingField === 'sprint'
+            || ($this->normalizedSelectedIds() !== [] && $this->bulkField === 'sprint');
         $needsProcedureTemplates = $this->usesWorkItems() && $this->showAddRow && $this->addKind === 'procedure';
         $activeViewName = $this->activeViewId
             ? ($savedViews->firstWhere('id', $this->activeViewId)?->name ?? $this->view)

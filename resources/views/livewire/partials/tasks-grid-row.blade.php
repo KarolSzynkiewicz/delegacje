@@ -69,11 +69,15 @@
 {{-- MAIN TASK ROW                                               --}}
 {{-- ════════════════════════════════════════════════════════════ --}}
 <tr wire:key="tg-row-{{ $task->id }}"
-    class="tg-task-row {{ $isExpanded ? 'tg-expanded' : '' }}"
+    class="tg-task-row {{ $isExpanded ? 'tg-expanded' : '' }}{{ $this->isSelected((int) $task->id) ? ' is-selected' : '' }}"
     style="border-left:3px solid {{ $borderColor }}"
     data-tg-drop-task="{{ $task->id }}"
     data-tg-drop-group="{{ $groupValue }}"
     data-tg-accepts-sub="{{ $canAddSubtask ? '1' : '0' }}">
+
+    <td style="width:36px; padding:5px 4px !important; text-align:center">
+        @include('livewire.partials.tasks-grid-select')
+    </td>
 
     {{-- Expand toggle --}}
     <td style="width:36px; padding:5px 4px !important; text-align:center">

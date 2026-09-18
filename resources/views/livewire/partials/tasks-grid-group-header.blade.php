@@ -7,6 +7,7 @@
     class="tg-group-header {{ $isCollapsed ? 'tg-group-collapsed' : '' }}"
     data-tg-drop-group="{{ $groupValue }}">
     {{-- Ten sam chevron co przy wierszu zadania --}}
+    <td style="width:36px; padding:5px 4px !important; text-align:center"></td>
     <td style="width:36px; padding:5px 4px !important; text-align:center">
         <button type="button"
                 wire:click="toggleGroupCollapse('{{ $groupKey }}')"
@@ -16,7 +17,7 @@
             <i class="bi bi-chevron-{{ $isCollapsed ? 'right' : 'down' }}" style="font-size:0.75rem"></i>
         </button>
     </td>
-    <td colspan="{{ $colCount - 1 }}" style="padding:7px 10px">
+    <td colspan="{{ $colCount - 2 }}" style="padding:7px 10px">
         <span class="tg-group-bullet">◆</span>
         <span>
             @if($groupBy === 'sprint' && (string) $groupValue !== '')

@@ -54,12 +54,19 @@
             const board = this.$refs.board;
             return !!(board && board.scrollTop > 1);
         },
+        timedViewport() {
+            const board = this.$refs.board;
+            if (!board) return null;
+            const r = board.getBoundingClientRect();
+            const sticky = board.querySelector('.wi-plan__sticky');
+            const top = sticky ? sticky.getBoundingClientRect().bottom : r.top;
+            return { board, top, bottom: r.bottom };
+        },
         preferTimedOverAllDay(clientY, payload) {
             if (this.isTimedOnly(payload)) return true;
-            const board = this.$refs.board;
-            if (!board) return false;
-            const r = board.getBoundingClientRect();
-            return clientY < r.top + 72 && this.canScrollBoardUp();
+            const view = this.timedViewport();
+            if (!view) return false;
+            return clientY < view.top + 56 && this.canScrollBoardUp();
         },
         asTimedHit(hit) {
             if (!hit) return null;
@@ -76,18 +83,18 @@
             const tick = () => {
                 this.boardScrollRaf = null;
                 if (!this.payload && !this.resizing && !this.drawing) return;
-                const board = this.$refs.board;
-                if (!board) return;
-                const r = board.getBoundingClientRect();
+                const view = this.timedViewport();
+                if (!view) return;
+                const board = view.board;
                 const y = this.boardScrollY;
-                const edge = 72;
+                const edge = 120;
                 let dy = 0;
-                if (y < r.top + edge) {
-                    const t = Math.min(1, Math.max(0, (edge - (y - r.top)) / edge));
-                    dy = -Math.ceil(5 + t * 24);
-                } else if (y > r.bottom - edge) {
-                    const t = Math.min(1, Math.max(0, (edge - (r.bottom - y)) / edge));
-                    dy = Math.ceil(5 + t * 24);
+                if (y < view.top + edge) {
+                    const t = Math.min(1, Math.max(0, (edge - (y - view.top)) / edge));
+                    dy = -Math.ceil(10 + t * 42);
+                } else if (y > view.bottom - edge) {
+                    const t = Math.min(1, Math.max(0, (edge - (view.bottom - y)) / edge));
+                    dy = Math.ceil(10 + t * 42);
                 }
                 if (dy !== 0) {
                     const prev = board.scrollTop;
@@ -125,6 +132,36 @@
             document.querySelectorAll('#wiPlan [data-plan-drag=\'queue:' + payload.id + '\']').forEach((el) => {
                 el.style.display = 'none';
             });
+        },
+        hideQueueSources(ids) {
+            (ids || []).forEach((id) => this.hideQueueSource({ kind: 'queue', id: id }));
+        },
+        queueMemberIds(draggedId) {
+            const dragged = Number(draggedId);
+            const members = [];
+            let draggedChecked = false;
+            document.querySelectorAll('#wiPlan [data-plan-queue] .tg-select input:checked').forEach((el) => {
+                const id = Number(el.value);
+                const host = el.closest('[data-plan-drag]');
+                const type = (host && host.dataset && host.dataset.planType) ? host.dataset.planType : '';
+                if (id === dragged) draggedChecked = true;
+                if (id > 0 && type !== 'meeting') members.push(id);
+            });
+            if (! draggedChecked) return [dragged];
+            if (members.indexOf(dragged) === -1) return [dragged];
+            return members;
+        },
+        dropQueueOnCalendar(payload, date, minutes, allDay, copy) {
+            if (payload.kind === 'queue' && payload.itemType !== 'meeting') {
+                const ids = this.queueMemberIds(payload.id);
+                if (ids.length > 1) {
+                    this.hideQueueSources(ids);
+                    $wire.dropQueueBundle(ids, date, minutes, !!allDay);
+                    return;
+                }
+            }
+            this.hideQueueSource(payload);
+            $wire.dropOnCell(payload.kind, payload.id, date, minutes, !!allDay, !!copy);
         },
         applyDrawPointer(clientY) {
             if (!this.drawing || this.drawing.allDay) return;
@@ -245,9 +282,13 @@
         markSource(on) {
             document.querySelectorAll('#wiPlan .is-source').forEach((el) => el.classList.remove('is-source'));
             if (!on || !this.payload) return;
-            const key = this.payload.kind + ':' + this.payload.id;
-            document.querySelectorAll('#wiPlan [data-plan-drag]').forEach((el) => {
-                if (el.getAttribute('data-plan-drag') === key) el.classList.add('is-source');
+            const kind = this.payload.kind;
+            const ids = kind === 'queue' ? this.queueMemberIds(this.payload.id) : [this.payload.id];
+            ids.forEach((id) => {
+                const key = kind + ':' + id;
+                document.querySelectorAll('#wiPlan [data-plan-drag]').forEach((el) => {
+                    if (el.getAttribute('data-plan-drag') === key) el.classList.add('is-source');
+                });
             });
         },
         applyGhostFromPoint(clientX, clientY) {
@@ -325,6 +366,13 @@
         armDrag() {
             if (this.armed || !this.payload) return;
             this.armed = true;
+            if (this.payload.kind === 'queue' && this.payload.itemType !== 'meeting') {
+                const ids = this.queueMemberIds(this.payload.id);
+                if (ids.length > 1) {
+                    this.payload.title = ids.length + ' WI → sesja';
+                    this.payload.bundle = true;
+                }
+            }
             this.$el.classList.add('is-dragging');
             this.$el.classList.toggle('is-queue-drag', this.payload.kind === 'queue');
             document.body.classList.add('wi-plan-dragging');
@@ -340,8 +388,13 @@
             }
             if (hit.type === 'session') {
                 if (payload.kind === 'queue' && payload.itemType !== 'meeting') {
-                    this.hideQueueSource(payload);
-                    $wire.addToSession(hit.id, payload.id);
+                    const ids = this.queueMemberIds(payload.id);
+                    this.hideQueueSources(ids);
+                    if (ids.length > 1) {
+                        $wire.addQueueItemsToSession(ids, hit.id);
+                    } else {
+                        $wire.addToSession(hit.id, payload.id);
+                    }
                     return;
                 }
                 if (!hit.col || !hit.date) return;
@@ -351,15 +404,13 @@
                     } else if (this.isTimedOnly(payload)) {
                         return;
                     } else {
-                        this.hideQueueSource(payload);
-                        $wire.dropOnCell(payload.kind, payload.id, hit.date, 0, true, copy);
+                        this.dropQueueOnCalendar(payload, hit.date, 0, true, copy);
                         return;
                     }
                 }
                 if (!hit || !hit.col) return;
                 const minutes = this.slotFromY(event.clientY, hit.col);
-                this.hideQueueSource(payload);
-                $wire.dropOnCell(payload.kind, payload.id, hit.date, minutes, false, copy);
+                this.dropQueueOnCalendar(payload, hit.date, minutes, false, copy);
                 return;
             }
             if (hit.type === 'head' || (hit.type === 'allday' && this.preferTimedOverAllDay(event.clientY, payload))) {
@@ -367,14 +418,12 @@
             }
             if (hit && hit.type === 'allday') {
                 if (this.isTimedOnly(payload)) return;
-                this.hideQueueSource(payload);
-                $wire.dropOnCell(payload.kind, payload.id, hit.date, 0, true, copy);
+                this.dropQueueOnCalendar(payload, hit.date, 0, true, copy);
                 return;
             }
             if (!hit || !hit.col) return;
             const minutes = this.slotFromY(event.clientY, hit.col);
-            this.hideQueueSource(payload);
-            $wire.dropOnCell(payload.kind, payload.id, hit.date, minutes, false, copy);
+            this.dropQueueOnCalendar(payload, hit.date, minutes, false, copy);
         },
         beginOpen(event, kind, id) {
             if (this.payload || this.resizing || this.drawing || !id) return;
@@ -596,7 +645,7 @@
                 :plan-queue="true"
                 :plan-user-id="$calendarUser->id"
                 :plan-pin-id="$pinId"
-                :key="'plan-q-'.$calendarUser->id.'-'.($pinId ?? 0).'-'.$queueNonce"
+                :key="'plan-q-'.$calendarUser->id.'-'.($pinId ?? 0)"
             />
         </aside>
 
@@ -682,7 +731,7 @@
                          wire:key="col-{{ $date }}"
                          @pointerdown="beginDraw($event, '{{ $date }}', false)">
                         @foreach($hours as $hour)
-                            <div class="wi-plan__slot"></div>
+                            <div class="wi-plan__slot wi-plan__slot--hour"></div>
                             <div class="wi-plan__slot wi-plan__slot--q"></div>
                             <div class="wi-plan__slot wi-plan__slot--half"></div>
                             <div class="wi-plan__slot wi-plan__slot--q"></div>
@@ -764,7 +813,7 @@
 
     @if($openCard)
         <div class="wi-plan__pop-backdrop" wire:click="closeEvent"></div>
-        <div class="wi-plan__pop {{ $openCard['isSession'] && ! $openCard['viewingMember'] ? 'is-session-pop' : 'is-card-pop' }}"
+        <div class="wi-plan__pop {{ $openCard['isSession'] && ! $openCard['viewingMember'] ? 'is-session-pop' : 'is-card-pop' }}{{ ! empty($openCard['procedureRun']) ? ' is-procedure-pop' : '' }}{{ ! empty($openCard['approval']) ? ' is-approval-pop' : '' }}"
              wire:key="plan-card-{{ $openCard['key'] }}"
              wire:click.stop
              role="dialog"
@@ -820,12 +869,25 @@
                             @endforelse
                         </div>
                     @elseif($openCard['task'])
+                        @if($openCard['procedureRun'])
+                            <livewire:procedure-run-stepper
+                                :run="$openCard['procedureRun']"
+                                :compact="true"
+                                wire:key="plan-stepper-{{ $openCard['procedureRun']->id }}"
+                            />
+                        @endif
                         @include('tasks.partials.task-body', [
                             'task' => $openCard['task'],
                             'showSubtasks' => $openCard['showSubtasks'],
                             'showComments' => true,
                             'showActivity' => false,
                             'wireKey' => 'plan-'.$openCard['task']->id,
+                        ])
+                    @elseif($openCard['approval'])
+                        @include('approval-requests.partials.body', [
+                            'approval' => $openCard['approval'],
+                            'embedded' => true,
+                            'showComments' => true,
                         ])
                     @else
                         <p class="wi-plan__pop-fallback-title">{{ $openCard['title'] }}</p>
@@ -984,7 +1046,7 @@
     .wi-plan__queue .tg-add-actions { display: none !important; }
     .wi-plan__queue .tg-cards { display: flex; flex-direction: column; gap: .35rem; }
     .wi-plan__queue .dt-card.card {
-        padding: .4rem .55rem .4rem 1.25rem !important;
+        padding: .4rem .55rem .4rem 2.2rem !important;
         border-radius: 10px !important;
     }
     .wi-plan__queue .dt-card__title {
@@ -1017,6 +1079,7 @@
     .wi-plan__board {
         background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 14px;
         overflow: auto; min-width: 0; max-height: calc(100vh - 11rem);
+        overscroll-behavior: contain;
     }
     .wi-plan__sticky {
         position: sticky; top: 0; z-index: 8;
@@ -1027,7 +1090,7 @@
     }
     .wi-plan__gutter { border-bottom: 1px solid rgba(255,255,255,.06); }
     .wi-plan__day-head { padding: .4rem .35rem .3rem; border-bottom: 1px solid rgba(255,255,255,.06); border-left: 1px solid rgba(255,255,255,.05); }
-    .wi-plan__day-head.is-today, .wi-plan__allday-cell.is-today, .wi-plan__col.is-today { background: rgba(59, 130, 246, .07); }
+    .wi-plan__day-head.is-today, .wi-plan__allday-cell.is-today, .wi-plan__col.is-today { background-color: rgba(59, 130, 246, .07); }
     .wi-plan__day-name { display: block; font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
     .wi-plan__day-num { font-size: .76rem; color: var(--text-main); }
     .wi-plan__allday { border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(245, 158, 11, .06); }
@@ -1058,11 +1121,24 @@
     .wi-plan__chip-off:hover { opacity: 1; }
     .wi-plan__hours { position: relative; }
     .wi-plan__hour {
-        height: var(--hour-px); font-size: .62rem; color: var(--text-muted);
-        padding: .08rem .2rem 0 0; text-align: right; border-top: 1px solid rgba(255,255,255,.05);
+        height: var(--hour-px); font-size: .62rem; font-weight: 500;
+        color: rgba(226, 232, 240, .68);
+        padding: .08rem .2rem 0 0; text-align: right;
+        border-top: 1px solid rgba(255,255,255,.14);
+        letter-spacing: .02em;
     }
-    .wi-plan__col { position: relative; border-left: 1px solid rgba(255,255,255,.06); cursor: cell; user-select: none; }
+    .wi-plan__col {
+        position: relative; border-left: 1px solid rgba(255,255,255,.06); cursor: cell; user-select: none;
+        background-image: repeating-linear-gradient(
+            to bottom,
+            rgba(255,255,255,.022) 0,
+            rgba(255,255,255,.022) var(--hour-px),
+            transparent var(--hour-px),
+            transparent calc(var(--hour-px) * 2)
+        );
+    }
     .wi-plan__slot { height: calc(var(--hour-px) / 4); border-top: 1px solid rgba(255,255,255,.035); pointer-events: none; }
+    .wi-plan__slot--hour { border-top-color: rgba(255,255,255,.14); }
     .wi-plan__slot--half { border-top-color: rgba(255,255,255,.07); }
     .wi-plan__slot--q { border-top-style: dotted; border-top-color: rgba(255,255,255,.03); }
     .wi-plan__rubber {
@@ -1196,6 +1272,10 @@
     }
     .wi-plan__pop.is-card-pop {
         width: min(44rem, calc(100vw - 2rem));
+    }
+    .wi-plan__pop.is-procedure-pop,
+    .wi-plan__pop.is-approval-pop {
+        width: min(56rem, calc(100vw - 2rem));
     }
     .wi-plan__pop.is-session-pop {
         width: min(26rem, calc(100vw - 2rem));

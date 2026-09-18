@@ -6,6 +6,7 @@ use App\Enums\WorkItemTimeBlockKind;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Collection;
 
 class WorkItemTimeBlock extends Model
 {
@@ -57,6 +58,18 @@ class WorkItemTimeBlock extends Model
         return $this->kind === WorkItemTimeBlockKind::Session;
     }
 
+    /**
+     * @return Collection<int, WorkItem>
+     */
+    public function openItems(): Collection
+    {
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->get();
+
+        return $items
+            ->filter(fn (WorkItem $item) => $item->status->isOpen())
+            ->values();
+    }
+
     public function displayTitle(): string
     {
         $name = trim((string) $this->title);
@@ -67,14 +80,12 @@ class WorkItemTimeBlock extends Model
             return (string) ($this->workItem?->title ?? 'Blok');
         }
 
-        $count = $this->relationLoaded('items') ? $this->items->count() : $this->items()->count();
-
-        return $this->itemCountLabel($count);
+        return $this->itemCountLabel($this->openItems()->count());
     }
 
     public function itemCountLabel(?int $count = null): string
     {
-        $count ??= $this->relationLoaded('items') ? $this->items->count() : $this->items()->count();
+        $count ??= $this->openItems()->count();
         if ($count === 0) {
             return 'Sesja';
         }

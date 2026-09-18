@@ -4,6 +4,7 @@
     data-tg-accepts-sub="{{ $canAddSubtask ? '1' : '0' }}"
     data-tg-expand-for="{{ $task->id }}">
     <td style="width:36px; border-left:3px solid {{ $borderColor }}; padding:0 !important; background:rgba(10,15,29,0.6) !important"></td>
+    <td style="width:36px; padding:0 !important; background:rgba(10,15,29,0.6) !important"></td>
     <td colspan="{{ count($visibleColumns) }}">
         <div class="tg-expand-body">
         <div class="row g-4">

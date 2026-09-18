@@ -820,6 +820,53 @@
     .xuiv2-tasks.is-plan-queue .tg-toolbar.card-body,
     .xuiv2-tasks.is-plan-queue .card-body.tg-toolbar { padding: 0.35rem 0.45rem !important; }
 
+    .tg-select {
+        margin: 0;
+        flex-shrink: 0;
+        cursor: pointer;
+        position: relative;
+        z-index: 3;
+    }
+    .tg-select input {
+        cursor: pointer;
+    }
+    .tg-task-row.is-selected > td {
+        background: rgba(168, 85, 247, .08) !important;
+    }
+    .tg-dt-card.is-selected {
+        box-shadow: 0 0 0 1px rgba(168, 85, 247, .55);
+    }
+    .tg-bulk-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: .45rem .6rem;
+        padding: .55rem .75rem;
+        margin-bottom: .65rem;
+        border: 1px solid var(--glass-border, rgba(255,255,255,.1));
+        border-radius: 12px;
+        background: rgba(13, 18, 30, .72);
+    }
+    .tg-bulk-bar__count {
+        font-size: .78rem;
+        font-weight: 600;
+        color: var(--text-main, #f1f5f9);
+    }
+    .tg-bulk-bar__mutate {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+    .tg-bulk-bar__mutate .form-control,
+    .tg-bulk-bar__mutate .form-select {
+        width: 10.5rem;
+        background: rgba(255,255,255,.04);
+        border-color: var(--glass-border, rgba(255,255,255,.1));
+        color: var(--text-main, #f1f5f9);
+    }
+
     /* ── Karty zadań (mobile) — ten sam szkielet label/wartość co /rotations ── */
     .tg-dt-card.card {
         border-left-width: 3px !important;
@@ -1232,11 +1279,13 @@
     </div>
 </template>
 
+@include('livewire.partials.tasks-grid-bulk-bar')
+
 {{-- ═══════════════════════════════════════════════════════════ --}}
 {{-- GRID TABLE                                                  --}}
 {{-- ═══════════════════════════════════════════════════════════ --}}
 @php
-    $colCount = count($visibleColumns) + 1; // expand col
+    $colCount = count($visibleColumns) + 2; // select + expand
     $colHeaderMeta = [];
     foreach ($visibleColumns as $metaKey) {
         $metaCol = $availableColumns[$metaKey] ?? null;
@@ -1342,6 +1391,7 @@
             {{-- ── Colgroup for column widths (Alpine-driven, updates on resize) ── --}}
             <colgroup>
                 <col style="width:36px; min-width:36px">
+                <col style="width:36px; min-width:36px">
                 @foreach($visibleColumns as $colKey)
                 <col data-col="{{ $colKey }}" :style="colWidths['{{ $colKey }}'] ? `width:${colWidths['{{ $colKey }}']}px;min-width:${colWidths['{{ $colKey }}']}px` : ''">
                 @endforeach
@@ -1350,6 +1400,14 @@
             {{-- ── Header ── --}}
             <thead>
                 <tr>
+                    <th style="width:36px; padding:8px 4px; border-bottom:none; text-align:center">
+                        <x-ui.input type="checkbox"
+                                    id="tg-select-all"
+                                    class="form-check-compact form-check-table tg-select mb-0"
+                                    :checked="$this->pageIsFullySelected() && $listedIds !== []"
+                                    wire:click="toggleSelectVisible"
+                                    aria-label="Zaznacz widoczne" />
+                    </th>
                     <th style="width:36px; padding:8px 4px; border-bottom:none"></th>
 
                     @php $activeChipKeys = array_column($filterChips, 'key'); @endphp
@@ -1433,6 +1491,7 @@
                 {{-- ── Inline add-task row ── --}}
                 @if($showAddRow && ! $this->isEdiReviewing())
                 <tr class="tg-add-row">
+                    <td></td>
                     <td style="padding:6px 4px; text-align:center">
                         <button wire:click="cancelAdd"
                                 class="btn btn-sm btn-link text-muted p-0"
@@ -1950,7 +2009,7 @@
             move(fromCol, toCol);
             table.querySelectorAll('tr.tg-task-row, tr.tg-add-row').forEach(function (tr) {
                 const cells = tr.children;
-                move(cells[iFrom + 1], cells[iTo + 1]);
+                move(cells[iFrom + 2], cells[iTo + 2]);
             });
         }
 

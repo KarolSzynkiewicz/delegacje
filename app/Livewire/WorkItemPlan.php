@@ -2,8 +2,10 @@
 
 namespace App\Livewire;
 
+use App\Enums\ApprovalDecision;
 use App\Enums\ProcedureSubjectType;
 use App\Enums\WorkItemTimeBlockKind;
+use App\Models\ApprovalRequest;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
 use App\Models\User;
@@ -67,7 +69,7 @@ class WorkItemPlan extends Component
 
     public ?int $openMemberId = null;
 
-    public int $queueNonce = 0;
+    public string $approvalComment = '';
 
     public function mount(): void
     {
@@ -240,6 +242,7 @@ class WorkItemPlan extends Component
         $this->openKind = $kind;
         $this->openId = $id;
         $this->openMemberId = null;
+        $this->approvalComment = '';
     }
 
     public function openSessionMember(int $itemId): void
@@ -248,7 +251,14 @@ class WorkItemPlan extends Component
             return;
         }
 
+        $block = $this->blockForUser($this->openId, $this->calendarUser()->id);
+        $member = $block?->items()->whereKey($itemId)->first();
+        if (! $member instanceof WorkItem || ! $member->status->isOpen()) {
+            return;
+        }
+
         $this->openMemberId = $itemId;
+        $this->approvalComment = '';
     }
 
     public function closeSessionMember(): void
@@ -261,12 +271,45 @@ class WorkItemPlan extends Component
         $this->openKind = null;
         $this->openId = null;
         $this->openMemberId = null;
+        $this->approvalComment = '';
+    }
+
+    public function decideOpenApproval(string $decision): void
+    {
+        $card = $this->resolveOpenCard();
+        $approval = $card['approval'] ?? null;
+        if (! $approval instanceof ApprovalRequest) {
+            return;
+        }
+
+        $this->authorize('decide', $approval);
+        $this->validate([
+            'approvalComment' => ['nullable', 'string', 'max:5000'],
+        ]);
+        if (! in_array($decision, ['approved', 'rejected'], true)) {
+            return;
+        }
+
+        $approval->decide(
+            ApprovalDecision::from($decision),
+            auth()->user(),
+            $this->approvalComment,
+        );
+        $this->approvalComment = '';
+        $this->closeEvent();
+        $this->refreshPlanQueue();
     }
 
     #[On('task-title-updated')]
     public function refreshAfterNestedTaskEdit(): void
     {
         // Occupancy titles refresh on the next parent render.
+    }
+
+    #[On('procedure-run-updated')]
+    public function refreshAfterProcedureAdvance(): void
+    {
+        // Nested stepper already mutated the run; occupancy/status refresh on render.
     }
 
     public function dismissUndo(): void
@@ -335,18 +378,107 @@ class WorkItemPlan extends Component
 
     public function addToSession(int $blockId, int $itemId): void
     {
+        if ($this->attachQueueItemToSession($blockId, $itemId)) {
+            $this->refreshPlanQueue();
+        }
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    public function addQueueItemsToSession(array $ids = [], int $sessionId = 0): void
+    {
+        $ids = $this->normalizeQueueIds($ids);
+        $added = [];
+        foreach ($ids as $id) {
+            if ($this->attachQueueItemToSession($sessionId, $id)) {
+                $added[] = $id;
+            }
+        }
+        if ($added !== []) {
+            $this->forgetQueueSelection($added);
+            $this->refreshPlanQueue();
+        }
+    }
+
+    /**
+     * Zaznaczone karty z kolejki (bez spotkań) spadają na siatkę jako nowa sesja.
+     *
+     * @param  list<int>  $ids
+     */
+    public function dropQueueBundle(array $ids, string $date, int $minutes, bool $allDay = false): void
+    {
+        $ids = $this->normalizeQueueIds($ids);
+        $user = $this->calendarUser();
+        $actor = auth()->user();
+        $service = app(WorkItemPlanService::class);
+        $items = [];
+        foreach ($ids as $id) {
+            $item = $this->workItem($id);
+            if (! $item || $item->isMeetingItem() || (int) $item->assignee_id !== (int) $user->id) {
+                continue;
+            }
+            $items[] = $item;
+        }
+
+        if (count($items) < 2) {
+            if (count($items) === 1) {
+                $this->dropOnCell('queue', $items[0]->id, $date, $minutes, $allDay);
+            }
+
+            return;
+        }
+
+        $starts = $this->dateAt($date, $allDay ? 0 : $minutes);
+        $ends = $allDay ? $starts : $starts->addMinutes(WorkItemPlanService::DEFAULT_MINUTES);
+        $session = $service->createSession('', $user, $actor, $starts, $ends, $allDay);
+        $added = [];
+        foreach ($items as $item) {
+            $service->addToSession($session, $item);
+            $added[] = (int) $item->id;
+            if ($this->pinId && (int) $this->pinId === (int) $item->id) {
+                $this->pinId = null;
+            }
+        }
+        $this->forgetQueueSelection($added);
+        $this->refreshPlanQueue();
+    }
+
+    /**
+     * @param  list<mixed>  $ids
+     * @return list<int>
+     */
+    protected function normalizeQueueIds(array $ids): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map('intval', $ids),
+            fn (int $id) => $id > 0
+        )));
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    protected function forgetQueueSelection(array $ids): void
+    {
+        $this->dispatch('plan-queue-forget-selected', ids: $ids)->to(TasksGrid::class);
+    }
+
+    protected function attachQueueItemToSession(int $blockId, int $itemId): bool
+    {
         $user = $this->calendarUser();
         $block = $this->blockForUser($blockId, $user->id);
         $item = $this->workItem($itemId);
         if (! $block || ! $item || (int) $item->assignee_id !== (int) $user->id) {
-            return;
+            return false;
         }
 
         app(WorkItemPlanService::class)->addToSession($block, $item);
         if ($this->pinId && (int) $this->pinId === (int) $item->id) {
             $this->pinId = null;
         }
-        $this->refreshPlanQueue();
+
+        return true;
     }
 
     public function removeFromSession(int $blockId, int $itemId): void
@@ -641,7 +773,6 @@ class WorkItemPlan extends Component
 
     protected function refreshPlanQueue(): void
     {
-        $this->queueNonce++;
         $this->dispatch('plan-queue-refresh')->to(TasksGrid::class);
     }
 
@@ -812,7 +943,7 @@ class WorkItemPlan extends Component
             $member = $this->openMemberId
                 ? $block->items->firstWhere('id', $this->openMemberId)
                 : null;
-            if ($member instanceof WorkItem) {
+            if ($member instanceof WorkItem && $member->status->isOpen()) {
                 return $this->cardFromWorkItem($member, $timeLabel, false, true, true, [], $block->id);
             }
 
@@ -828,6 +959,8 @@ class WorkItemPlan extends Component
                 'viewingMember' => false,
                 'members' => $members,
                 'task' => null,
+                'approval' => null,
+                'procedureRun' => null,
                 'showSubtasks' => false,
                 'description' => '',
                 'blockId' => $block->id,
@@ -859,6 +992,34 @@ class WorkItemPlan extends Component
         $task = $item->editableProjectTask();
         if ($task) {
             $task->loadMissing(['assignedTo', 'createdBy', 'sprint', 'attachments.uploader']);
+            if ($task->isProcedure()) {
+                $task->loadMissing([
+                    'procedureRun.template',
+                    'procedureRun.version',
+                    'procedureRun.steps.approvalRequest.approver',
+                    'procedureRun.steps.performedBy',
+                    'procedureRun.subject',
+                    'procedureRun.startedBy',
+                    'procedureRun.task',
+                ]);
+            }
+        }
+
+        $approval = $item->source instanceof ApprovalRequest ? $item->source : null;
+        if ($approval && auth()->user()?->can('view', $approval)) {
+            $approval->loadMissing([
+                'approver',
+                'createdBy',
+                'decidedBy',
+                'sprint',
+                'attachments.uploader',
+                'comment.commentable',
+                'procedureRun.template',
+                'procedureRun.task',
+                'procedureRun.subject',
+            ]);
+        } else {
+            $approval = null;
         }
 
         return [
@@ -873,6 +1034,8 @@ class WorkItemPlan extends Component
             'viewingMember' => $viewingMember,
             'members' => $members,
             'task' => $task,
+            'approval' => $approval,
+            'procedureRun' => $task?->procedureRun,
             'showSubtasks' => $task && ! $task->isProcedure() && ! $task->isCallback() && ! $task->isMeeting(),
             'description' => $item->plainDescription(),
             'blockId' => $blockId,
@@ -884,7 +1047,7 @@ class WorkItemPlan extends Component
      */
     protected function sessionMemberRows(WorkItemTimeBlock $block): array
     {
-        return $block->items
+        return $block->openItems()
             ->map(fn (WorkItem $item) => [
                 'id' => $item->id,
                 'title' => $item->title,
@@ -894,7 +1057,6 @@ class WorkItemPlan extends Component
                 'dueLabel' => $item->due_at?->format('d.m'),
                 'dueLate' => (bool) $item->due_at?->isPast(),
             ])
-            ->values()
             ->all();
     }
 

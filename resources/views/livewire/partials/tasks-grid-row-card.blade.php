@@ -69,7 +69,7 @@
 @endphp
 
 <x-ui.card
-    class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}{{ $this->isPlanQueue() && (int) $this->planPinId === (int) $task->id ? ' is-pin' : '' }}"
+    class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}{{ $this->isSelected((int) $task->id) ? ' is-selected' : '' }}{{ $this->isPlanQueue() && (int) $this->planPinId === (int) $task->id ? ' is-pin' : '' }}"
     wire:key="tg-card-{{ $task->id }}"
     style="border-left-color: {{ $borderColor }}"
     data-plan-drag="{{ $this->isPlanQueue() && $isWorkItem ? 'queue:'.$task->id : '' }}"
@@ -94,6 +94,9 @@
                     <i class="bi bi-chevron-right" style="font-size:0.75rem"></i>
                 </button>
             @endif
+            <span class="tg-dt-hit" @pointerdown.stop>
+                @include('livewire.partials.tasks-grid-select')
+            </span>
             @if($canAddSubtask && $subtaskTotal > 0 && (! $this->isPlanQueue() || in_array('subtasks', $visibleColumns, true)))
                 <span class="tg-card-subtask-badge" data-tg-sub-stats="{{ $task->id }}" title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                     {{ $subtaskDone }}/{{ $subtaskTotal }}

@@ -242,4 +242,127 @@ class TasksGridGroupColumnTest extends TestCase
 
         $this->assertSame(240, $component->get('columnWidths')['name']);
     }
+
+    public function test_columns_and_grouping_return_from_cookies_on_a_fresh_mount(): void
+    {
+        $component = Livewire::actingAs($this->user)
+            ->withCookies([
+                'tg_cols' => 'name,type,priority,due_date',
+                'tg_group' => 'category',
+            ])
+            ->test(TasksGrid::class);
+
+        $this->assertSame('category', $component->get('groupBy'));
+        $this->assertContains('priority', $component->get('visibleColumns'));
+        $this->assertNotContains('created_by', $component->get('visibleColumns'));
+        $this->assertNotContains('category', $component->get('visibleColumns'));
+    }
+
+    public function test_changing_columns_or_grouping_queues_cookies(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('toggleColumn', 'created_by')
+            ->call('setGroupBy', 'status');
+
+        $cols = collect(\Illuminate\Support\Facades\Cookie::getQueuedCookies())
+            ->first(fn ($cookie) => $cookie->getName() === 'tg_cols');
+        $group = collect(\Illuminate\Support\Facades\Cookie::getQueuedCookies())
+            ->first(fn ($cookie) => $cookie->getName() === 'tg_group');
+
+        $this->assertNotNull($cols);
+        $this->assertNotNull($group);
+        $this->assertSame('status', $group->getValue());
+        $this->assertStringNotContainsString('created_by', $cols->getValue());
+        $this->assertStringNotContainsString('status', $cols->getValue());
+    }
+
+    public function test_query_string_group_by_wins_over_the_cookie(): void
+    {
+        Livewire::actingAs($this->user)
+            ->withCookies(['tg_group' => 'sprint'])
+            ->withQueryParams(['groupBy' => 'status'])
+            ->test(TasksGrid::class)
+            ->assertSet('groupBy', 'status');
+    }
+
+    public function test_plan_queue_keeps_columns_and_grouping_after_a_refresh(): void
+    {
+        $component = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class, [
+                'planQueue' => true,
+                'planUserId' => $this->user->id,
+            ])
+            ->call('toggleColumn', 'priority')
+            ->call('setGroupBy', 'status');
+
+        $this->assertSame('status', $component->get('groupBy'));
+        $this->assertContains('priority', $component->get('visibleColumns'));
+
+        $component->call('refreshPlanQueueListing');
+
+        $this->assertSame('status', $component->get('groupBy'));
+        $this->assertContains('priority', $component->get('visibleColumns'));
+        $this->assertNotContains('status', $component->get('visibleColumns'));
+    }
+
+    public function test_plan_queue_restores_chrome_from_its_own_cookies(): void
+    {
+        $component = Livewire::actingAs($this->user)
+            ->withCookies([
+                'tg_plan_cols' => 'name,priority,due_date',
+                'tg_plan_group' => 'category',
+            ])
+            ->test(TasksGrid::class, [
+                'planQueue' => true,
+                'planUserId' => $this->user->id,
+            ]);
+
+        $this->assertSame('category', $component->get('groupBy'));
+        $this->assertContains('priority', $component->get('visibleColumns'));
+        $this->assertNotContains('created_by', $component->get('visibleColumns'));
+        $this->assertNotContains('category', $component->get('visibleColumns'));
+    }
+
+    public function test_bulk_apply_sets_the_chosen_field_on_selected_work_items(): void
+    {
+        $one = \App\Models\ProjectTask::query()->create([
+            'name' => 'Pierwsze',
+            'status' => \App\Enums\TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $two = \App\Models\ProjectTask::query()->create([
+            'name' => 'Drugie',
+            'status' => \App\Enums\TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $first = \App\Models\WorkItem::query()->where('source_id', $one->id)->firstOrFail();
+        $second = \App\Models\WorkItem::query()->where('source_id', $two->id)->firstOrFail();
+        $other = User::factory()->create(['name' => 'Ola']);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('toggleSelected', $first->id)
+            ->call('toggleSelected', $second->id)
+            ->set('bulkField', 'assigned_to')
+            ->set('bulkValue', (string) $other->id)
+            ->call('bulkApply')
+            ->assertSee('Zmieniono: Przypisany');
+
+        $this->assertSame($other->id, $one->fresh()->assigned_to);
+        $this->assertSame($other->id, $two->fresh()->assigned_to);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('toggleSelected', $first->id)
+            ->call('toggleSelected', $second->id)
+            ->set('bulkField', 'category')
+            ->set('bulkValue', 'Flota')
+            ->call('bulkApply');
+
+        $this->assertSame('Flota', $one->fresh()->category);
+        $this->assertSame('Flota', $two->fresh()->category);
+    }
 }

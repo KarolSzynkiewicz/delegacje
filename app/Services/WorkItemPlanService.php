@@ -753,8 +753,8 @@ class WorkItemPlanService
     {
         $start = CarbonImmutable::parse($block->starts_at);
         $end = CarbonImmutable::parse($block->ends_at);
-        $members = $block->items
-            ->filter(fn (WorkItem $item) => $item->status->isOpen())
+        $open = $block->openItems();
+        $members = $open
             ->map(fn (WorkItem $item) => [
                 'id' => $item->id,
                 'title' => $item->title,
@@ -764,7 +764,6 @@ class WorkItemPlanService
                 'dueLabel' => $item->due_at?->format('d.m'),
                 'dueLate' => (bool) $item->due_at?->isPast(),
             ])
-            ->values()
             ->all();
 
         return new PlanEvent(
@@ -778,7 +777,7 @@ class WorkItemPlanService
             endsAt: $end,
             day: $start->toDateString(),
             type: WorkItemTimeBlockKind::Session->value,
-            typeLabel: $block->itemCountLabel(),
+            typeLabel: $block->itemCountLabel($open->count()),
             typeIcon: WorkItemTimeBlockKind::Session->icon(),
             ghost: $start->toDateString() < $today->toDateString(),
             movable: true,
