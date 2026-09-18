@@ -14,25 +14,20 @@
 <div class="wi-plan" id="wiPlan"
      x-data="{
         payload: null,
+        armed: false,
+        ghost: null,
+        ghostChip: { visible: false, x: 0, y: 0 },
         hourPx: {{ $hourPx }},
         startHour: {{ $gridStartHour }},
         viewStartHour: {{ $viewStartHour }},
         snap: {{ $snap }},
         gridHours: {{ $gridHours }},
+        defaultMinutes: {{ $defaultMinutes }},
         resizing: null,
         drawing: null,
         detail: null,
-        setPayload(event, kind, id, movable) {
-            if (movable === false || this.resizing) {
-                event?.preventDefault();
-                return;
-            }
-            this.payload = { kind, id, copy: !!(event && (event.ctrlKey || event.metaKey)) };
-            if (event && event.dataTransfer) {
-                event.dataTransfer.setData('text/plain', kind + ':' + id);
-                event.dataTransfer.effectAllowed = 'copyMove';
-            }
-        },
+        detailPos: { left: 24, top: 96 },
+        holdTimer: null,
         minutesFromY(clientY, col) {
             const r = col.getBoundingClientRect();
             const y = Math.min(Math.max(0, clientY - r.top), r.height - 1);
@@ -63,24 +58,58 @@
             const pad = (n) => String(n).padStart(2, '0');
             return pad(h) + ':' + pad(m);
         },
-        dropOn(date, col, clientY, allDay, event) {
-            if (!this.payload) return;
-            const minutes = allDay ? 0 : this.minutesFromY(clientY, col);
-            const copy = !!(this.payload.copy || event?.ctrlKey || event?.metaKey);
-            $wire.dropOnCell(this.payload.kind, this.payload.id, date, minutes, !!allDay, copy);
-            this.payload = null;
+        trackPointer(event, move, up) {
+            const pointerId = event.pointerId;
+            const onMove = (e) => { if (e.pointerId === pointerId) move(e); };
+            const onUp = (e) => {
+                if (e.pointerId !== pointerId) return;
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+                window.removeEventListener('pointercancel', onUp);
+                up(e);
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+            window.addEventListener('pointercancel', onUp);
         },
-        dropEffect(event) {
-            if (!event?.dataTransfer) return;
-            event.dataTransfer.dropEffect = (event.ctrlKey || event.metaKey) ? 'copy' : 'move';
+        swallowNextClick() {
+            const eat = (ev) => {
+                ev.stopPropagation();
+                ev.preventDefault();
+                window.removeEventListener('click', eat, true);
+            };
+            window.addEventListener('click', eat, true);
+        },
+        hitTarget(clientX, clientY) {
+            const el = document.elementFromPoint(clientX, clientY);
+            if (!el || typeof el.closest !== 'function') return null;
+            const queue = el.closest('[data-plan-queue]');
+            if (queue) return { type: 'queue', col: queue };
+            const allDay = el.closest('[data-plan-allday]');
+            if (allDay) return { type: 'allday', date: allDay.dataset.date, col: allDay };
+            const col = el.closest('[data-plan-col]');
+            if (col) return { type: 'col', date: col.dataset.date, col };
+            return null;
+        },
+        previewSlot() {
+            if (this.drawing && !this.drawing.allDay) return this.drawing;
+            if (this.ghost && !this.ghost.allDay && !this.ghost.unschedule) return this.ghost;
+            if (this.resizing) {
+                const start = this.resizing.start;
+                let end = this.resizing.end ?? (start + this.snap);
+                if (end <= start) end = start + this.snap;
+                return { date: this.resizing.date, start, end };
+            }
+            return null;
         },
         paintRubber() {
-            const d = this.drawing;
+            const d = this.previewSlot();
             document.querySelectorAll('#wiPlan .wi-plan__rubber').forEach((el) => {
-                if (!d || d.allDay || el.dataset.date !== d.date) {
+                if (!d || el.dataset.date !== d.date) {
                     if (!el.classList.contains('is-held')) {
                         el.style.display = 'none';
                     }
+                    el.classList.remove('is-move');
                     return;
                 }
                 const start = Math.min(d.start, d.end);
@@ -91,35 +120,183 @@
                 el.style.display = 'block';
                 el.style.top = top + '%';
                 el.style.height = height + '%';
+                el.classList.toggle('is-move', !!(this.ghost || this.resizing));
                 const label = el.querySelector('.wi-plan__rubber-time');
                 if (label) label.textContent = this.formatMinutes(start) + ' – ' + this.formatMinutes(end);
             });
         },
-        beginResize(event, kind, id, date) {
+        paintDropTargets() {
+            document.querySelectorAll('#wiPlan [data-plan-allday]').forEach((el) => {
+                el.classList.toggle('is-drop', !!(this.ghost && this.ghost.allDay && el.dataset.date === this.ghost.date));
+            });
+            document.querySelectorAll('#wiPlan [data-plan-queue]').forEach((el) => {
+                el.classList.toggle('is-drop', !!(this.ghost && this.ghost.unschedule));
+            });
+        },
+        markSource(on) {
+            document.querySelectorAll('#wiPlan .is-source').forEach((el) => el.classList.remove('is-source'));
+            if (!on || !this.payload) return;
+            const key = this.payload.kind + ':' + this.payload.id;
+            document.querySelectorAll('#wiPlan [data-plan-drag]').forEach((el) => {
+                if (el.getAttribute('data-plan-drag') === key) el.classList.add('is-source');
+            });
+        },
+        applyGhostFromPoint(clientX, clientY) {
+            if (!this.payload) return;
+            this.ghostChip = { visible: true, x: clientX, y: clientY };
+            const hit = this.hitTarget(clientX, clientY);
+            if (!hit) {
+                this.ghost = null;
+                this.paintRubber();
+                this.paintDropTargets();
+                return;
+            }
+            if (hit.type === 'queue') {
+                this.ghost = this.payload.kind === 'block' ? { unschedule: true } : null;
+                this.paintRubber();
+                this.paintDropTargets();
+                return;
+            }
+            if (hit.type === 'allday') {
+                this.ghost = { date: hit.date, allDay: true, start: 0, end: 0, col: hit.col };
+                this.paintRubber();
+                this.paintDropTargets();
+                return;
+            }
+            const start = this.slotFromY(clientY, hit.col);
+            const duration = this.payload.duration || this.defaultMinutes;
+            this.ghost = {
+                date: hit.date,
+                allDay: false,
+                start,
+                end: Math.min(24 * 60, start + duration),
+                col: hit.col,
+            };
+            this.paintRubber();
+            this.paintDropTargets();
+        },
+        clearDrag() {
+            if (this.holdTimer) {
+                clearTimeout(this.holdTimer);
+                this.holdTimer = null;
+            }
+            this.payload = null;
+            this.armed = false;
+            this.ghost = null;
+            this.ghostChip = { visible: false, x: 0, y: 0 };
+            this.markSource(false);
+            this.$el.classList.remove('is-dragging');
+            document.body.classList.remove('wi-plan-dragging');
+            this.paintRubber();
+            this.paintDropTargets();
+        },
+        armDrag() {
+            if (this.armed || !this.payload) return;
+            this.armed = true;
+            this.$el.classList.add('is-dragging');
+            document.body.classList.add('wi-plan-dragging');
+            this.markSource(true);
+        },
+        commitDrop(event, payload) {
+            const copy = !!(payload.copy || event.ctrlKey || event.metaKey);
+            const hit = this.hitTarget(event.clientX, event.clientY);
+            if (!hit) return;
+            if (hit.type === 'queue') {
+                if (payload.kind === 'block') $wire.unschedule(payload.id);
+                return;
+            }
+            if (hit.type === 'allday') {
+                $wire.dropOnCell(payload.kind, payload.id, hit.date, 0, true, copy);
+                return;
+            }
+            const minutes = this.slotFromY(event.clientY, hit.col);
+            $wire.dropOnCell(payload.kind, payload.id, hit.date, minutes, false, copy);
+        },
+        beginDrag(event, kind, id, duration, title, detail) {
+            if (this.resizing || this.drawing || !id) return;
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            if (event.target.closest('.wi-plan__resize, .wi-plan__chip-off, a, button')) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.payload = {
+                kind,
+                id,
+                copy: !!(event.ctrlKey || event.metaKey),
+                duration: duration || this.defaultMinutes,
+                title: title || '',
+                detail: detail || null,
+                x0: event.clientX,
+                y0: event.clientY,
+            };
+            this.armed = false;
+            this.holdTimer = window.setTimeout(() => {
+                if (!this.payload || this.armed) return;
+                this.armDrag();
+                this.applyGhostFromPoint(this.payload.x0, this.payload.y0);
+            }, 180);
+            this.trackPointer(event, (e) => {
+                if (!this.payload) return;
+                const dx = e.clientX - this.payload.x0;
+                const dy = e.clientY - this.payload.y0;
+                if (!this.armed && (dx * dx + dy * dy) >= 36) {
+                    if (this.holdTimer) {
+                        clearTimeout(this.holdTimer);
+                        this.holdTimer = null;
+                    }
+                    this.armDrag();
+                }
+                if (!this.armed) return;
+                this.payload.copy = !!(e.ctrlKey || e.metaKey || this.payload.copy);
+                this.applyGhostFromPoint(e.clientX, e.clientY);
+            }, (e) => {
+                const payload = this.payload;
+                const armed = this.armed;
+                if (!armed) {
+                    this.clearDrag();
+                    if (payload?.detail) {
+                        this.swallowNextClick();
+                        this.openDetail(e, payload.detail);
+                    }
+                    return;
+                }
+                this.swallowNextClick();
+                this.commitDrop(e, payload);
+                this.clearDrag();
+            });
+        },
+        beginResize(event, kind, id, date, startMinutes) {
             event.stopPropagation();
             event.preventDefault();
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
             const col = event.currentTarget.closest('[data-plan-col]');
-            this.resizing = { kind, id, date, col };
-            const move = (e) => {
+            const eventEl = event.currentTarget.closest('.wi-plan__event');
+            if (eventEl) eventEl.classList.add('is-resizing');
+            this.resizing = { kind, id, date, col, start: startMinutes, end: startMinutes + this.snap };
+            document.body.classList.add('wi-plan-drawing');
+            this.paintRubber();
+            this.trackPointer(event, (e) => {
                 if (!this.resizing) return;
                 this.resizing.end = this.minutesFromY(e.clientY, this.resizing.col);
-            };
-            const up = (e) => {
+                this.paintRubber();
+            }, (e) => {
+                document.body.classList.remove('wi-plan-drawing');
+                document.querySelectorAll('#wiPlan .is-resizing').forEach((el) => el.classList.remove('is-resizing'));
                 if (this.resizing) {
                     const minutes = this.minutesFromY(e.clientY, this.resizing.col);
                     $wire.resizeOnCell(this.resizing.kind, this.resizing.id, this.resizing.date, minutes);
                 }
                 this.resizing = null;
-                window.removeEventListener('mousemove', move);
-                window.removeEventListener('mouseup', up);
-            };
-            window.addEventListener('mousemove', move);
-            window.addEventListener('mouseup', up);
+                this.paintRubber();
+            });
         },
         beginDraw(event, date, allDay) {
             if (this.payload || this.resizing) return;
-            if (event.target.closest('.wi-plan__event, .wi-plan__chip, .wi-plan__flag, .wi-plan__chip-off')) return;
-            if (event.button !== 0) return;
+            if (this.detail) {
+                this.detail = null;
+                return;
+            }
+            if (event.target.closest('.wi-plan__event, .wi-plan__chip, .wi-plan__flag, .wi-plan__chip-off, .wi-plan__float, .wi-plan__pop')) return;
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
             event.preventDefault();
             const col = event.currentTarget;
             const anchor = allDay ? 0 : this.slotFromY(event.clientY, col);
@@ -133,13 +310,10 @@
             };
             document.body.classList.add('wi-plan-drawing');
             this.paintRubber();
-            const move = (e) => {
+            this.trackPointer(event, (e) => {
                 this.applyDrawPointer(e.clientY);
                 this.paintRubber();
-            };
-            const up = (e) => {
-                window.removeEventListener('mousemove', move);
-                window.removeEventListener('mouseup', up);
+            }, (e) => {
                 document.body.classList.remove('wi-plan-drawing');
                 if (!this.drawing) {
                     this.paintRubber();
@@ -149,35 +323,36 @@
                     this.applyDrawPointer(e.clientY);
                 }
                 const d = this.drawing;
+                this.drawing = null;
                 this.paintRubber();
                 $wire.openComposer(d.date, d.start, d.end || d.start + this.snap, !!d.allDay);
-            };
-            window.addEventListener('mousemove', move);
-            window.addEventListener('mouseup', up);
+            });
+        },
+        placeDetail(clientX, clientY) {
+            const width = 320;
+            const height = 180;
+            const left = Math.max(12, Math.min(clientX + 12, window.innerWidth - width - 12));
+            const top = Math.max(12, Math.min(clientY + 12, window.innerHeight - height - 12));
+            this.detailPos = { left, top };
         },
         openDetail(event, data) {
-            event.stopPropagation();
+            event?.stopPropagation?.();
             this.detail = data;
+            this.placeDetail(event?.clientX ?? 24, event?.clientY ?? 96);
+        },
+        closeDetail() {
+            this.detail = null;
         },
         scrollToWorkHours() {
             const el = this.$refs.board;
             if (!el || el.dataset.scrolled === '1') return;
             el.scrollTop = Math.max(0, (this.viewStartHour - this.startHour) * this.hourPx);
             el.dataset.scrolled = '1';
+        },
+        init() {
+            this.scrollToWorkHours();
         }
      }"
-     x-init="
-        scrollToWorkHours();
-        $watch(() => $wire.composerOpen, (open) => {
-            if (open) {
-                queueMicrotask(() => this.paintRubber());
-                return;
-            }
-            this.drawing = null;
-            this.paintRubber();
-        });
-     "
-     @dragend="payload = null"
      @click.outside="detail = null">
 
     <div class="wi-plan__toolbar">
@@ -202,18 +377,16 @@
     </div>
 
     <div class="wi-plan__body">
-        <aside class="wi-plan__queue"
-               @dragover.prevent
-               @drop.prevent="if (payload && payload.kind === 'block') { $wire.unschedule(payload.id); payload = null; }">
+        <aside class="wi-plan__queue" data-plan-queue>
             <div class="wi-plan__queue-head">
                 Do przypięcia
                 <span class="wi-plan__count">{{ $queue->count() }}</span>
             </div>
             @forelse($queue as $item)
                 <article class="wi-plan__card"
-                         draggable="true"
                          wire:key="q-{{ $item->id }}"
-                         @dragstart="setPayload($event, 'queue', {{ $item->id }}, true)">
+                         data-plan-drag="queue:{{ $item->id }}"
+                         @pointerdown="beginDrag($event, 'queue', {{ $item->id }}, {{ $defaultMinutes }}, {{ \Illuminate\Support\Js::from($item->title) }})">
                     <i class="bi {{ $item->type->icon() }} wi-plan__card-icon"></i>
                     <div class="wi-plan__card-body">
                         <span class="wi-plan__card-title">{{ $item->title }}</span>
@@ -254,29 +427,27 @@
                             $allDayEvents = $allDayByDay[$date] ?? [];
                         @endphp
                         <div class="wi-plan__allday-cell {{ $date === $today ? 'is-today' : '' }}"
+                             data-plan-allday
+                             data-date="{{ $date }}"
                              wire:key="ad-{{ $date }}"
-                             @dragover.prevent="dropEffect($event)"
-                             @drop.prevent="dropOn('{{ $date }}', $event.currentTarget, $event.clientY, true, $event)"
-                             @mousedown="beginDraw($event, '{{ $date }}', true)">
+                             @pointerdown="beginDraw($event, '{{ $date }}', true)">
                             @foreach($flags as $flag)
-                                <a href="{{ $flag['url'] }}" class="wi-plan__flag" title="Termin: {{ $flag['title'] }}" @mousedown.stop>
+                                <a href="{{ $flag['url'] }}" class="wi-plan__flag" title="Termin: {{ $flag['title'] }}" @pointerdown.stop>
                                     <i class="bi bi-flag-fill"></i>{{ \Illuminate\Support\Str::limit($flag['title'], 22) }}
                                 </a>
                             @endforeach
                             @foreach($allDayEvents as $slot)
                                 @php $dragId = $slot->blockId; @endphp
                                 <div class="wi-plan__chip {{ $slot->ghost ? 'is-ghost' : '' }}"
-                                     draggable="true"
                                      wire:key="{{ $slot->key }}"
-                                     @mousedown.stop
-                                     @dragstart="setPayload($event, 'block', {{ $dragId }}, true)"
-                                     @click="openDetail($event, {{ \Illuminate\Support\Js::from($slot->payload()) }})">
+                                     data-plan-drag="block:{{ $dragId }}"
+                                     @pointerdown.stop="beginDrag($event, 'block', {{ $dragId ?: 0 }}, {{ $defaultMinutes }}, {{ \Illuminate\Support\Js::from($slot->title) }}, {{ \Illuminate\Support\Js::from($slot->payload()) }})">
                                     <span class="wi-plan__chip-title">{{ $slot->title }}</span>
                                     @if($dragId)
                                         <button type="button"
                                                 class="wi-plan__chip-off"
                                                 title="Odplanuj"
-                                                @mousedown.stop
+                                                @pointerdown.stop
                                                 @click.stop="$wire.unschedule({{ $dragId }})">×</button>
                                     @endif
                                 </div>
@@ -300,9 +471,7 @@
                          data-date="{{ $date }}"
                          style="height: {{ $gridHeight }}px"
                          wire:key="col-{{ $date }}"
-                         @dragover.prevent="dropEffect($event)"
-                         @drop.prevent="dropOn('{{ $date }}', $event.currentTarget, $event.clientY, false, $event)"
-                         @mousedown="beginDraw($event, '{{ $date }}', false)">
+                         @pointerdown="beginDraw($event, '{{ $date }}', false)">
                         @foreach($hours as $hour)
                             <div class="wi-plan__slot"></div>
                             <div class="wi-plan__slot wi-plan__slot--q"></div>
@@ -335,25 +504,21 @@
                                 $width = 100 / max(1, $slot->laneCount);
                                 $left = $slot->lane * $width;
                                 $dragId = $slot->kind === 'block' ? $slot->blockId : $slot->workItemId;
+                                $startMin = ((int) $slot->startsAt->format('H') * 60) + (int) $slot->startsAt->format('i');
+                                $duration = max($snap, $slot->durationMinutes() ?: $defaultMinutes);
+                                $resizeKind = $slot->kind === 'block' ? 'block' : 'meeting';
                             @endphp
                             <div class="wi-plan__event is-{{ $slot->kind }} {{ $slot->ghost ? 'is-ghost' : '' }} {{ $slot->isCompact() ? 'is-compact' : '' }}"
                                  wire:key="{{ $slot->key }}"
-                                 draggable="true"
+                                 data-plan-drag="{{ $slot->kind }}:{{ $dragId }}"
                                  style="top: {{ $slot->topPercent }}%; height: {{ $slot->heightPercent }}%; left: calc({{ $left }}% + 2px); width: calc({{ $width }}% - 4px);"
-                                 @mousedown.stop
-                                 @dragstart="setPayload($event, '{{ $slot->kind }}', {{ $dragId }}, true)"
-                                 @click="openDetail($event, {{ \Illuminate\Support\Js::from($slot->payload()) }})">
+                                 @pointerdown.stop="beginDrag($event, '{{ $slot->kind }}', {{ $dragId ?: 0 }}, {{ $duration }}, {{ \Illuminate\Support\Js::from($slot->title) }}, {{ \Illuminate\Support\Js::from($slot->payload()) }})">
                                 <span class="wi-plan__event-title">{{ $slot->title }}</span>
                                 @unless($slot->isCompact())
                                     <span class="wi-plan__event-time font-mono">{{ $slot->timeLabel() }}</span>
                                 @endunless
-                                @if($slot->kind === 'block')
-                                    <span class="wi-plan__resize"
-                                          @mousedown.stop="beginResize($event, 'block', {{ $dragId }}, '{{ $date }}')"></span>
-                                @else
-                                    <span class="wi-plan__resize"
-                                          @mousedown.stop="beginResize($event, 'meeting', {{ $dragId }}, '{{ $date }}')"></span>
-                                @endif
+                                <span class="wi-plan__resize"
+                                      @pointerdown.stop="beginResize($event, '{{ $resizeKind }}', {{ $dragId ?: 0 }}, '{{ $date }}', {{ $startMin }})"></span>
                             </div>
                         @endforeach
                     </div>
@@ -362,10 +527,16 @@
         </div>
     </div>
 
-    <div class="wi-plan__pop" x-show="detail" x-cloak @click.outside="detail = null">
+    <div class="wi-plan__pop"
+         x-show="detail"
+         x-cloak
+         @pointerdown.stop
+         @click.outside="closeDetail()"
+         :style="'left:' + detailPos.left + 'px; top:' + detailPos.top + 'px'">
         <div class="wi-plan__pop-top">
             <i class="bi" :class="detail?.typeIcon"></i>
             <strong x-text="detail?.title"></strong>
+            <button type="button" class="wi-plan__nav wi-plan__pop-close" title="Zamknij" @click="closeDetail()">×</button>
         </div>
         <div class="wi-plan__pop-meta font-mono" x-text="detail?.timeLabel"></div>
         <div class="wi-plan__pop-meta" x-text="detail?.typeLabel"></div>
@@ -373,8 +544,9 @@
             <a :href="detail?.url" class="btn btn-sm btn-outline-secondary">Otwórz kartę</a>
             <template x-if="detail?.kind === 'block' && detail?.blockId">
                 <button type="button" class="btn btn-sm btn-outline-secondary"
-                        @click="$wire.unschedule(detail.blockId); detail = null">Odplanuj</button>
+                        @click="$wire.unschedule(detail.blockId); closeDetail()">Odplanuj</button>
             </template>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="closeDetail()">Zamknij</button>
         </div>
     </div>
 
@@ -455,6 +627,13 @@
         </div>
     @endif
 
+    <div class="wi-plan__float"
+         x-show="ghostChip.visible"
+         x-cloak
+         :class="payload?.copy && 'is-copy'"
+         :style="'left:' + ghostChip.x + 'px; top:' + ghostChip.y + 'px'"
+         x-text="payload?.title"></div>
+
 <style>
     .wi-plan { display: flex; flex-direction: column; gap: .75rem; min-height: calc(100vh - 8.5rem); position: relative; }
     .wi-plan__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
@@ -484,6 +663,7 @@
         display: flex; gap: .5rem; align-items: flex-start; padding: .45rem .55rem; margin-bottom: .4rem;
         border: 1px solid rgba(255,255,255,.08); border-left: 3px solid var(--primary);
         border-radius: 10px; background: rgba(255,255,255,.03); cursor: grab;
+        -webkit-user-drag: none; user-select: none; touch-action: none;
     }
     .wi-plan__card-icon { color: var(--accent); margin-top: .12rem; font-size: .85rem; }
     .wi-plan__card-title { color: var(--text-main); font-size: .78rem; font-weight: 600; display: block; }
@@ -518,7 +698,7 @@
         text-decoration: none; overflow: hidden;
     }
     .wi-plan__flag { background: rgba(251, 191, 36, .18); color: #fbbf24; }
-    .wi-plan__chip { background: linear-gradient(135deg, rgba(59,130,246,.75), rgba(168,85,247,.7)); color: #fff; cursor: grab; }
+    .wi-plan__chip { background: linear-gradient(135deg, rgba(59,130,246,.75), rgba(168,85,247,.7)); color: #fff; cursor: grab; -webkit-user-drag: none; user-select: none; touch-action: none; }
     .wi-plan__chip.is-ghost { opacity: .5; }
     .wi-plan__chip-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .wi-plan__chip-off {
@@ -567,7 +747,10 @@
         overflow: hidden; color: #fff; cursor: pointer; box-sizing: border-box;
         background: #60a5fa; border: 1px solid rgba(255,255,255,.16);
         box-shadow: 0 4px 10px rgba(0,0,0,.18);
+        -webkit-user-drag: none; user-select: none; touch-action: none;
     }
+    .wi-plan__event.is-source, .wi-plan__chip.is-source, .wi-plan__card.is-source,
+    .wi-plan__event.is-resizing { opacity: .35; }
     .wi-plan__event.is-compact { padding: 0 5px; border-radius: 4px; }
     .wi-plan__event.is-compact .wi-plan__event-title { line-height: 1.15; }
     .wi-plan__event.is-compact .wi-plan__resize { height: 6px; }
@@ -583,13 +766,15 @@
         position: absolute; left: 0; right: 0; bottom: 0; height: 14px; cursor: ns-resize; z-index: 4;
     }
     .wi-plan__pop {
-        position: absolute; z-index: 20; top: 4.5rem; left: 32%; width: min(320px, 90%);
-        background: rgba(13, 18, 30, .94); border: 1px solid var(--glass-border); border-radius: 12px;
+        position: fixed; z-index: 40; width: min(320px, calc(100vw - 24px));
+        background: rgba(13, 18, 30, .96); border: 1px solid var(--glass-border); border-radius: 12px;
         padding: .85rem .95rem; box-shadow: 0 16px 40px rgba(0,0,0,.4);
     }
     .wi-plan__pop-top { display: flex; align-items: center; gap: .45rem; color: var(--text-main); font-size: .85rem; }
+    .wi-plan__pop-top strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wi-plan__pop-close { margin-left: auto; line-height: 1; padding: .1rem .45rem; }
     .wi-plan__pop-meta { font-size: .72rem; color: var(--text-muted); margin-top: .2rem; }
-    .wi-plan__pop-actions { display: flex; gap: .5rem; margin-top: .75rem; }
+    .wi-plan__pop-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
     .wi-plan__composer-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.35); }
     .wi-plan__composer {
         position: fixed; z-index: 31; top: 16%; left: 50%; transform: translateX(-50%);
@@ -622,6 +807,22 @@
     }
     .wi-plan__composer-foot { display: flex; justify-content: flex-end; gap: .45rem; margin-top: .75rem; }
     .wi-plan-drawing { user-select: none !important; cursor: ns-resize; }
+    .wi-plan-dragging, .wi-plan-dragging * { cursor: grabbing !important; user-select: none !important; }
+    .wi-plan.is-dragging .wi-plan__event,
+    .wi-plan.is-dragging .wi-plan__chip,
+    .wi-plan.is-dragging .wi-plan__flag,
+    .wi-plan.is-dragging .wi-plan__card { pointer-events: none; }
+    .wi-plan__allday-cell.is-drop, .wi-plan__queue.is-drop {
+        outline: 2px dashed rgba(96, 165, 250, .85); outline-offset: -2px;
+    }
+    .wi-plan__float {
+        position: fixed; z-index: 80; pointer-events: none; max-width: 16rem;
+        transform: translate(14px, 10px); padding: .28rem .55rem; border-radius: 8px;
+        background: linear-gradient(135deg, var(--primary), var(--accent)); color: #fff;
+        font-size: .72rem; font-weight: 600; box-shadow: 0 10px 24px rgba(0,0,0,.35);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .wi-plan__float.is-copy { box-shadow: 0 0 0 2px #fff, 0 10px 24px rgba(0,0,0,.35); }
     [x-cloak] { display: none !important; }
     @media (max-width: 991.98px) {
         .wi-plan__body { grid-template-columns: 1fr; }

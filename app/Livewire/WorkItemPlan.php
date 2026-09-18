@@ -275,6 +275,7 @@ class WorkItemPlan extends Component
             'gridStartHour' => WorkItemPlanService::GRID_START_HOUR,
             'viewStartHour' => WorkItemPlanService::VIEW_START_HOUR,
             'snap' => WorkItemPlanService::SNAP_MINUTES,
+            'defaultMinutes' => WorkItemPlanService::DEFAULT_MINUTES,
             'composerRangeLabel' => $this->composerRangeLabel(),
             'procedureTemplates' => ProcedureTemplate::query()->orderBy('name')->get(['id', 'name', 'subject_type']),
             'procedureSubjectType' => $this->procedureComposerSubjectType(),
