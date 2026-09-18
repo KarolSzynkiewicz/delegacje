@@ -61,7 +61,7 @@
                 @endif
                 @if($procedureLink = $comment->procedureSourceCard())
                     <a href="{{ $procedureLink['url'] }}" class="comment-item__proc" title="Otwórz procedurę">
-                        <i class="bi bi-diagram-3"></i>
+                        <i class="bi bi-share"></i>
                         <span>{{ $procedureLink['label'] }}</span>
                     </a>
                 @endif

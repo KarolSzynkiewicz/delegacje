@@ -3,14 +3,18 @@
 namespace App\Livewire;
 
 use App\Enums\ProcedureSubjectType;
+use App\Enums\WorkItemTimeBlockKind;
 use App\Enums\WorkItemType;
 use App\Models\ProcedureTemplate;
+use App\Models\ProjectTask;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Models\WorkItemTimeBlock;
 use App\Services\WorkItemPlanService;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
@@ -53,6 +57,9 @@ class WorkItemPlan extends Component
     public string $composerProcedureSubjectId = '';
 
     public string $composerProcedureNameSuffix = '';
+
+    /** @var array{token: string, message: string, type: string, payload: array<string, mixed>}|null */
+    public ?array $undo = null;
 
     public function mount(): void
     {
@@ -118,7 +125,10 @@ class WorkItemPlan extends Component
 
                 return;
             }
+            $snapshot = $this->blockSnapshot($block);
             $service->moveBlock($block, $starts, $allDay);
+            $block->refresh();
+            $this->offerUndo($this->movedMessage($block->starts_at, (bool) $block->all_day), 'restore_block', $snapshot);
 
             return;
         }
@@ -131,7 +141,18 @@ class WorkItemPlan extends Component
             if (! $item || $item->type !== WorkItemType::Meeting) {
                 return;
             }
+            $source = $item->source;
+            if (! $source instanceof ProjectTask) {
+                return;
+            }
+            $snapshot = $this->meetingSnapshot($item, $source);
             $service->moveMeeting($item, $starts);
+            $source->refresh();
+            $this->offerUndo(
+                $this->movedMessage($source->starts_at ?? $starts, false),
+                'restore_meeting',
+                $snapshot,
+            );
         }
     }
 
@@ -146,7 +167,14 @@ class WorkItemPlan extends Component
             if (! $block) {
                 return;
             }
+            $snapshot = $this->blockSnapshot($block);
             $service->resizeBlock($block, $ends);
+            $block->refresh();
+            $this->offerUndo(
+                $this->resizedMessage($block->starts_at, $block->ends_at),
+                'restore_block',
+                $snapshot,
+            );
 
             return;
         }
@@ -156,7 +184,18 @@ class WorkItemPlan extends Component
             if (! $item || $item->type !== WorkItemType::Meeting) {
                 return;
             }
+            $source = $item->source;
+            if (! $source instanceof ProjectTask || ! $source->starts_at) {
+                return;
+            }
+            $snapshot = $this->meetingSnapshot($item, $source);
             $service->resizeMeeting($item, $ends);
+            $source->refresh();
+            $this->offerUndo(
+                $this->resizedMessage($source->starts_at, $source->ends_at),
+                'restore_meeting',
+                $snapshot,
+            );
         }
     }
 
@@ -166,7 +205,95 @@ class WorkItemPlan extends Component
         if (! $block) {
             return;
         }
+        $snapshot = $this->blockSnapshot($block);
         app(WorkItemPlanService::class)->deleteBlock($block);
+        $this->offerUndo('Odplanowano', 'recreate_block', $snapshot);
+    }
+
+    public function dismissUndo(): void
+    {
+        $this->undo = null;
+    }
+
+    public function undoLastChange(): void
+    {
+        if (! $this->undo) {
+            return;
+        }
+
+        $undo = $this->undo;
+        $this->undo = null;
+        $payload = $undo['payload'];
+
+        if ($undo['type'] === 'restore_block') {
+            $block = $this->blockForUser((int) $payload['id'], $this->calendarUser()->id);
+            if (! $block) {
+                return;
+            }
+            $block->update([
+                'starts_at' => $payload['starts_at'],
+                'ends_at' => $payload['ends_at'],
+                'all_day' => $payload['all_day'],
+            ]);
+
+            return;
+        }
+
+        if ($undo['type'] === 'recreate_block') {
+            $block = WorkItemTimeBlock::query()->create([
+                'work_item_id' => $payload['work_item_id'],
+                'kind' => $payload['kind'],
+                'title' => $payload['title'],
+                'user_id' => $payload['user_id'],
+                'starts_at' => $payload['starts_at'],
+                'ends_at' => $payload['ends_at'],
+                'all_day' => $payload['all_day'],
+                'created_by_id' => $payload['created_by_id'],
+            ]);
+            if ($payload['kind'] === WorkItemTimeBlockKind::Session->value && $payload['item_ids'] !== []) {
+                $block->items()->sync($payload['item_ids']);
+            }
+
+            return;
+        }
+
+        if ($undo['type'] === 'restore_meeting') {
+            $item = $this->workItem((int) $payload['work_item_id']);
+            $source = $item?->source;
+            if (! $source instanceof ProjectTask) {
+                return;
+            }
+            $source->update([
+                'starts_at' => $payload['starts_at'],
+                'ends_at' => $payload['ends_at'],
+                'due_date' => $payload['due_date'],
+            ]);
+        }
+    }
+
+    public function addToSession(int $blockId, int $itemId): void
+    {
+        $user = $this->calendarUser();
+        $block = $this->blockForUser($blockId, $user->id);
+        $item = $this->workItem($itemId);
+        if (! $block || ! $item || (int) $item->assignee_id !== (int) $user->id) {
+            return;
+        }
+
+        app(WorkItemPlanService::class)->addToSession($block, $item);
+        if ($this->pinId && (int) $this->pinId === (int) $item->id) {
+            $this->pinId = null;
+        }
+    }
+
+    public function removeFromSession(int $blockId, int $itemId): void
+    {
+        $block = $this->blockForUser($blockId, $this->calendarUser()->id);
+        if (! $block) {
+            return;
+        }
+
+        app(WorkItemPlanService::class)->removeFromSession($block, $itemId);
     }
 
     public function openComposer(string $date, int $startMinutes, int $endMinutes, bool $allDay = false): void
@@ -369,7 +496,7 @@ class WorkItemPlan extends Component
     protected function composerRules(): array
     {
         $rules = [
-            'composerType' => ['required', 'in:task,meeting,approval,procedure'],
+            'composerType' => ['required', 'in:task,meeting,approval,procedure,session'],
         ];
 
         if (! $this->composerUnscheduled) {
@@ -390,6 +517,12 @@ class WorkItemPlan extends Component
                 'integer',
                 $subjectTable ? Rule::exists($subjectTable, 'id') : null,
             ]));
+
+            return $rules;
+        }
+
+        if ($this->composerType === 'session') {
+            $rules['composerTitle'] = ['nullable', 'string', 'max:255'];
 
             return $rules;
         }
@@ -433,6 +566,75 @@ class WorkItemPlan extends Component
             'composerProcedureNameSuffix' => 'dopisek',
             'composerProcedureSubjectId' => $subjectType?->label() ?? 'dotyczy',
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    protected function offerUndo(string $message, string $type, array $payload): void
+    {
+        $this->undo = [
+            'token' => (string) Str::uuid(),
+            'message' => $message,
+            'type' => $type,
+            'payload' => $payload,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function blockSnapshot(WorkItemTimeBlock $block): array
+    {
+        $kind = $block->kind instanceof WorkItemTimeBlockKind
+            ? $block->kind->value
+            : (string) $block->kind;
+
+        return [
+            'id' => $block->id,
+            'work_item_id' => $block->work_item_id,
+            'kind' => $kind,
+            'title' => $block->title,
+            'user_id' => $block->user_id,
+            'starts_at' => $block->starts_at->toDateTimeString(),
+            'ends_at' => $block->ends_at->toDateTimeString(),
+            'all_day' => (bool) $block->all_day,
+            'created_by_id' => $block->created_by_id,
+            'item_ids' => $kind === WorkItemTimeBlockKind::Session->value
+                ? $block->items()->pluck('work_items.id')->all()
+                : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function meetingSnapshot(WorkItem $item, ProjectTask $task): array
+    {
+        return [
+            'work_item_id' => $item->id,
+            'starts_at' => $task->starts_at?->toDateTimeString(),
+            'ends_at' => $task->ends_at?->toDateTimeString(),
+            'due_date' => $task->due_date?->toDateString(),
+        ];
+    }
+
+    protected function movedMessage(CarbonInterface $starts, bool $allDay): string
+    {
+        $when = CarbonImmutable::parse($starts)->locale('pl');
+        if ($allDay) {
+            return 'Wydarzenie zostało przełożone na '.$when->translatedFormat('j M').' · cały dzień';
+        }
+
+        return 'Wydarzenie zostało przełożone na '.$when->translatedFormat('j M, H:i');
+    }
+
+    protected function resizedMessage(CarbonInterface $starts, CarbonInterface $ends): string
+    {
+        $start = CarbonImmutable::parse($starts)->locale('pl');
+        $end = CarbonImmutable::parse($ends)->locale('pl');
+
+        return 'Wydarzenie zostało przełożone na '.$start->translatedFormat('j M, H:i').'–'.$end->format('H:i');
     }
 
     protected function weekStart(): CarbonImmutable

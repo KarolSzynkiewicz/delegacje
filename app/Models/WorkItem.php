@@ -12,6 +12,7 @@ use App\WorkItems\StatusWidget;
 use App\WorkItems\WorkItemCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
@@ -67,6 +68,12 @@ class WorkItem extends Model
     public function timeBlocks(): HasMany
     {
         return $this->hasMany(WorkItemTimeBlock::class);
+    }
+
+    public function sessionBlocks(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkItemTimeBlock::class, 'work_item_time_block_items')
+            ->withTimestamps();
     }
 
     /**

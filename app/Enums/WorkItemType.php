@@ -32,7 +32,7 @@ enum WorkItemType: string
         return match ($this) {
             self::Task => 'bi-check2-square',
             self::Subtask => 'bi-list-check',
-            self::ProcedureRun => 'bi-diagram-3',
+            self::ProcedureRun => 'bi-share',
             self::Dispatch => 'bi-box-seam',
             self::FollowUp => 'bi-at',
             self::Callback => 'bi-telephone',

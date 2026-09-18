@@ -68,7 +68,7 @@ final class ChronoAssistCatalog
                 'children' => [
                     ['key' => 'create-task', 'label' => 'Zadanie + podzadania', 'hint' => 'Z kontekstu filtra', 'icon' => 'bi-check2-square'],
                     ['key' => 'create-sprint', 'label' => 'Sprint', 'hint' => 'Cel, start, done, kamienie', 'icon' => 'bi-flag'],
-                    ['key' => 'create-procedure', 'label' => 'Procedura', 'hint' => 'Flow z kroków', 'icon' => 'bi-diagram-3'],
+                    ['key' => 'create-procedure', 'label' => 'Procedura', 'hint' => 'Flow z kroków', 'icon' => 'bi-share'],
                 ],
             ],
             [

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\TaskStatus;
 use App\Enums\WorkItemStatus;
+use App\Enums\WorkItemTimeBlockKind;
 use App\Enums\WorkItemType;
 use App\Models\ApprovalRequest;
 use App\Models\ProcedureRun;
@@ -53,7 +54,7 @@ class WorkItemPlanService
     }
 
     /**
-     * Otwarte WI osoby, które nie mają slotu z datą ≥ dziś (blok albo spotkanie).
+     * Otwarte WI osoby, które nie mają slotu z datą ≥ dziś (blok, sesja albo spotkanie).
      *
      * @return Collection<int, WorkItem>
      */
@@ -64,13 +65,24 @@ class WorkItemPlanService
         $blockedIds = WorkItemTimeBlock::query()
             ->where('user_id', $calendarUser->id)
             ->where('starts_at', '>=', $today)
+            ->whereNotNull('work_item_id')
             ->pluck('work_item_id');
+
+        $sessionItemIds = WorkItem::query()
+            ->whereHas('sessionBlocks', function ($query) use ($calendarUser, $today) {
+                $query->where('user_id', $calendarUser->id)
+                    ->where('kind', WorkItemTimeBlockKind::Session->value)
+                    ->where('starts_at', '>=', $today);
+            })
+            ->pluck('id');
+
+        $hideIds = $blockedIds->merge($sessionItemIds)->unique()->filter()->values();
 
         return WorkItem::query()
             ->with('source')
             ->where('assignee_id', $calendarUser->id)
             ->whereIn('status', [WorkItemStatus::Pending->value, WorkItemStatus::InProgress->value])
-            ->when($blockedIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $blockedIds))
+            ->when($hideIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $hideIds))
             ->orderByRaw('due_at IS NULL')
             ->orderBy('due_at')
             ->orderByDesc('priority')
@@ -93,7 +105,7 @@ class WorkItemPlanService
         $allDay = [];
 
         $blocks = WorkItemTimeBlock::query()
-            ->with('workItem')
+            ->with(['workItem', 'items'])
             ->where('user_id', $calendarUser->id)
             ->where('starts_at', '<', $end)
             ->where('ends_at', '>', $start)
@@ -101,11 +113,9 @@ class WorkItemPlanService
             ->get();
 
         foreach ($blocks as $block) {
-            $item = $block->workItem;
-            if (! $item) {
-                continue;
-            }
-            $event = $this->eventFromBlock($block, $item, $today);
+            $event = $block->isSession()
+                ? $this->eventFromSession($block, $today)
+                : ($block->workItem ? $this->eventFromBlock($block, $block->workItem, $today) : null);
             if (! $event) {
                 continue;
             }
@@ -218,6 +228,7 @@ class WorkItemPlanService
             $day = CarbonImmutable::parse($startsAt)->startOfDay();
             WorkItemTimeBlock::query()->create([
                 'work_item_id' => $item->id,
+                'kind' => WorkItemTimeBlockKind::Item,
                 'user_id' => $calendarUser->id,
                 'starts_at' => $day,
                 'ends_at' => $day->endOfDay(),
@@ -236,6 +247,7 @@ class WorkItemPlanService
         }
         WorkItemTimeBlock::query()->create([
             'work_item_id' => $item->id,
+            'kind' => WorkItemTimeBlockKind::Item,
             'user_id' => $calendarUser->id,
             'starts_at' => $window['starts_at'],
             'ends_at' => $window['ends_at'],
@@ -272,30 +284,59 @@ class WorkItemPlanService
     {
         if ($allDay) {
             $day = CarbonImmutable::parse($startsAt)->startOfDay();
-
-            return WorkItemTimeBlock::query()->create([
-                'work_item_id' => $block->work_item_id,
+            $copy = WorkItemTimeBlock::query()->create([
+                'work_item_id' => $block->isSession() ? null : $block->work_item_id,
+                'kind' => $block->kind,
+                'title' => $block->title,
                 'user_id' => $block->user_id,
                 'starts_at' => $day,
                 'ends_at' => $day->endOfDay(),
                 'all_day' => true,
                 'created_by_id' => $actor->id,
             ]);
+            $this->copySessionMembers($block, $copy);
+
+            return $copy;
         }
 
         $duration = $block->all_day
             ? self::DEFAULT_MINUTES
             : max(self::SNAP_MINUTES, $this->minutesBetween($block->starts_at, $block->ends_at));
         $window = $this->windowFromStart($startsAt, $duration);
-
-        return WorkItemTimeBlock::query()->create([
-            'work_item_id' => $block->work_item_id,
+        $copy = WorkItemTimeBlock::query()->create([
+            'work_item_id' => $block->isSession() ? null : $block->work_item_id,
+            'kind' => $block->kind,
+            'title' => $block->title,
             'user_id' => $block->user_id,
             'starts_at' => $window['starts_at'],
             'ends_at' => $window['ends_at'],
             'all_day' => false,
             'created_by_id' => $actor->id,
         ]);
+        $this->copySessionMembers($block, $copy);
+
+        return $copy;
+    }
+
+    public function addToSession(WorkItemTimeBlock $block, WorkItem $item): void
+    {
+        if (! $block->isSession() || $item->type === WorkItemType::Meeting) {
+            return;
+        }
+        if ((int) $item->assignee_id !== (int) $block->user_id) {
+            return;
+        }
+
+        $block->items()->syncWithoutDetaching([$item->id]);
+    }
+
+    public function removeFromSession(WorkItemTimeBlock $block, int $itemId): void
+    {
+        if (! $block->isSession()) {
+            return;
+        }
+
+        $block->items()->detach($itemId);
     }
 
     public function resizeBlock(WorkItemTimeBlock $block, CarbonInterface $endsAt): void
@@ -419,7 +460,7 @@ class WorkItemPlanService
      *     subject_id?: int|null,
      *     name_suffix?: string|null
      * }  $extra
-     * @return array{task: ProjectTask}|array{approval: ApprovalRequest}|array{meeting: ProjectTask}|array{procedure: ProcedureRun}
+     * @return array{task: ProjectTask}|array{approval: ApprovalRequest}|array{meeting: ProjectTask}|array{procedure: ProcedureRun}|array{session: WorkItemTimeBlock}
      */
     public function createOnCalendar(
         string $type,
@@ -433,6 +474,10 @@ class WorkItemPlanService
     ): array {
         if ($type === 'procedure') {
             return $this->createProcedureOnCalendar($calendarUser, $actor, $startsAt, $endsAt, $allDay, $extra);
+        }
+
+        if ($type === 'session') {
+            return ['session' => $this->createSession($title, $calendarUser, $actor, $startsAt, $endsAt, $allDay)];
         }
 
         $title = trim($title);
@@ -622,6 +667,104 @@ class WorkItemPlanService
             'ends_at' => $endsAt,
             'due_date' => $startsAt->toDateString(),
         ]);
+    }
+
+    public function createSession(
+        string $title,
+        User $calendarUser,
+        User $actor,
+        CarbonInterface $startsAt,
+        CarbonInterface $endsAt,
+        bool $allDay = false,
+    ): WorkItemTimeBlock {
+        if ($allDay) {
+            $day = CarbonImmutable::parse($startsAt)->startOfDay();
+
+            return WorkItemTimeBlock::query()->create([
+                'work_item_id' => null,
+                'kind' => WorkItemTimeBlockKind::Session,
+                'title' => $this->sessionTitle($title),
+                'user_id' => $calendarUser->id,
+                'starts_at' => $day,
+                'ends_at' => $day->endOfDay(),
+                'all_day' => true,
+                'created_by_id' => $actor->id,
+            ]);
+        }
+
+        $start = $this->snap($startsAt);
+        $end = $this->snap($endsAt);
+        if ($end->lessThanOrEqualTo($start)) {
+            $end = $start->addMinutes(self::DEFAULT_MINUTES);
+        }
+
+        return WorkItemTimeBlock::query()->create([
+            'work_item_id' => null,
+            'kind' => WorkItemTimeBlockKind::Session,
+            'title' => $this->sessionTitle($title),
+            'user_id' => $calendarUser->id,
+            'starts_at' => $start,
+            'ends_at' => $end,
+            'all_day' => false,
+            'created_by_id' => $actor->id,
+        ]);
+    }
+
+    private function sessionTitle(string $title): ?string
+    {
+        $title = trim($title);
+
+        return $title !== '' ? $title : null;
+    }
+
+    private function copySessionMembers(WorkItemTimeBlock $from, WorkItemTimeBlock $to): void
+    {
+        if (! $from->isSession()) {
+            return;
+        }
+
+        $ids = $from->items()->pluck('work_items.id')->all();
+        if ($ids !== []) {
+            $to->items()->sync($ids);
+        }
+    }
+
+    private function eventFromSession(WorkItemTimeBlock $block, CarbonImmutable $today): PlanEvent
+    {
+        $start = CarbonImmutable::parse($block->starts_at);
+        $end = CarbonImmutable::parse($block->ends_at);
+        $members = $block->items
+            ->map(fn (WorkItem $item) => [
+                'id' => $item->id,
+                'title' => $item->title,
+                'url' => $item->openUrl(),
+                'typeLabel' => $item->type->label(),
+                'typeIcon' => $item->type->icon(),
+                'dueLabel' => $item->due_at?->format('d.m'),
+                'dueLate' => (bool) $item->due_at?->isPast(),
+            ])
+            ->values()
+            ->all();
+
+        return new PlanEvent(
+            key: 'block:'.$block->id,
+            kind: 'block',
+            workItemId: null,
+            blockId: $block->id,
+            title: $block->displayTitle(),
+            url: '',
+            startsAt: $start,
+            endsAt: $end,
+            day: $start->toDateString(),
+            type: WorkItemTimeBlockKind::Session->value,
+            typeLabel: $block->itemCountLabel(),
+            typeIcon: WorkItemTimeBlockKind::Session->icon(),
+            ghost: $start->toDateString() < $today->toDateString(),
+            movable: true,
+            allDay: (bool) $block->all_day,
+            isSession: true,
+            members: $members,
+        );
     }
 
     private function eventFromBlock(WorkItemTimeBlock $block, WorkItem $item, CarbonImmutable $today): ?PlanEvent

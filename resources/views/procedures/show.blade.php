@@ -43,7 +43,7 @@
             <x-ui.card>
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-3 flex-wrap">
                     <h3 class="fs-6 fw-semibold text-uppercase text-muted mb-0" style="letter-spacing:.05em;">
-                        <i class="bi bi-diagram-3 me-1"></i> Przepływ ({{ $template->nodeCount() }})
+                        <i class="bi bi-share me-1"></i> Przepływ ({{ $template->nodeCount() }})
                     </h3>
                     @if($template->latestVersion())
                         <span class="small text-muted font-mono">{{ $template->latestVersion()->label() }}</span>

@@ -45,7 +45,7 @@
                     <div class="fw-semibold small mb-1">{{ $label }}</div>
                 @endif
                 <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-diagram-3 text-primary"></i>
+                    <i class="bi bi-share text-primary"></i>
                     <span class="fw-semibold">{{ $binding->template->name }}</span>
                 </div>
                 @if($isPreview)

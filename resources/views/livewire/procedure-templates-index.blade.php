@@ -99,7 +99,7 @@
                                 @endif
 
                                 <div class="d-flex flex-wrap gap-3 small text-muted mt-auto pt-2 border-top min-w-0">
-                                    <span class="text-nowrap"><i class="bi bi-diagram-3 me-1"></i>{{ $template->nodeCount() }} kroków</span>
+                                    <span class="text-nowrap"><i class="bi bi-share me-1"></i>{{ $template->nodeCount() }} kroków</span>
                                     <span class="text-nowrap"><i class="bi bi-play-circle me-1"></i>{{ $template->runs_count }} przebiegów</span>
                                     <span class="min-w-0 text-truncate"><i class="bi bi-person me-1"></i>{{ $template->createdBy?->name }}</span>
                                 </div>

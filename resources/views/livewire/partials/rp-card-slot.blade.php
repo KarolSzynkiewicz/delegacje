@@ -1,7 +1,7 @@
 {{-- Etap prowadzony procedurą: weryfikacja / onboarding / zatrudnienie --}}
 <div class="rp-doc-section rp-doc-section--procedure">
     <div class="rp-field-label">
-        <i class="bi bi-diagram-3 me-1"></i>{{ $reviewStatus->procedureSlotLabel() }}
+        <i class="bi bi-share me-1"></i>{{ $reviewStatus->procedureSlotLabel() }}
     </div>
     <livewire:procedure-slot
         :slot-key="$reviewSlotKey"

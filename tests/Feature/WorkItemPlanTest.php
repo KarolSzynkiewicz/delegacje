@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\TaskStatus;
+use App\Enums\WorkItemTimeBlockKind;
 use App\Enums\WorkItemType;
 use App\Livewire\WorkItemPlan;
 use App\Models\ApprovalRequest;
@@ -465,6 +466,51 @@ class WorkItemPlanTest extends TestCase
         $this->assertSame('2026-09-17 09:30:00', $block->ends_at->format('Y-m-d H:i:s'));
     }
 
+    public function test_undo_restores_a_moved_block(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Przypadkowy drop');
+        $block = WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 10:00:00',
+            'ends_at' => '2026-09-17 11:00:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        $component = Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('dropOnCell', 'block', $block->id, '2026-09-18', 12 * 60)
+            ->assertSee('Cofnij');
+
+        $block->refresh();
+        $this->assertSame('2026-09-18 12:00:00', $block->starts_at->format('Y-m-d H:i:s'));
+
+        $component->call('undoLastChange')->assertSet('undo', null);
+
+        $block->refresh();
+        $this->assertSame('2026-09-17 10:00:00', $block->starts_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-09-17 11:00:00', $block->ends_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_undo_restores_an_unscheduled_session(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('Worek', '2026-09-17 14:00:00', '2026-09-17 16:00:00');
+        $item = $this->workItem('Oddzwonić do Oli');
+        $session->items()->attach($item->id);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('unschedule', $session->id)
+            ->call('undoLastChange');
+
+        $restored = WorkItemTimeBlock::query()->where('kind', WorkItemTimeBlockKind::Session)->first();
+        $this->assertNotNull($restored);
+        $this->assertSame('2026-09-17 14:00:00', $restored->starts_at->format('Y-m-d H:i:s'));
+        $this->assertEqualsCanonicalizing([$item->id], $restored->items()->pluck('work_items.id')->all());
+    }
+
     public function test_copying_a_block_keeps_the_original_and_adds_another_slot(): void
     {
         $this->actingAs($this->user);
@@ -564,6 +610,137 @@ class WorkItemPlanTest extends TestCase
         $block = WorkItemTimeBlock::query()->where('work_item_id', $item->id)->first();
         $this->assertNotNull($block);
         $this->assertSame('2026-09-18 14:00:00', $block->starts_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_composer_creates_an_empty_session_on_the_slot(): void
+    {
+        $this->actingAs($this->user);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openComposer', '2026-09-17', 14 * 60, 16 * 60, false)
+            ->set('composerType', 'session')
+            ->set('composerTitle', 'Dzwonienie')
+            ->call('submitComposer')
+            ->assertHasNoErrors();
+
+        $block = WorkItemTimeBlock::query()->where('kind', WorkItemTimeBlockKind::Session)->first();
+        $this->assertNotNull($block);
+        $this->assertNull($block->work_item_id);
+        $this->assertSame('Dzwonienie', $block->title);
+        $this->assertSame('2026-09-17 14:00:00', $block->starts_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-09-17 16:00:00', $block->ends_at->format('Y-m-d H:i:s'));
+        $this->assertSame(0, $block->items()->count());
+
+        $events = collect(app(WorkItemPlanService::class)->occupancy($this->user, now(), now())['timed']['2026-09-17']);
+        $this->assertTrue($events->contains(fn ($event) => $event->isSession && $event->title === 'Dzwonienie'));
+    }
+
+    public function test_queue_items_join_a_session_instead_of_making_new_blocks(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('Dzwonienie', '2026-09-17 14:00:00', '2026-09-17 16:00:00');
+        $first = $this->workItem('Oddzwonić do Ani');
+        $second = $this->workItem('Oddzwonić do Bartka');
+        $other = $this->workItem('Pilny mail');
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('addToSession', $session->id, $first->id)
+            ->call('addToSession', $session->id, $second->id)
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, WorkItemTimeBlock::query()->count());
+        $this->assertEqualsCanonicalizing([$first->id, $second->id], $session->items()->pluck('work_items.id')->all());
+
+        $queue = app(WorkItemPlanService::class)->queue($this->user, now());
+        $this->assertFalse($queue->contains(fn (WorkItem $row) => $row->id === $first->id));
+        $this->assertFalse($queue->contains(fn (WorkItem $row) => $row->id === $second->id));
+        $this->assertTrue($queue->contains(fn (WorkItem $row) => $row->id === $other->id));
+
+        $events = collect(app(WorkItemPlanService::class)->occupancy($this->user, now(), now())['timed']['2026-09-17']);
+        $card = $events->first(fn ($event) => $event->isSession);
+        $this->assertSame('Dzwonienie', $card->title);
+        $this->assertSame('2 zadania', $card->typeLabel);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('removeFromSession', $session->id, $first->id)
+            ->assertHasNoErrors();
+
+        $queue = app(WorkItemPlanService::class)->queue($this->user, now());
+        $this->assertTrue($queue->contains(fn (WorkItem $row) => $row->id === $first->id));
+        $this->assertFalse($queue->contains(fn (WorkItem $row) => $row->id === $second->id));
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('dropOnCell', 'queue', $other->id, '2026-09-17', 14 * 60)
+            ->assertHasNoErrors();
+
+        $this->assertSame(2, WorkItemTimeBlock::query()->count());
+        $this->assertTrue(WorkItemTimeBlock::query()->where('work_item_id', $other->id)->exists());
+    }
+
+    public function test_meetings_cannot_join_a_session(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('Dzwonienie', '2026-09-17 14:00:00', '2026-09-17 16:00:00');
+        $task = $this->task('Spotkanie: sync');
+        $item = WorkItem::query()->where('source_id', $task->id)->firstOrFail();
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('addToSession', $session->id, $item->id);
+
+        $this->assertSame(0, $session->items()->count());
+        $this->assertNull($task->fresh()->starts_at);
+    }
+
+    public function test_yesterdays_session_returns_members_to_the_queue(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('Wczorajsze dzwonienie', '2026-09-16 14:00:00', '2026-09-16 16:00:00');
+        $item = $this->workItem('Oddzwonić do Igi');
+        $session->items()->attach($item->id);
+
+        $queue = app(WorkItemPlanService::class)->queue($this->user, now());
+        $this->assertTrue($queue->contains(fn (WorkItem $row) => $row->id === $item->id));
+    }
+
+    public function test_copying_a_session_copies_its_members(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('Dzwonienie', '2026-09-17 10:00:00', '2026-09-17 12:00:00');
+        $item = $this->workItem('Oddzwonić do Oli');
+        $session->items()->attach($item->id);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('dropOnCell', 'block', $session->id, '2026-09-18', 14 * 60, false, true)
+            ->assertHasNoErrors();
+
+        $copy = WorkItemTimeBlock::query()
+            ->where('kind', WorkItemTimeBlockKind::Session)
+            ->where('id', '!=', $session->id)
+            ->first();
+        $this->assertNotNull($copy);
+        $this->assertSame('2026-09-18 14:00:00', $copy->starts_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-09-18 16:00:00', $copy->ends_at->format('Y-m-d H:i:s'));
+        $this->assertEqualsCanonicalizing([$item->id], $copy->items()->pluck('work_items.id')->all());
+        $this->assertEqualsCanonicalizing([$item->id], $session->fresh()->items()->pluck('work_items.id')->all());
+    }
+
+    private function planSession(string $title, string $starts, string $ends): WorkItemTimeBlock
+    {
+        return WorkItemTimeBlock::query()->create([
+            'work_item_id' => null,
+            'kind' => WorkItemTimeBlockKind::Session,
+            'title' => $title !== '' ? $title : null,
+            'user_id' => $this->user->id,
+            'starts_at' => $starts,
+            'ends_at' => $ends,
+            'created_by_id' => $this->user->id,
+        ]);
     }
 
     private function task(string $name, ?string $due = null): ProjectTask

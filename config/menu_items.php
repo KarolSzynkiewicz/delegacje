@@ -41,7 +41,7 @@ return [
 
     'procedures' => [
         'route' => 'procedure-templates.index',
-        'icon' => 'bi bi-diagram-3',
+        'icon' => 'bi bi-share',
         'label' => 'Procedury',
     ],
 

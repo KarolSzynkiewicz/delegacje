@@ -15,7 +15,7 @@
             <div class="d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
                 <div class="min-w-0">
                     <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                        <i class="bi bi-diagram-3 text-primary"></i>
+                        <i class="bi bi-share text-primary"></i>
                         <span class="fw-semibold">{{ $run->template->name ?? 'Procedura' }}</span>
                         @if($run->version)
                             <x-ui.badge variant="secondary">{{ $run->version->label() }}</x-ui.badge>

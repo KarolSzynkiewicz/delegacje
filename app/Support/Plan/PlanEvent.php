@@ -6,10 +6,13 @@ use Carbon\CarbonImmutable;
 
 final class PlanEvent
 {
+    /**
+     * @param  list<array{id: int, title: string, url: string, typeLabel: string, typeIcon: string, dueLabel: ?string, dueLate: bool}>  $members
+     */
     public function __construct(
         public readonly string $key,
         public readonly string $kind,
-        public readonly int $workItemId,
+        public readonly ?int $workItemId,
         public readonly ?int $blockId,
         public readonly string $title,
         public readonly string $url,
@@ -22,6 +25,8 @@ final class PlanEvent
         public readonly bool $ghost,
         public readonly bool $movable,
         public readonly bool $allDay = false,
+        public readonly bool $isSession = false,
+        public readonly array $members = [],
         public int $lane = 0,
         public int $laneCount = 1,
         public float $topPercent = 0,
@@ -64,6 +69,9 @@ final class PlanEvent
             'timeLabel' => $this->timeLabel(),
             'allDay' => $this->allDay,
             'ghost' => $this->ghost,
+            'isSession' => $this->isSession,
+            'memberCount' => count($this->members),
+            'members' => $this->members,
         ];
     }
 }
