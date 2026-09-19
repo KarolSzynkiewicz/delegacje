@@ -18,6 +18,10 @@
         armed: false,
         ghost: null,
         ghostChip: { visible: false, x: 0, y: 0 },
+        lastQueueSelectId: 0,
+        sessionNamePrompt: null,
+        sessionNameDraft: '',
+        dueOpen: '',
         hourPx: {{ $hourPx }},
         startHour: {{ $gridStartHour }},
         viewStartHour: {{ $viewStartHour }},
@@ -155,13 +159,66 @@
             if (payload.kind === 'queue' && payload.itemType !== 'meeting') {
                 const ids = this.queueMemberIds(payload.id);
                 if (ids.length > 1) {
-                    this.hideQueueSources(ids);
-                    $wire.dropQueueBundle(ids, date, minutes, !!allDay);
+                    this.sessionNamePrompt = { ids: ids, date: date, minutes: minutes, allDay: !!allDay };
+                    this.sessionNameDraft = '';
+                    this.$nextTick(() => { if (this.$refs.sessionNameInput) this.$refs.sessionNameInput.focus(); });
                     return;
                 }
             }
             this.hideQueueSource(payload);
             $wire.dropOnCell(payload.kind, payload.id, date, minutes, !!allDay, !!copy);
+        },
+        confirmSessionName() {
+            if (!this.sessionNamePrompt) return;
+            const name = String(this.sessionNameDraft || '').trim();
+            if (!name) return;
+            const prompt = this.sessionNamePrompt;
+            this.hideQueueSources(prompt.ids);
+            $wire.dropQueueBundle(prompt.ids, prompt.date, prompt.minutes, !!prompt.allDay, name);
+            this.sessionNamePrompt = null;
+            this.sessionNameDraft = '';
+            this.lastQueueSelectId = 0;
+        },
+        cancelSessionName() {
+            this.sessionNamePrompt = null;
+            this.sessionNameDraft = '';
+        },
+        queueSelectBoxes() {
+            return Array.from(document.querySelectorAll('#wiPlan [data-plan-queue] .tg-select input[type=\'checkbox\']'));
+        },
+        syncQueueSelectedClass(input) {
+            const card = input.closest('.tg-dt-card, .tg-task-row');
+            if (card) card.classList.toggle('is-selected', !!input.checked);
+        },
+        toggleQueueSelect(event, id, input) {
+            const boxes = this.queueSelectBoxes();
+            const ids = boxes.map((el) => Number(el.value));
+            if (event.shiftKey && this.lastQueueSelectId) {
+                const a = ids.indexOf(this.lastQueueSelectId);
+                const b = ids.indexOf(id);
+                if (a >= 0 && b >= 0) {
+                    const from = Math.min(a, b);
+                    const to = Math.max(a, b);
+                    for (let i = from; i <= to; i++) {
+                        boxes[i].checked = true;
+                        this.syncQueueSelectedClass(boxes[i]);
+                    }
+                    this.lastQueueSelectId = id;
+                    return;
+                }
+            }
+            input.checked = !input.checked;
+            this.syncQueueSelectedClass(input);
+            this.lastQueueSelectId = id;
+        },
+        onQueueSelectClick(event) {
+            const wrap = event.target.closest('#wiPlan [data-plan-queue] .tg-select');
+            if (!wrap || !this.$el.contains(wrap)) return;
+            const input = wrap.querySelector('input[type=\'checkbox\']');
+            if (!input) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.toggleQueueSelect(event, Number(input.value), input);
         },
         applyDrawPointer(clientY) {
             if (!this.drawing || this.drawing.allDay) return;
@@ -588,6 +645,7 @@
         },
         init() {
             this.scrollToWorkHours();
+            this.$el.addEventListener('click', (e) => this.onQueueSelectClick(e), true);
         }
      }">
 
@@ -677,11 +735,34 @@
                              data-date="{{ $date }}"
                              wire:key="ad-{{ $date }}"
                              @pointerdown="beginDraw($event, '{{ $date }}', true)">
-                            @foreach($flags as $flag)
+                            @php
+                                $flagVisible = array_slice($flags, 0, 3);
+                                $flagHidden = array_slice($flags, 3);
+                            @endphp
+                            @foreach($flagVisible as $flag)
                                 <a href="{{ $flag['url'] }}" class="wi-plan__flag" title="Termin: {{ $flag['title'] }}" @pointerdown.stop>
                                     <i class="bi bi-flag-fill"></i>{{ \Illuminate\Support\Str::limit($flag['title'], 22) }}
                                 </a>
                             @endforeach
+                            @if($flagHidden !== [])
+                                <button type="button"
+                                        class="wi-plan__flag wi-plan__flag-more"
+                                        @pointerdown.stop
+                                        @click.stop="dueOpen = dueOpen === '{{ $date }}' ? '' : '{{ $date }}'">
+                                    +{{ count($flagHidden) }}
+                                </button>
+                                <div class="wi-plan__flag-overflow"
+                                     x-show="dueOpen === '{{ $date }}'"
+                                     x-cloak
+                                     @click.stop
+                                     @pointerdown.stop>
+                                    @foreach($flagHidden as $flag)
+                                        <a href="{{ $flag['url'] }}" class="wi-plan__flag" title="Termin: {{ $flag['title'] }}">
+                                            <i class="bi bi-flag-fill"></i>{{ \Illuminate\Support\Str::limit($flag['title'], 22) }}
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
                             @foreach($allDayEvents as $slot)
                                 @php $dragId = $slot->blockId; @endphp
                                 <div class="wi-plan__chip {{ $slot->ghost ? 'is-ghost' : '' }} {{ $slot->isSession ? 'is-session' : '' }} {{ $slot->kind === 'meeting' ? 'is-meeting' : '' }}"
@@ -818,7 +899,9 @@
              wire:click.stop
              role="dialog"
              aria-modal="true"
-             @keydown.escape.window="if (!document.querySelector('.task-qe-overlay')) $wire.closeEvent()">
+             @keydown.escape.window="if (!document.querySelector('.task-qe-overlay') && !document.activeElement?.closest('input, textarea, select')) $wire.closeEvent()"
+             @keydown.left.window="if (!document.querySelector('.task-qe-overlay') && !document.activeElement?.closest('input, textarea, select')) $wire.openPrevSessionMember()"
+             @keydown.right.window="if (!document.querySelector('.task-qe-overlay') && !document.activeElement?.closest('input, textarea, select')) $wire.openNextSessionMember()">
             <div class="wi-plan__pop-head">
                 <div class="wi-plan__pop-head-copy">
                     <span class="wi-plan__pop-head-kicker"><i class="bi bi-eye"></i> Podgląd z Planera</span>
@@ -827,8 +910,45 @@
                 <span class="wi-plan__pop-head-type">
                     <i class="bi {{ $openCard['typeIcon'] }}"></i>{{ $openCard['typeLabel'] }}
                 </span>
-                @if($openCard['isSession'] && ! $openCard['viewingMember'] && $openCard['title'] !== '')
-                    <strong class="wi-plan__pop-head-title">{{ $openCard['title'] }}</strong>
+                @if($openCard['isSession'] && ! $openCard['viewingMember'])
+                    @if($editingSessionTitle)
+                        <div class="wi-plan__pop-rename">
+                            <input type="text"
+                                   class="form-control form-control-sm"
+                                   wire:model="sessionTitleDraft"
+                                   maxlength="255"
+                                   placeholder="Nazwa sesji"
+                                   wire:keydown.enter="saveSessionTitle"
+                                   wire:keydown.escape="cancelSessionRename"
+                                   x-data x-init="$el.focus(); $el.select()">
+                            <button type="button" class="btn btn-sm btn-primary" wire:click="saveSessionTitle">Zapisz</button>
+                        </div>
+                    @else
+                        <strong class="wi-plan__pop-head-title">{{ $openCard['title'] !== '' ? $openCard['title'] : 'Sesja' }}</strong>
+                        <button type="button"
+                                class="wi-plan__nav wi-plan__pop-rename-btn"
+                                title="Zmień nazwę"
+                                wire:click="startSessionRename">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    @endif
+                @endif
+                @if($openCard['viewingMember'] && ($openCard['memberTotal'] ?? 0) > 1)
+                    <div class="wi-plan__pop-member-nav">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                wire:click="openPrevSessionMember"
+                                @disabled(! $openCard['prevMemberId'])>
+                            <i class="bi bi-chevron-left"></i> Poprzednie
+                        </button>
+                        <span class="font-mono">{{ $openCard['memberIndex'] }} / {{ $openCard['memberTotal'] }}</span>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                wire:click="openNextSessionMember"
+                                @disabled(! $openCard['nextMemberId'])>
+                            Następne <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
                 @endif
                 <div class="wi-plan__pop-head-actions">
                     @if($openCard['viewingMember'])
@@ -902,6 +1022,32 @@
             </div>
         </div>
     @endif
+
+    <div x-show="sessionNamePrompt" x-cloak>
+        <div class="wi-plan__composer-backdrop" @click="cancelSessionName()"></div>
+        <div class="wi-plan__composer" @click.stop>
+            <div class="wi-plan__composer-head">
+                <span>Nazwa sesji</span>
+                <button type="button" class="wi-plan__nav" @click="cancelSessionName()">×</button>
+            </div>
+            <p class="wi-plan__composer-range font-mono" x-text="sessionNamePrompt ? (sessionNamePrompt.ids.length + ' WI') : ''"></p>
+            <input type="text"
+                   class="form-control form-control-sm"
+                   x-ref="sessionNameInput"
+                   x-model="sessionNameDraft"
+                   maxlength="255"
+                   placeholder="Jak nazwiesz ten worek?"
+                   @keydown.enter.prevent="confirmSessionName()"
+                   @keydown.escape.prevent="cancelSessionName()">
+            <div class="wi-plan__composer-foot">
+                <button type="button" class="btn btn-sm btn-outline-secondary" @click="cancelSessionName()">Anuluj</button>
+                <button type="button"
+                        class="btn btn-sm btn-primary"
+                        @click="confirmSessionName()"
+                        :disabled="!(sessionNameDraft || '').trim()">Zapisz</button>
+            </div>
+        </div>
+    </div>
 
     @if($composerOpen)
         <div class="wi-plan__composer-backdrop" wire:click="closeComposer"></div>
@@ -1096,8 +1242,10 @@
     .wi-plan__allday { border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(245, 158, 11, .06); }
     .wi-plan__allday-label { font-size: .58rem; color: var(--text-muted); padding: .3rem .2rem; text-transform: uppercase; letter-spacing: .04em; }
     .wi-plan__allday-cell {
+        position: relative;
         min-height: 2.2rem; padding: .2rem; border-left: 1px solid rgba(255,255,255,.05);
         display: flex; flex-direction: column; gap: .18rem; cursor: cell;
+        overflow: visible;
     }
     .wi-plan__flag, .wi-plan__chip {
         display: flex; align-items: center; gap: .25rem; width: 100%; text-align: left; border: 0; border-radius: 4px;
@@ -1105,6 +1253,10 @@
         text-decoration: none; overflow: hidden;
     }
     .wi-plan__flag { background: rgba(251, 191, 36, .18); color: #fbbf24; }
+    .wi-plan__flag-more { font-weight: 600; background: rgba(251, 191, 36, .28); }
+    .wi-plan__flag-overflow {
+        display: flex; flex-direction: column; gap: .18rem;
+    }
     .wi-plan__chip {
         position: relative;
         background: #3d4f7c; color: #fff; cursor: pointer;
@@ -1308,6 +1460,15 @@
     .wi-plan__pop-head-title {
         min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         font-size: .82rem; color: var(--text-main);
+    }
+    .wi-plan__pop-rename {
+        display: flex; align-items: center; gap: .35rem; min-width: 0; flex: 1;
+    }
+    .wi-plan__pop-rename .form-control { min-width: 8rem; }
+    .wi-plan__pop-rename-btn { padding: .15rem .4rem; line-height: 1; }
+    .wi-plan__pop-member-nav {
+        display: inline-flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+        font-size: .72rem; color: var(--text-muted);
     }
     .wi-plan__pop-head-actions { margin-left: auto; display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
     .wi-plan__pop-close { line-height: 1; padding: .1rem .45rem; }

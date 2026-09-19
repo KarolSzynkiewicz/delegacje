@@ -71,6 +71,10 @@ class WorkItemPlan extends Component
 
     public string $approvalComment = '';
 
+    public bool $editingSessionTitle = false;
+
+    public string $sessionTitleDraft = '';
+
     public function mount(): void
     {
         $service = app(WorkItemPlanService::class);
@@ -243,6 +247,8 @@ class WorkItemPlan extends Component
         $this->openId = $id;
         $this->openMemberId = null;
         $this->approvalComment = '';
+        $this->editingSessionTitle = false;
+        $this->sessionTitleDraft = '';
     }
 
     public function openSessionMember(int $itemId): void
@@ -264,6 +270,8 @@ class WorkItemPlan extends Component
     public function closeSessionMember(): void
     {
         $this->openMemberId = null;
+        $this->editingSessionTitle = false;
+        $this->sessionTitleDraft = '';
     }
 
     public function closeEvent(): void
@@ -272,6 +280,62 @@ class WorkItemPlan extends Component
         $this->openId = null;
         $this->openMemberId = null;
         $this->approvalComment = '';
+        $this->editingSessionTitle = false;
+        $this->sessionTitleDraft = '';
+    }
+
+    public function openPrevSessionMember(): void
+    {
+        $id = (int) (($this->resolveOpenCard() ?? [])['prevMemberId'] ?? 0);
+        if ($id > 0) {
+            $this->openSessionMember($id);
+        }
+    }
+
+    public function openNextSessionMember(): void
+    {
+        $id = (int) (($this->resolveOpenCard() ?? [])['nextMemberId'] ?? 0);
+        if ($id > 0) {
+            $this->openSessionMember($id);
+        }
+    }
+
+    public function startSessionRename(): void
+    {
+        $card = $this->resolveOpenCard();
+        if (! $card || ! $card['isSession'] || $card['viewingMember'] || ! $card['blockId']) {
+            return;
+        }
+
+        $this->sessionTitleDraft = (string) ($card['title'] ?? '');
+        $this->editingSessionTitle = true;
+    }
+
+    public function cancelSessionRename(): void
+    {
+        $this->editingSessionTitle = false;
+        $this->sessionTitleDraft = '';
+    }
+
+    public function saveSessionTitle(): void
+    {
+        $card = $this->resolveOpenCard();
+        if (! $card || ! $card['isSession'] || $card['viewingMember'] || ! $card['blockId']) {
+            return;
+        }
+
+        $this->validate([
+            'sessionTitleDraft' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $block = $this->blockForUser((int) $card['blockId'], $this->calendarUser()->id);
+        if (! $block) {
+            return;
+        }
+
+        app(WorkItemPlanService::class)->renameSession($block, $this->sessionTitleDraft);
+        $this->editingSessionTitle = false;
+        $this->sessionTitleDraft = '';
     }
 
     public function decideOpenApproval(string $decision): void
@@ -406,7 +470,7 @@ class WorkItemPlan extends Component
      *
      * @param  list<int>  $ids
      */
-    public function dropQueueBundle(array $ids, string $date, int $minutes, bool $allDay = false): void
+    public function dropQueueBundle(array $ids, string $date, int $minutes, bool $allDay = false, string $title = ''): void
     {
         $ids = $this->normalizeQueueIds($ids);
         $user = $this->calendarUser();
@@ -431,7 +495,7 @@ class WorkItemPlan extends Component
 
         $starts = $this->dateAt($date, $allDay ? 0 : $minutes);
         $ends = $allDay ? $starts : $starts->addMinutes(WorkItemPlanService::DEFAULT_MINUTES);
-        $session = $service->createSession('', $user, $actor, $starts, $ends, $allDay);
+        $session = $service->createSession($title, $user, $actor, $starts, $ends, $allDay);
         $added = [];
         foreach ($items as $item) {
             $service->addToSession($session, $item);
@@ -944,10 +1008,10 @@ class WorkItemPlan extends Component
                 ? $block->items->firstWhere('id', $this->openMemberId)
                 : null;
             if ($member instanceof WorkItem && $member->status->isOpen()) {
-                return $this->cardFromWorkItem($member, $timeLabel, false, true, true, [], $block->id);
+                return $this->cardFromWorkItem($member, $timeLabel, false, true, true, $members, $block->id);
             }
 
-            return [
+            return array_merge([
                 'key' => 'session:'.$block->id,
                 'timeLabel' => $timeLabel,
                 'typeLabel' => WorkItemTimeBlockKind::Session->label(),
@@ -964,7 +1028,7 @@ class WorkItemPlan extends Component
                 'showSubtasks' => false,
                 'description' => '',
                 'blockId' => $block->id,
-            ];
+            ], $this->memberNav($members, null));
         }
 
         $item = $block->workItem;
@@ -1022,7 +1086,7 @@ class WorkItemPlan extends Component
             $approval = null;
         }
 
-        return [
+        return array_merge([
             'key' => ($viewingMember ? 'session-member:' : 'item:').$item->id,
             'timeLabel' => $timeLabel,
             'typeLabel' => $item->type->label(),
@@ -1039,6 +1103,23 @@ class WorkItemPlan extends Component
             'showSubtasks' => $task && ! $task->isProcedure() && ! $task->isCallback() && ! $task->isMeeting(),
             'description' => $item->plainDescription(),
             'blockId' => $blockId,
+        ], $this->memberNav($members, $viewingMember ? $item->id : null));
+    }
+
+    /**
+     * @param  list<array{id: int, title: string, url: string, typeLabel: string, typeIcon: string, dueLabel: ?string, dueLate: bool}>  $members
+     * @return array{prevMemberId: ?int, nextMemberId: ?int, memberIndex: int, memberTotal: int}
+     */
+    protected function memberNav(array $members, ?int $currentId): array
+    {
+        $ids = array_values(array_map('intval', array_column($members, 'id')));
+        $index = $currentId ? array_search((int) $currentId, $ids, true) : false;
+
+        return [
+            'prevMemberId' => $index === false ? null : ($ids[$index - 1] ?? null),
+            'nextMemberId' => $index === false ? null : ($ids[$index + 1] ?? null),
+            'memberIndex' => $index === false ? 0 : $index + 1,
+            'memberTotal' => count($ids),
         ];
     }
 

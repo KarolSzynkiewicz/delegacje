@@ -730,6 +730,15 @@ class WorkItemPlanService
         ]);
     }
 
+    public function renameSession(WorkItemTimeBlock $block, string $title): void
+    {
+        if (! $block->isSession()) {
+            return;
+        }
+
+        $block->update(['title' => $this->sessionTitle($title)]);
+    }
+
     private function sessionTitle(string $title): ?string
     {
         $title = trim($title);

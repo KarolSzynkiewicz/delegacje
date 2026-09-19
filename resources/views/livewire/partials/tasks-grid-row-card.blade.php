@@ -69,7 +69,7 @@
 @endphp
 
 <x-ui.card
-    class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}{{ $this->isSelected((int) $task->id) ? ' is-selected' : '' }}{{ $this->isPlanQueue() && (int) $this->planPinId === (int) $task->id ? ' is-pin' : '' }}"
+    class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}{{ ! $this->isPlanQueue() && $this->isSelected((int) $task->id) ? ' is-selected' : '' }}{{ $this->isPlanQueue() && (int) $this->planPinId === (int) $task->id ? ' is-pin' : '' }}"
     wire:key="tg-card-{{ $task->id }}"
     style="border-left-color: {{ $borderColor }}"
     data-plan-drag="{{ $this->isPlanQueue() && $isWorkItem ? 'queue:'.$task->id : '' }}"

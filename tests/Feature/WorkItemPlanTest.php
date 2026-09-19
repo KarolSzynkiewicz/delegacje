@@ -317,7 +317,8 @@ class WorkItemPlanTest extends TestCase
             ])
             ->assertSee('Wymienic rolety w sypialni')
             ->assertSee('Spotkanie: urodziny Szymona i Aldony')
-            ->assertSeeHtml('wire:click.stop="toggleSelected('.$item->id.')"')
+            ->assertSeeHtml('id="tg-sel-'.$item->id.'"')
+            ->assertDontSeeHtml('toggleSelected('.$item->id.')')
             ->assertDontSeeHtml('toggleSelected('.$meetingItem->id.')')
             ->call('toggleSelected', $meetingItem->id)
             ->assertSet('selectedIds', [])
@@ -876,11 +877,12 @@ class WorkItemPlanTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(WorkItemPlan::class)
-            ->call('dropQueueBundle', [$first->id, $second->id, $meeting->id], '2026-09-17', 14 * 60)
+            ->call('dropQueueBundle', [$first->id, $second->id, $meeting->id], '2026-09-17', 14 * 60, false, 'Dzwonienie')
             ->assertHasNoErrors();
 
         $session = WorkItemTimeBlock::query()->where('kind', WorkItemTimeBlockKind::Session)->first();
         $this->assertNotNull($session);
+        $this->assertSame('Dzwonienie', $session->title);
         $this->assertSame('2026-09-17 14:00:00', $session->starts_at->format('Y-m-d H:i:s'));
         $this->assertSame('2026-09-17 14:30:00', $session->ends_at->format('Y-m-d H:i:s'));
         $this->assertEqualsCanonicalizing(
@@ -1079,6 +1081,67 @@ class WorkItemPlanTest extends TestCase
             ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
             ->assertSee('Szczegóły')
             ->assertSee('← Sesja');
+    }
+
+    public function test_session_member_preview_can_step_to_neighbors(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('Dzwonienie', '2026-09-17 10:00:00', '2026-09-17 12:00:00');
+        $first = $this->workItem('Pierwszy z worka');
+        $second = $this->workItem('Drugi z worka');
+        $third = $this->workItem('Trzeci z worka');
+        $session->items()->attach([$first->id, $second->id, $third->id]);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'block', $session->id)
+            ->call('openSessionMember', $first->id)
+            ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
+            ->assertSee('Pierwszy z worka')
+            ->assertSee('1 / 3')
+            ->assertSee('Następne')
+            ->call('openNextSessionMember')
+            ->assertSee('Drugi z worka')
+            ->assertSee('2 / 3')
+            ->call('openNextSessionMember')
+            ->assertSee('Trzeci z worka')
+            ->assertSee('3 / 3')
+            ->call('openPrevSessionMember')
+            ->assertSee('Drugi z worka');
+    }
+
+    public function test_session_title_can_be_renamed_from_the_preview(): void
+    {
+        $this->actingAs($this->user);
+        $session = $this->planSession('', '2026-09-17 10:00:00', '2026-09-17 12:00:00');
+        $this->assertNull($session->fresh()->title);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'block', $session->id)
+            ->assertSee('Sesja')
+            ->call('startSessionRename')
+            ->set('sessionTitleDraft', 'Dzwonienie do leadów')
+            ->call('saveSessionTitle')
+            ->assertHasNoErrors()
+            ->assertSee('Dzwonienie do leadów');
+
+        $this->assertSame('Dzwonienie do leadów', $session->fresh()->title);
+    }
+
+    public function test_all_day_due_flags_collapse_after_three(): void
+    {
+        $this->actingAs($this->user);
+        $this->task('Alfa cel flagi unikat', '2026-09-18');
+        $this->task('Beta cel flagi unikat', '2026-09-18');
+        $this->task('Gamma cel flagi unikat', '2026-09-18');
+        $this->task('Delta cel flagi unikat', '2026-09-18');
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->assertSee('Alfa cel flagi unikat')
+            ->assertSeeHtml('wi-plan__flag-more')
+            ->assertSee('+1');
     }
 
     public function test_unschedule_closes_the_plan_card_dialog(): void
