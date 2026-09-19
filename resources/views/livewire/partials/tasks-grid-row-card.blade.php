@@ -72,6 +72,7 @@
     class="dt-card tg-dt-card{{ $isExpanded ? ' is-expanded' : '' }}{{ ! $this->isPlanQueue() && $this->isSelected((int) $task->id) ? ' is-selected' : '' }}{{ $this->isPlanQueue() && (int) $this->planPinId === (int) $task->id ? ' is-pin' : '' }}"
     wire:key="tg-card-{{ $task->id }}"
     style="border-left-color: {{ $borderColor }}"
+    data-tg-id="{{ $task->id }}"
     data-plan-drag="{{ $this->isPlanQueue() && $isWorkItem ? 'queue:'.$task->id : '' }}"
     data-plan-title="{{ $this->isPlanQueue() && $isWorkItem ? $task->name : '' }}"
     data-plan-type="{{ $this->isPlanQueue() && $isWorkItem ? $task->type->value : '' }}"
@@ -429,11 +430,10 @@
         <div class="dt-card__row">
             <span class="dt-card__label">Bloki</span>
             <span class="dt-card__value">
-                @php $pills = $isWorkItem ? $task->schedulePills() : []; @endphp
-                @if($pills !== [])
-                    <span class="font-mono" style="font-size:.78rem">{{ implode(' · ', $pills) }}</span>
+                @if($isWorkItem)
+                    @include('livewire.partials.tg-schedule-cell', ['item' => $task])
                 @else
-                    <span class="text-muted">brak</span>
+                    <span class="text-muted">—</span>
                 @endif
             </span>
         </div>

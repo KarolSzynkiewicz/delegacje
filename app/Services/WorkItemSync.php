@@ -30,6 +30,12 @@ class WorkItemSync
             return null;
         }
 
+        $existing = WorkItem::query()
+            ->where('source_type', $payload['source_type'])
+            ->where('source_id', $payload['source_id'])
+            ->first();
+        $previousAssigneeId = $existing?->assignee_id;
+
         $item = WorkItem::query()->updateOrCreate(
             [
                 'source_type' => $payload['source_type'],
@@ -37,6 +43,10 @@ class WorkItemSync
             ],
             $payload,
         );
+
+        if ((int) ($previousAssigneeId ?? 0) !== (int) ($item->assignee_id ?? 0)) {
+            app(WorkItemPlanService::class)->reassignItemSchedule($item);
+        }
 
         if ($model instanceof ProjectTask) {
             $this->refreshAssignedSubtaskItems($model);

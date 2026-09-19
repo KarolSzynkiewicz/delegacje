@@ -372,6 +372,29 @@ class WorkItemPlanService
         $block->items()->detach($itemId);
     }
 
+    /**
+     * Blok idzie z kartą: nowa osoba dostaje slot, stara kalendarz jest czysty.
+     * Sesja zostaje — wypinamy tylko tę kartę. Bez osoby kasujemy bloki item.
+     */
+    public function reassignItemSchedule(WorkItem $item): void
+    {
+        $item->sessionBlocks()->detach();
+
+        $blocks = WorkItemTimeBlock::query()
+            ->where('work_item_id', $item->id)
+            ->where('kind', WorkItemTimeBlockKind::Item);
+
+        if ($item->assignee_id === null) {
+            $blocks->delete();
+            $item->unsetRelation('timeBlocks');
+
+            return;
+        }
+
+        $blocks->update(['user_id' => (int) $item->assignee_id]);
+        $item->unsetRelation('timeBlocks');
+    }
+
     public function resizeBlock(WorkItemTimeBlock $block, CarbonInterface $endsAt): void
     {
         if ($block->all_day) {

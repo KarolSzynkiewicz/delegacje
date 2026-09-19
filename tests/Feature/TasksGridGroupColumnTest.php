@@ -365,4 +365,12 @@ class TasksGridGroupColumnTest extends TestCase
         $this->assertSame('Flota', $one->fresh()->category);
         $this->assertSame('Flota', $two->fresh()->category);
     }
+
+    public function test_bulk_bar_stays_in_the_dom_with_empty_selection(): void
+    {
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml('class="tg-bulk-bar"')
+            ->assertSee('Co zmieniasz');
+    }
 }

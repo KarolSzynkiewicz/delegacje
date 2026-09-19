@@ -1,17 +1,22 @@
-@if(! $this->isPlanQueue() && $this->normalizedSelectedIds() !== [])
+@unless($this->isPlanQueue())
     @php
         $selectedCount = count($this->normalizedSelectedIds());
         $bulkFields = $this->bulkWritableFields();
         $bulkField = $this->bulkField;
         $canApply = $bulkField !== '' && array_key_exists($bulkField, $bulkFields)
             && ($bulkField !== 'status' || $this->bulkValue !== '');
+        $pageFullySelected = $this->pageIsFullySelected();
     @endphp
-    <div class="tg-bulk-bar" wire:key="tg-bulk-{{ $selectedCount }}-{{ $bulkField }}">
-        <span class="tg-bulk-bar__count font-mono">
+    <div id="tg-bulk-bar"
+         class="tg-bulk-bar{{ $selectedCount > 0 ? ' is-on' : '' }}"
+         wire:key="tg-bulk-{{ $bulkField }}">
+        <span class="tg-bulk-bar__count font-mono" data-tg-bulk-count>
             Wybrano {{ $selectedCount }}
         </span>
         <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="toggleSelectVisible">
-            {{ $this->pageIsFullySelected() ? 'Odznacz widoczne' : 'Zaznacz widoczne' }}
+            <span data-tg-bulk-visible>
+                {{ $pageFullySelected ? 'Odznacz widoczne' : 'Zaznacz widoczne' }}
+            </span>
         </button>
         <div class="tg-bulk-bar__mutate">
             <select class="form-select form-select-sm" wire:model.live="bulkField" aria-label="Co zmieniasz">
@@ -75,4 +80,4 @@
             ×
         </button>
     </div>
-@endif
+@endunless

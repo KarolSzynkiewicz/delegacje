@@ -63,6 +63,23 @@
             color: var(--text-main, #f1f5f9);
             background: rgba(168, 85, 247, 0.16);
         }
+        .task-show-meta .tg-schedule {
+            position: relative;
+            z-index: 2;
+            display: inline-flex;
+            max-width: 100%;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: .78rem;
+            font-variant-numeric: tabular-nums;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+        .task-show-meta .tg-schedule--scheduled { color: var(--primary, #3b82f6); }
+        .task-show-meta .tg-schedule--stale { color: #f59e0b; font-weight: 600; }
+        .task-show-meta .tg-schedule--none { color: var(--text-muted, #94a3b8); }
+        .task-show-meta .tg-schedule:hover {
+            outline: 1px dashed rgba(168, 85, 247, .45);
+        }
         @media (hover: none) {
             .task-show-meta .tg-facet__edit { opacity: 0.85; }
         }
@@ -272,6 +289,15 @@
                     </div>
                 </span>
             </div>
+
+            @if($workItem)
+                <div class="dt-card__row">
+                    <span class="dt-card__label">Bloki</span>
+                    <span class="dt-card__value">
+                        @include('livewire.partials.tg-schedule-cell', ['item' => $workItem])
+                    </span>
+                </div>
+            @endif
 
             @if($task->isMeeting())
                 <div class="dt-card__row">

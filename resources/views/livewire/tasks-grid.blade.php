@@ -533,56 +533,71 @@
         .tg-expand-spinner, .tg-expand-skel__line { animation: none; }
     }
 
-    /* ── Footer / add-task rows ── */
-    .tg-footer-row > td {
-        background: rgba(255,255,255,0.02) !important;
-        border-top: 1px dashed rgba(255,255,255,0.1) !important;
-        padding: 8px 12px !important;
-        color: var(--text-muted, #94a3b8) !important;
+    /* ── Add composer (top of list) ── */
+    .tg-add-composer {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: .4rem .5rem;
+        margin-bottom: .45rem;
+        padding: .4rem .55rem;
+        border-radius: 14px;
+        background: var(--bg-input, rgba(15, 23, 42, .45));
+        border: 1px solid var(--glass-border, rgba(255,255,255,.1));
     }
-    .tg-add-row > td {
-        border-top: 1px dashed rgba(255, 255, 255, 0.1) !important;
-        background: rgba(255, 255, 255, 0.02) !important;
-        padding: 5px 6px !important;
+    .tg-add-composer:focus-within {
+        border-color: rgba(59, 130, 246, .45);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
     }
-    .tg-add-row .form-control,
-    .tg-add-row .form-select {
-        background: rgba(15, 23, 42, 0.45) !important;
-        border-color: rgba(255, 255, 255, 0.08) !important;
-        color: var(--text-main, #f1f5f9) !important;
-        font-size: 0.8rem !important;
-        box-shadow: none !important;
+    .tg-add-composer--wide {
+        flex-direction: column;
+        align-items: stretch;
     }
-    .tg-add-row .form-control:focus,
-    .tg-add-row .form-select:focus {
-        border-color: rgba(168, 85, 247, 0.35) !important;
-        box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.12) !important;
+    .tg-add-composer__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
     }
-    .tg-add-row .tg-add-submit,
-    .tg-add-card .tg-add-submit {
-        background: rgba(168, 85, 247, 0.12) !important;
-        border: 1px solid rgba(168, 85, 247, 0.28) !important;
-        color: #d8b4fe !important;
-        box-shadow: none !important;
-        filter: none !important;
-        transform: none !important;
-    }
-    .tg-add-row .tg-add-submit:hover,
-    .tg-add-card .tg-add-submit:hover {
-        background: rgba(168, 85, 247, 0.2) !important;
-        color: #f1e8ff !important;
-        filter: none !important;
-        transform: none !important;
-        box-shadow: none !important;
-    }
-    .tg-add-row .tg-add-status {
-        font-family: 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 0.68rem;
-        letter-spacing: .04em;
-        text-transform: uppercase;
+    .tg-add-composer__kind {
+        font-size: .78rem;
+        font-weight: 600;
         color: var(--text-muted, #94a3b8);
-        white-space: nowrap;
     }
+    .tg-add-composer__name {
+        flex: 1 1 10rem;
+        min-width: 0;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: var(--text-main, #f1f5f9);
+        font-size: .9rem;
+        padding: .15rem .2rem;
+    }
+    .tg-add-composer__name::placeholder {
+        color: var(--text-muted, #94a3b8);
+        opacity: .8;
+    }
+    .tg-add-composer__name:focus {
+        outline: none;
+    }
+    .tg-add-composer__select {
+        width: auto;
+        min-width: 8.5rem;
+        max-width: 12rem;
+        background: rgba(255,255,255,.04) !important;
+        border-color: var(--glass-border, rgba(255,255,255,.1)) !important;
+        color: var(--text-main, #f1f5f9) !important;
+        font-size: .78rem !important;
+    }
+    .tg-add-kinds {
+        display: flex;
+        align-items: center;
+        gap: .3rem;
+        margin: -.15rem 0 .65rem;
+    }
+    .xuiv2-tasks.is-edi-review .tg-add-composer,
+    .xuiv2-tasks.is-edi-review .tg-add-kinds { display: none !important; }
 
     /* ── Subtask drag-and-drop (pointer events, not HTML5) ── */
     .tg-subtask-item { transition: background .1s; -webkit-user-drag: none; user-select: none; }
@@ -837,7 +852,7 @@
         box-shadow: 0 0 0 1px rgba(168, 85, 247, .55);
     }
     .tg-bulk-bar {
-        display: flex;
+        display: none;
         align-items: center;
         flex-wrap: wrap;
         gap: .45rem .6rem;
@@ -846,6 +861,9 @@
         border: 1px solid var(--glass-border, rgba(255,255,255,.1));
         border-radius: 12px;
         background: rgba(13, 18, 30, .72);
+    }
+    .tg-bulk-bar.is-on {
+        display: flex;
     }
     .tg-bulk-bar__count {
         font-size: .78rem;
@@ -865,6 +883,28 @@
         background: rgba(255,255,255,.04);
         border-color: var(--glass-border, rgba(255,255,255,.1));
         color: var(--text-main, #f1f5f9);
+    }
+    .tg-schedule {
+        position: relative;
+        z-index: 2;
+        display: inline-flex;
+        max-width: 100%;
+        min-width: 0;
+        align-items: center;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: .72rem;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.35;
+        text-decoration: none;
+        border-radius: 4px;
+        word-break: break-word;
+    }
+    .tg-schedule--scheduled { color: var(--primary, #3b82f6); }
+    .tg-schedule--stale { color: #f59e0b; font-weight: 600; }
+    .tg-schedule--none { color: rgba(255,255,255,.25); }
+    .tg-schedule:hover {
+        outline: 1px dashed rgba(168, 85, 247, .45);
+        color: inherit;
     }
 
     /* ── Karty zadań (mobile) — ten sam szkielet label/wartość co /rotations ── */
@@ -947,54 +987,8 @@
     }
     .tg-group-card-header:first-child { margin-top: 0; }
 
-    /* ── Add-task (mobile) ── */
-    .tg-add-card {
-        border: 1px dashed rgba(255, 255, 255, 0.16) !important;
-        background: rgba(255, 255, 255, 0.02);
-    }
-        .tg-add-card .form-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted,#94a3b8); margin-bottom: 2px; }
-
-        .tg-add-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            margin-top: 0.55rem;
-        }
-        .tg-add-actions .btn {
-            display: flex !important;
-            align-items: center;
-            justify-content: flex-start;
-            gap: 0.75rem !important;
-            width: 100% !important;
-            min-height: 52px;
-            padding: 0.8rem 1rem !important;
-            font-size: 0.95rem !important;
-            font-weight: 600 !important;
-            line-height: 1.25 !important;
-            border-radius: 14px !important;
-            background: var(--bg-card, rgba(13, 18, 30, 0.52)) !important;
-            border: 1px solid var(--glass-border, rgba(255,255,255,0.1)) !important;
-            color: var(--text-main, #f1f5f9) !important;
-            text-decoration: none !important;
-            text-align: left;
-            box-shadow: none !important;
-        }
-        .tg-add-actions .btn i {
-            font-size: 1.25rem;
-            width: 1.5rem;
-            text-align: center;
-            flex-shrink: 0;
-            background: linear-gradient(135deg, var(--primary, #3b82f6), var(--accent, #a855f7));
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            -webkit-text-fill-color: transparent;
-        }
-        .tg-add-actions .btn:active {
-            background: rgba(59, 130, 246, 0.12) !important;
-            border-color: rgba(96, 165, 250, 0.45) !important;
-        }
-    .xuiv2-tasks.is-edi-review .tg-add-actions { display: none !important; }
+    .xuiv2-tasks.is-edi-review .tg-add-composer,
+    .xuiv2-tasks.is-edi-review .tg-add-kinds { display: none !important; }
     body:has(.xuiv2-tasks.is-edi-review) .ui-page-header__right {
         display: none !important;
     }
@@ -1280,6 +1274,7 @@
 </template>
 
 @include('livewire.partials.tasks-grid-bulk-bar')
+@include('livewire.partials.tasks-grid-add-composer')
 
 {{-- ═══════════════════════════════════════════════════════════ --}}
 {{-- GRID TABLE                                                  --}}
@@ -1488,162 +1483,6 @@
                     </tr>
                 @endif
 
-                {{-- ── Inline add-task row ── --}}
-                @if($showAddRow && ! $this->isEdiReviewing())
-                <tr class="tg-add-row">
-                    <td></td>
-                    <td style="padding:6px 4px; text-align:center">
-                        <button wire:click="cancelAdd"
-                                class="btn btn-sm btn-link text-muted p-0"
-                                title="Anuluj">
-                            <i class="bi bi-x-lg" style="font-size:0.8rem"></i>
-                        </button>
-                    </td>
-
-                    {{-- Name (always) --}}
-                    @if(in_array('name', $visibleColumns))
-                    <td style="padding:4px 6px; min-width:{{ $addKind === 'meeting' ? '640px' : '220px' }}">
-                        <div class="d-flex flex-column gap-1">
-                            @if($addKind === 'procedure')
-                                @include('livewire.partials.tasks-grid-procedure-start-fields')
-                                <div class="d-flex gap-1 align-items-start">
-                                    <button wire:click="submitAdd" class="btn btn-sm tg-add-submit flex-shrink-0">
-                                        <i class="bi bi-play-fill me-1"></i>Uruchom
-                                    </button>
-                                </div>
-                            @elseif($addKind === 'meeting')
-                                @include('livewire.partials.tasks-grid-meeting-start-fields', ['showSubmit' => true])
-                            @else
-                            <div class="d-flex gap-1 align-items-start">
-                                <input type="text"
-                                       wire:model="newTaskName"
-                                       class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
-                                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : 'Nazwa zadania *' }}"
-                                       wire:keydown.enter="submitAdd"
-                                       wire:keydown.escape="cancelAdd"
-                                       x-data x-init="$el.focus()">
-                                <button wire:click="submitAdd" class="btn btn-sm tg-add-submit flex-shrink-0">
-                                    @if($addKind === 'approval')
-                                        <i class="bi bi-check2-circle me-1"></i>Poproś
-                                    @else
-                                        <i class="bi bi-plus-lg me-1"></i>Dodaj
-                                    @endif
-                                </button>
-                            </div>
-                            @error('newTaskName')
-                                <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
-                            @enderror
-                            @endif
-                        </div>
-                    </td>
-                    @endif
-
-                    @if(in_array('type', $visibleColumns))
-                    <td class="small text-muted" style="white-space:nowrap">
-                        @if($addKind === 'procedure') Procedura
-                        @elseif($addKind === 'approval') Zatwierdzenie
-                        @elseif($addKind === 'meeting') Spotkanie
-                        @else Zadanie
-                        @endif
-                    </td>
-                    @endif
-
-                    @if(in_array('status', $visibleColumns))
-                    <td style="padding:4px 6px">
-                        <span class="tg-add-status">{{ $addKind === 'procedure' ? 'W trakcie' : ($addKind === 'approval' ? 'Oczekuje' : ($addKind === 'meeting' ? 'Umówione' : 'Oczekujące')) }}</span>
-                    </td>
-                    @endif
-
-                    @if(in_array('sprint', $visibleColumns))
-                    <td style="padding:4px 6px">
-                        <select wire:model="newTaskSprint" class="form-select form-select-sm" style="min-width:130px">
-                            <option value="">Poza sprintem</option>
-                            @foreach($allSprints as $sprintOption)
-                                <option value="{{ $sprintOption->id }}">{{ $sprintOption->name }}</option>
-                            @endforeach
-                        </select>
-                    </td>
-                    @endif
-
-                    @if(in_array('category', $visibleColumns))
-                    <td style="padding:4px 6px">
-                        <input type="text" wire:model="newTaskCategory"
-                               class="form-control form-control-sm" placeholder="Kategoria…">
-                    </td>
-                    @endif
-
-                    @if(in_array('assigned_to', $visibleColumns))
-                    <td style="padding:4px 6px">
-                        @if($addKind !== 'meeting')
-                        <select wire:model="newTaskAssignedTo" class="form-select form-select-sm" style="min-width:110px">
-                            <option value="">{{ $addKind === 'approval' ? 'Zatwierdzający *' : 'Nieprzypisane' }}</option>
-                            @foreach($allUsers as $u)
-                                <option value="{{ $u->id }}">{{ $u->name }}</option>
-                            @endforeach
-                        </select>
-                        @endif
-                    </td>
-                    @endif
-
-                    @if(in_array('priority', $visibleColumns))
-                    <td style="padding:4px 6px">
-                        <select wire:model="newTaskPriority" class="form-select form-select-sm">
-                            <option value="">Brak</option>
-                            <option value="1">1 – Najniższy</option>
-                            <option value="2">2 – Niski</option>
-                            <option value="3">3 – Średni</option>
-                            <option value="4">4 – Wysoki</option>
-                            <option value="5">5 – Krytyczny</option>
-                        </select>
-                    </td>
-                    @endif
-
-                    @if(in_array('due_date', $visibleColumns))
-                    <td style="padding:4px 6px">
-                        @if($addKind !== 'meeting')
-                        <input type="date" wire:model="newTaskDueDate" class="form-control form-control-sm">
-                        @endif
-                    </td>
-                    @endif
-
-                    {{-- Empty cells for read-only columns --}}
-                    @foreach(['blocks','subtasks','comments','created_by','created_at','updated_at'] as $_ec)
-                        @if(in_array($_ec, $visibleColumns))<td></td>@endif
-                    @endforeach
-                </tr>
-                @endif
-
-                {{-- ── Add-task footer row ── --}}
-                @unless($this->isEdiReviewing())
-                <tr class="tg-footer-row">
-                    <td colspan="{{ $colCount }}" style="padding:7px 12px">
-                        @if(!$showAddRow)
-                        <div class="d-flex flex-wrap gap-3 align-items-center">
-                            <button type="button" wire:click="startAdd('task')"
-                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-                                <i class="bi bi-plus-circle me-1"></i>Dodaj zadanie
-                            </button>
-                            @if($this->usesWorkItems())
-                            <button type="button" wire:click="startAdd('procedure')"
-                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-                                <i class="bi bi-play-circle me-1"></i>Uruchom procedurę
-                            </button>
-                            <button type="button" wire:click="startAdd('approval')"
-                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-                                <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
-                            </button>
-                            <button type="button" wire:click="startAdd('meeting')"
-                                    class="btn btn-sm btn-link text-primary text-decoration-none p-0">
-                                <i class="bi bi-calendar-plus me-1"></i>Umów spotkanie
-                            </button>
-                            @endif
-                        </div>
-                        @else
-                        <span class="text-muted small">Naciśnij <kbd>Enter</kbd> aby dodać lub <kbd>Esc</kbd> aby anulować</span>
-                        @endif
-                    </td>
-                </tr>
-                @endunless
             </tbody>
         </table>
     </div>
@@ -1724,120 +1563,6 @@
         </div>
     @endif
 
-    {{-- ── Inline add-task card ── --}}
-    @if($showAddRow)
-    <x-ui.card class="dt-card tg-add-card">
-        <div class="dt-card__title d-flex justify-content-between align-items-start gap-2">
-            <span>
-                @if($addKind === 'procedure') Uruchom procedurę
-                @elseif($addKind === 'approval') Poproś o zatwierdzenie
-                @elseif($addKind === 'meeting') Umów spotkanie
-                @else Nowe zadanie
-                @endif
-            </span>
-            <button wire:click="cancelAdd" class="btn btn-sm btn-link text-muted p-0 tg-dt-hit" title="Anuluj">
-                <i class="bi bi-x-lg" style="font-size:0.8rem"></i>
-            </button>
-        </div>
-        <div class="d-flex flex-column gap-2">
-            @if($addKind === 'procedure')
-            @include('livewire.partials.tasks-grid-procedure-start-fields')
-            @elseif($addKind === 'meeting')
-            @include('livewire.partials.tasks-grid-meeting-start-fields', ['showSubmit' => false])
-            @endif
-
-            @if(in_array('name', $visibleColumns) && $addKind !== 'procedure' && $addKind !== 'meeting')
-            <div>
-                <input type="text"
-                       wire:model="newTaskName"
-                       class="form-control form-control-sm @error('newTaskName') is-invalid @enderror"
-                       placeholder="{{ $addKind === 'approval' ? 'O co prosisz? *' : 'Nazwa zadania *' }}"
-                       wire:keydown.enter="submitAdd"
-                       wire:keydown.escape="cancelAdd">
-                @error('newTaskName')
-                    <div class="invalid-feedback" style="font-size:0.72rem">{{ $message }}</div>
-                @enderror
-            </div>
-            @endif
-
-            @if(in_array('sprint', $visibleColumns) && $addKind !== 'procedure')
-            <select wire:model="newTaskSprint" class="form-select form-select-sm">
-                <option value="">Poza sprintem</option>
-                @foreach($allSprints as $sprintOption)
-                    <option value="{{ $sprintOption->id }}">{{ $sprintOption->name }}</option>
-                @endforeach
-            </select>
-            @endif
-
-            @if(in_array('category', $visibleColumns) && $addKind !== 'procedure')
-            <input type="text" wire:model="newTaskCategory" class="form-control form-control-sm" placeholder="Kategoria…">
-            @endif
-
-            @if((in_array('assigned_to', $visibleColumns) || $addKind === 'approval') && $addKind !== 'meeting')
-            <select wire:model="newTaskAssignedTo" class="form-select form-select-sm @error('newTaskAssignedTo') is-invalid @enderror">
-                <option value="">{{ $addKind === 'approval' ? 'Zatwierdzający *' : 'Nieprzypisane' }}</option>
-                @foreach($allUsers as $u)
-                    <option value="{{ $u->id }}">{{ $u->name }}</option>
-                @endforeach
-            </select>
-            @error('newTaskAssignedTo')
-                <div class="invalid-feedback d-block" style="font-size:0.72rem">{{ $message }}</div>
-            @enderror
-            @endif
-
-            @if(in_array('priority', $visibleColumns) && $addKind !== 'procedure')
-            <select wire:model="newTaskPriority" class="form-select form-select-sm">
-                <option value="">Priorytet: brak</option>
-                <option value="1">1 – Najniższy</option>
-                <option value="2">2 – Niski</option>
-                <option value="3">3 – Średni</option>
-                <option value="4">4 – Wysoki</option>
-                <option value="5">5 – Krytyczny</option>
-            </select>
-            @endif
-
-            @if(in_array('due_date', $visibleColumns) && $addKind !== 'meeting')
-            <input type="date" wire:model="newTaskDueDate" class="form-control form-control-sm">
-            @endif
-
-            <button wire:click="submitAdd" class="btn btn-sm tg-add-submit w-100">
-                @if($addKind === 'procedure')
-                    <i class="bi bi-play-fill me-1"></i>Uruchom procedurę
-                @elseif($addKind === 'approval')
-                    <i class="bi bi-check2-circle me-1"></i>Poproś o zatwierdzenie
-                @elseif($addKind === 'meeting')
-                    <i class="bi bi-calendar-plus me-1"></i>Umów spotkanie
-                @else
-                    <i class="bi bi-plus-lg me-1"></i>Dodaj zadanie
-                @endif
-            </button>
-        </div>
-    </x-ui.card>
-    @else
-    @unless($this->isPlanQueue())
-    <div class="tg-add-actions">
-        <button type="button" wire:click="startAdd('task')" class="btn">
-            <i class="bi bi-plus-circle" aria-hidden="true"></i>
-            <span>Dodaj zadanie</span>
-        </button>
-        @if($this->usesWorkItems())
-        <button type="button" wire:click="startAdd('procedure')" class="btn">
-            <i class="bi bi-play-circle" aria-hidden="true"></i>
-            <span>Uruchom procedurę</span>
-        </button>
-        <button type="button" wire:click="startAdd('approval')" class="btn">
-            <i class="bi bi-check2-circle" aria-hidden="true"></i>
-            <span>Poproś o zatwierdzenie</span>
-        </button>
-        <button type="button" wire:click="startAdd('meeting')" class="btn">
-            <i class="bi bi-calendar-plus" aria-hidden="true"></i>
-            <span>Umów spotkanie</span>
-        </button>
-        @endif
-    </div>
-    @endunless
-    @endif
-
     {{-- Pagination (only in flat view) --}}
     @if($tasks instanceof \Illuminate\Contracts\Pagination\Paginator && $tasks->hasPages())
     <div class="mt-2">
@@ -1849,6 +1574,51 @@
 
 <script>
 @unless($this->isPlanQueue())
+    (function () {
+        function applyTgSelection(d) {
+            if (!d || window._tgSelApplying) return;
+            window._tgSelApplying = true;
+            try {
+                const ids = new Set((Array.isArray(d.ids) ? d.ids : []).map(Number));
+                const count = Number(d.count || 0);
+                const root = document.getElementById('xuiv2Tasks');
+                if (!root) return;
+                root.querySelectorAll('input[id^="tg-sel-"]').forEach(function (input) {
+                    const id = Number(input.value);
+                    const on = ids.has(id);
+                    if (id && input.checked !== on) input.checked = on;
+                });
+                const all = document.getElementById('tg-select-all');
+                if (all && 'checked' in all && all.checked !== !!d.allVisible) {
+                    all.checked = !!d.allVisible;
+                }
+                root.querySelectorAll('[data-tg-id]').forEach(function (el) {
+                    el.classList.toggle('is-selected', ids.has(Number(el.getAttribute('data-tg-id'))));
+                });
+                const bar = document.getElementById('tg-bulk-bar');
+                if (bar) {
+                    bar.classList.toggle('is-on', count > 0);
+                    const countEl = bar.querySelector('[data-tg-bulk-count]');
+                    if (countEl) countEl.textContent = 'Wybrano ' + count;
+                    const visEl = bar.querySelector('[data-tg-bulk-visible]');
+                    if (visEl) visEl.textContent = d.allVisible ? 'Odznacz widoczne' : 'Zaznacz widoczne';
+                }
+            } finally {
+                window._tgSelApplying = false;
+            }
+        }
+        if (!window._tgSelBound) {
+            window._tgSelBound = true;
+            window.addEventListener('tg-selection-changed', function (e) {
+                const detail = e.detail;
+                const d = detail && (detail.ids !== undefined || detail.count !== undefined)
+                    ? detail
+                    : (Array.isArray(detail) ? detail[0] : detail);
+                applyTgSelection(d);
+            });
+        }
+    })();
+
     (function () {
         if (window._tgDndAbort) {
             try { window._tgDndAbort.abort(); } catch (e) {}

@@ -138,7 +138,7 @@ class TasksGrid extends Component
     public array $collapsedGroups = [];
 
     // Column management
-    public array $visibleColumns = ['name', 'type', 'status', 'sprint', 'category', 'assigned_to', 'created_by', 'priority', 'due_date', 'subtasks'];
+    public array $visibleColumns = ['name', 'type', 'status', 'sprint', 'category', 'assigned_to', 'created_by', 'priority', 'due_date', 'blocks', 'subtasks'];
 
     public array $columnWidths = [];
 
@@ -487,12 +487,14 @@ class TasksGrid extends Component
         $ids = $this->normalizedSelectedIds();
         if (in_array($id, $ids, true)) {
             $this->selectedIds = array_values(array_filter($ids, fn (int $keep) => $keep !== $id));
+            $this->skipSelectionRender();
 
             return;
         }
 
         $ids[] = $id;
         $this->selectedIds = $ids;
+        $this->skipSelectionRender();
     }
 
     public function clearSelection(): void
@@ -500,6 +502,7 @@ class TasksGrid extends Component
         $this->selectedIds = [];
         $this->bulkField = '';
         $this->bulkValue = '';
+        $this->skipSelectionRender();
     }
 
     #[On('plan-queue-forget-selected')]
@@ -531,11 +534,27 @@ class TasksGrid extends Component
         $selected = $this->normalizedSelectedIds();
         if ($visible !== [] && collect($visible)->every(fn (int $id) => in_array($id, $selected, true))) {
             $this->selectedIds = array_values(array_diff($selected, $visible));
+            $this->skipSelectionRender();
 
             return;
         }
 
         $this->selectedIds = array_values(array_unique(array_merge($selected, $visible)));
+        $this->skipSelectionRender();
+    }
+
+    protected function skipSelectionRender(): void
+    {
+        if ($this->isPlanQueue()) {
+            return;
+        }
+
+        $this->skipRender();
+        $this->dispatch('tg-selection-changed',
+            ids: $this->normalizedSelectedIds(),
+            count: count($this->normalizedSelectedIds()),
+            allVisible: $this->pageIsFullySelected(),
+        );
     }
 
     /**
@@ -1754,7 +1773,7 @@ class TasksGrid extends Component
             ? $this->lockedSprintId
             : ($this->newTaskSprint ?: null);
 
-        $task = ProjectTask::create([
+        ProjectTask::create([
             'name' => $this->newTaskName,
             'sprint_id' => $sprintId,
             'sprint_position' => $sprintId
@@ -1768,8 +1787,10 @@ class TasksGrid extends Component
             'created_by' => auth()->id(),
         ]);
 
-        $this->resetAddForm();
-        $this->flash = 'Zadanie dodane.';
+        $this->newTaskName = '';
+        $this->resetErrorBag();
+        $this->invalidateViewCounts();
+        $this->js('queueMicrotask(() => document.getElementById("tg-add-name")?.focus())');
     }
 
     public function startAdd(string $kind): void
@@ -1786,6 +1807,15 @@ class TasksGrid extends Component
             return;
         }
 
+        if ($kind === 'task') {
+            $this->addKind = 'task';
+            $this->showAddRow = false;
+            $this->resetErrorBag();
+            $this->js('queueMicrotask(() => document.getElementById("tg-add-name")?.focus())');
+
+            return;
+        }
+
         $this->addKind = $kind;
         $this->showAddRow = true;
         $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo', 'newTaskPriority', 'newTaskDueDate', 'newProcedureTemplateId', 'newProcedureSubjectId', 'newProcedureNameSuffix', 'newMeetingDate', 'newMeetingStart', 'newMeetingEnd', 'newMeetingParticipantIds', 'newMeetingLocation']);
@@ -1799,6 +1829,13 @@ class TasksGrid extends Component
             $this->newMeetingParticipantIds = array_values(array_filter([auth()->id()]));
         }
         $this->resetErrorBag();
+    }
+
+    public function clearAddComposer(): void
+    {
+        $this->reset(['newTaskName', 'newTaskCategory', 'newTaskAssignedTo']);
+        $this->resetErrorBag();
+        $this->js('queueMicrotask(() => document.getElementById("tg-add-name")?.focus())');
     }
 
     public function cancelAdd(): void
@@ -3404,7 +3441,7 @@ class TasksGrid extends Component
         }
 
         if ($this->visibleColumns === []) {
-            $this->visibleColumns = ['name', 'status', 'sprint', 'category', 'assigned_to', 'created_by', 'priority', 'due_date', 'subtasks'];
+            $this->visibleColumns = ['name', 'status', 'sprint', 'category', 'assigned_to', 'created_by', 'priority', 'due_date', 'blocks', 'subtasks'];
             if ($this->usesWorkItems()) {
                 $this->insertVisibleColumn('type');
             }

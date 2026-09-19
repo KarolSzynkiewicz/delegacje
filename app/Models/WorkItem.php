@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\ApprovalDecision;
 use App\Enums\WorkItemStatus;
+use App\Enums\WorkItemTimeBlockKind;
 use App\Enums\WorkItemType;
+use App\Services\WorkItemPlanService;
 use App\Services\WorkItemSync;
 use App\WorkItems\GridField;
 use App\WorkItems\HandlesWorkItem;
@@ -102,6 +104,109 @@ class WorkItem extends Model
             ->values()
             ->map(fn (WorkItemTimeBlock $block) => $block->label())
             ->all();
+    }
+
+    /**
+     * none | scheduled | stale (otwarte WI, wszystkie sloty przed dniem dzisiejszym).
+     */
+    public function scheduleState(): string
+    {
+        $today = now()->startOfDay();
+
+        if ($this->isMeetingItem()) {
+            $source = $this->source;
+            if (! ($source instanceof ProjectTask) || ! $source->starts_at) {
+                return 'none';
+            }
+            if ($this->status->isOpen() && $source->starts_at->lt($today)) {
+                return 'stale';
+            }
+
+            return 'scheduled';
+        }
+
+        $blocks = $this->itemScheduleBlocks();
+        if ($blocks->isEmpty()) {
+            return 'none';
+        }
+        $hasUpcoming = $blocks->contains(
+            fn (WorkItemTimeBlock $block) => $block->starts_at->gte($today)
+        );
+        if ($hasUpcoming) {
+            return 'scheduled';
+        }
+
+        return $this->status->isOpen() ? 'stale' : 'scheduled';
+    }
+
+    public function scheduleLabel(): string
+    {
+        return match ($this->scheduleState()) {
+            'stale' => 'skisło',
+            'scheduled' => implode(' · ', $this->schedulePills()) ?: 'w planie',
+            default => 'brak',
+        };
+    }
+
+    public function planPinUrl(): string
+    {
+        $params = array_filter([
+            'u' => $this->assignee_id,
+            'pin' => $this->id,
+        ]);
+        $at = $this->scheduleAnchor();
+        if ($at) {
+            $params['w'] = app(WorkItemPlanService::class)->weekStart($at)->toDateString();
+        }
+
+        return route('work-items.plan', $params);
+    }
+
+    public static function forProjectTask(ProjectTask $task): ?self
+    {
+        $match = static::query()
+            ->with(['timeBlocks', 'source'])
+            ->where('source_type', $task->getMorphClass())
+            ->where('source_id', $task->id)
+            ->first();
+        if ($match) {
+            return $match;
+        }
+        if (! $task->procedure_run_id) {
+            return null;
+        }
+
+        return static::query()
+            ->with(['timeBlocks', 'source'])
+            ->where('source_type', (new ProcedureRun)->getMorphClass())
+            ->where('source_id', $task->procedure_run_id)
+            ->first();
+    }
+
+    /**
+     * @return Collection<int, WorkItemTimeBlock>
+     */
+    protected function itemScheduleBlocks(): Collection
+    {
+        $blocks = $this->relationLoaded('timeBlocks')
+            ? $this->timeBlocks
+            : $this->timeBlocks()->get();
+
+        return $blocks
+            ->filter(fn (WorkItemTimeBlock $block) => $block->kind === WorkItemTimeBlockKind::Item)
+            ->values();
+    }
+
+    protected function scheduleAnchor(): mixed
+    {
+        if ($this->isMeetingItem()) {
+            $source = $this->source;
+            if ($source instanceof ProjectTask && $source->starts_at) {
+                return $source->starts_at;
+            }
+        }
+
+        return $this->itemScheduleBlocks()->sortByDesc('starts_at')->first()?->starts_at;
     }
 
     public function isMeetingItem(): bool

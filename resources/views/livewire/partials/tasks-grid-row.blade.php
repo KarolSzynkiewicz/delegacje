@@ -71,6 +71,7 @@
 <tr wire:key="tg-row-{{ $task->id }}"
     class="tg-task-row {{ $isExpanded ? 'tg-expanded' : '' }}{{ $this->isSelected((int) $task->id) ? ' is-selected' : '' }}"
     style="border-left:3px solid {{ $borderColor }}"
+    data-tg-id="{{ $task->id }}"
     data-tg-drop-task="{{ $task->id }}"
     data-tg-drop-group="{{ $groupValue }}"
     data-tg-accepts-sub="{{ $canAddSubtask ? '1' : '0' }}">
@@ -418,15 +419,10 @@
     {{-- ── Time blocks ── --}}
     @case('blocks')
     <td style="min-width:110px">
-        @php $pills = $isWorkItem ? $task->schedulePills() : []; @endphp
-        @if($pills !== [])
-            <div class="d-flex flex-column gap-1">
-                @foreach($pills as $pill)
-                    <span class="font-mono" style="font-size:.72rem;color:var(--text-muted)">{{ $pill }}</span>
-                @endforeach
-            </div>
+        @if($isWorkItem)
+            @include('livewire.partials.tg-schedule-cell', ['item' => $task])
         @else
-            <span class="tg-mono" style="font-size:.78rem;color:rgba(255,255,255,.25)">brak</span>
+            <span class="tg-mono" style="font-size:.78rem;color:rgba(255,255,255,.25)">—</span>
         @endif
     </td>
     @break

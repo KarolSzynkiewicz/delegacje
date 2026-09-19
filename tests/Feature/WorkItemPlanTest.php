@@ -1273,6 +1273,133 @@ class WorkItemPlanTest extends TestCase
             ->assertDontSee('Otwórz kartę');
     }
 
+    public function test_changing_assignee_moves_item_blocks_to_the_new_person(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Przypisanie bloku');
+        $block = WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 08:00:00',
+            'ends_at' => '2026-09-17 08:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+        $ola = User::factory()->create(['name' => 'Ola']);
+
+        $item->source->update(['assigned_to' => $ola->id]);
+
+        $this->assertSame($ola->id, $block->fresh()->user_id);
+        $this->assertSame($ola->id, $item->fresh()->assignee_id);
+    }
+
+    public function test_changing_assignee_detaches_the_card_from_sessions_and_keeps_the_session(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('W sesji');
+        $session = $this->planSession('Fokus', '2026-09-17 10:00:00', '2026-09-17 12:00:00');
+        $session->items()->attach($item->id);
+        $ola = User::factory()->create(['name' => 'Ola']);
+
+        $item->source->update(['assigned_to' => $ola->id]);
+
+        $this->assertFalse($session->items()->whereKey($item->id)->exists());
+        $this->assertNotNull($session->fresh());
+    }
+
+    public function test_unassigning_deletes_item_blocks(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Bez osoby');
+        $block = WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 08:00:00',
+            'ends_at' => '2026-09-17 08:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        $item->source->update(['assigned_to' => null]);
+
+        $this->assertDatabaseMissing('work_item_time_blocks', ['id' => $block->id]);
+        $this->assertNull($item->fresh()->assignee_id);
+    }
+
+    public function test_open_item_with_only_past_blocks_is_stale_and_pins_that_week(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Skisło');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-16 08:00:00',
+            'ends_at' => '2026-09-16 08:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+        $item->load('timeBlocks');
+
+        $this->assertSame('stale', $item->scheduleState());
+        $this->assertSame('skisło', $item->scheduleLabel());
+        $this->assertStringContainsString('pin='.$item->id, $item->planPinUrl());
+        $this->assertStringContainsString('w=2026-09-14', $item->planPinUrl());
+    }
+
+    public function test_grid_links_stale_blocks_to_the_plan(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Widok skisło');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-16 08:00:00',
+            'ends_at' => '2026-09-16 08:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        Livewire::test(TasksGrid::class)
+            ->assertSee('skisło')
+            ->assertSeeHtml('pin='.$item->id)
+            ->assertSeeHtml('tg-schedule--stale');
+    }
+
+    public function test_task_show_links_blocks_facet_to_the_plan(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Podgląd bloków');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 08:00:00',
+            'ends_at' => '2026-09-17 08:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        Livewire::test(\App\Livewire\TaskShowQuickEdit::class, ['task' => $item->source])
+            ->assertSee('Bloki')
+            ->assertSeeHtml('pin='.$item->id);
+    }
+
+    public function test_grid_keeps_the_bulk_bar_in_the_dom_before_selection(): void
+    {
+        $this->actingAs($this->user);
+        $this->workItem('Zaznaczanie');
+
+        Livewire::test(TasksGrid::class)
+            ->assertSeeHtml('tg-bulk-bar')
+            ->assertDontSeeHtml('x-show="count > 0"')
+            ->assertSee('Co zmieniasz');
+    }
+
+    public function test_toggling_selection_dispatches_without_requiring_a_new_html_payload(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Skip render');
+
+        Livewire::test(TasksGrid::class)
+            ->call('toggleSelected', $item->id)
+            ->assertSet('selectedIds', [$item->id])
+            ->assertDispatched('tg-selection-changed', count: 1, allVisible: true);
+    }
+
     private function planSession(string $title, string $starts, string $ends): WorkItemTimeBlock
     {
         return WorkItemTimeBlock::query()->create([

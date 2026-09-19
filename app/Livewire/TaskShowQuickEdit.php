@@ -6,6 +6,7 @@ use App\Livewire\Concerns\WithTaskQuickEdit;
 use App\Models\ProjectTask;
 use App\Models\Sprint;
 use App\Models\User;
+use App\Models\WorkItem;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 
@@ -62,6 +63,7 @@ class TaskShowQuickEdit extends Component
                 ->limit(40)
                 ->get(),
             'sourceCard' => $this->task->sourceCard(),
+            'workItem' => WorkItem::forProjectTask($this->task),
         ]);
     }
 }
