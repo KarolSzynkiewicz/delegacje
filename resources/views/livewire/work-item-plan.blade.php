@@ -603,7 +603,7 @@
         },
         beginDraw(event, date, allDay) {
             if (this.payload || this.resizing) return;
-            if (event.target.closest('.wi-plan__event, .wi-plan__chip, .wi-plan__flag, .wi-plan__chip-off, .wi-plan__float, .wi-plan__pop')) return;
+            if (event.target.closest('.wi-plan__event, .wi-plan__chip, .wi-plan__flag, .wi-plan__due, .wi-plan__chip-off, .wi-plan__float, .wi-plan__pop')) return;
             if (event.pointerType === 'mouse' && event.button !== 0) return;
             event.preventDefault();
             const col = event.currentTarget;
@@ -684,17 +684,20 @@
     <div class="wi-plan__body">
         <aside class="wi-plan__queue" data-plan-queue @pointerdown="onQueueGrip($event)">
             <div class="wi-plan__queue-head">
-                Do przypięcia
-                <div class="wi-plan__queue-tools">
-                    @unless($pinId)
-                        <button type="button"
-                                class="wi-plan__nav"
-                                wire:click="openUnscheduledMeeting"
-                                title="Spotkanie bez godziny">
-                            <i class="bi bi-calendar-plus"></i>
+                <span>Do przypięcia</span>
+                @unless($pinId)
+                    <div class="wi-plan__queue-add">
+                        <button type="button" wire:click="openUnscheduledComposer('task')">
+                            <i class="bi bi-plus-circle"></i>Dodaj zadanie
                         </button>
-                    @endunless
-                </div>
+                        <button type="button" wire:click="openUnscheduledComposer('procedure')">
+                            <i class="bi bi-play-circle"></i>Uruchom procedurę
+                        </button>
+                        <button type="button" wire:click="openUnscheduledComposer('meeting')">
+                            <i class="bi bi-calendar-plus"></i>Umów spotkanie
+                        </button>
+                    </div>
+                @endunless
             </div>
             @if($pinId && $pinnedTitle)
                 <p class="wi-plan__pin-hint">Nowe: <strong>{{ $pinnedTitle }}</strong> — przeciągnij na godzinę w siatce.</p>
@@ -709,13 +712,24 @@
 
         <div class="wi-plan__board" x-ref="board">
             <div class="wi-plan__sticky">
-                <div class="wi-plan__head">
+                <div class="wi-plan__head {{ $debtCount > 0 ? 'has-debt' : '' }}" @if($debtCount > 0) style="--debt-span: {{ $debtCount }}" @endif>
                     <div class="wi-plan__gutter"></div>
+                    @if($debtCount > 0)
+                        <div class="wi-plan__debt-banner">
+                            Niedokończone
+                            <span class="wi-plan__debt-sub">strefa długu</span>
+                        </div>
+                    @endif
                     @foreach($days as $day)
-                        @php $date = $day->toDateString(); @endphp
-                        <div class="wi-plan__day-head {{ $date === $today ? 'is-today' : '' }}"
+                        @php
+                            $date = $day->toDateString();
+                            $isDebt = $date < $today;
+                            $col = $loop->index + 2;
+                        @endphp
+                        <div class="wi-plan__day-head{{ $date === $today ? ' is-today' : '' }}{{ $isDebt ? ' is-debt' : '' }}{{ $date === $today && $debtCount > 0 ? ' is-debt-edge' : '' }}"
                              data-plan-day-head
-                             data-date="{{ $date }}">
+                             data-date="{{ $date }}"
+                             @if($debtCount > 0) style="grid-column: {{ $col }}; grid-row: {{ $isDebt ? '2' : '1 / 3' }}" @endif>
                             <span class="wi-plan__day-name">{{ $dayNames[$day->dayOfWeekIso - 1] }}</span>
                             <span class="wi-plan__day-num font-mono">{{ $day->format('d.m') }}</span>
                         </div>
@@ -730,37 +744,39 @@
                             $flags = $dueFlags[$date] ?? [];
                             $allDayEvents = $allDayByDay[$date] ?? [];
                         @endphp
-                        <div class="wi-plan__allday-cell {{ $date === $today ? 'is-today' : '' }}"
+                        <div class="wi-plan__allday-cell{{ $date === $today ? ' is-today' : '' }}{{ $date < $today ? ' is-debt' : '' }}{{ $date === $today && $debtCount > 0 ? ' is-debt-edge' : '' }}"
                              data-plan-allday
                              data-date="{{ $date }}"
                              wire:key="ad-{{ $date }}"
                              @pointerdown="beginDraw($event, '{{ $date }}', true)">
-                            @php
-                                $flagVisible = array_slice($flags, 0, 3);
-                                $flagHidden = array_slice($flags, 3);
-                            @endphp
-                            @foreach($flagVisible as $flag)
-                                <a href="{{ $flag['url'] }}" class="wi-plan__flag" title="Termin: {{ $flag['title'] }}" @pointerdown.stop>
-                                    <i class="bi bi-flag-fill"></i>{{ \Illuminate\Support\Str::limit($flag['title'], 22) }}
-                                </a>
-                            @endforeach
-                            @if($flagHidden !== [])
-                                <button type="button"
-                                        class="wi-plan__flag wi-plan__flag-more"
-                                        @pointerdown.stop
-                                        @click.stop="dueOpen = dueOpen === '{{ $date }}' ? '' : '{{ $date }}'">
-                                    +{{ count($flagHidden) }}
-                                </button>
-                                <div class="wi-plan__flag-overflow"
-                                     x-show="dueOpen === '{{ $date }}'"
-                                     x-cloak
-                                     @click.stop
-                                     @pointerdown.stop>
-                                    @foreach($flagHidden as $flag)
-                                        <a href="{{ $flag['url'] }}" class="wi-plan__flag" title="Termin: {{ $flag['title'] }}">
-                                            <i class="bi bi-flag-fill"></i>{{ \Illuminate\Support\Str::limit($flag['title'], 22) }}
-                                        </a>
-                                    @endforeach
+                            @if($flags !== [])
+                                <div class="wi-plan__due" @pointerdown.stop>
+                                    <button type="button"
+                                            class="wi-plan__due-toggle"
+                                            :class="{ 'is-open': dueOpen === '{{ $date }}' }"
+                                            :aria-expanded="dueOpen === '{{ $date }}' ? 'true' : 'false'"
+                                            @click.stop="dueOpen = dueOpen === '{{ $date }}' ? '' : '{{ $date }}'">
+                                        <i class="bi bi-flag-fill wi-plan__due-icon"></i>
+                                        <span class="wi-plan__due-label">Terminy <span class="font-mono">· {{ count($flags) }}</span></span>
+                                        <span class="wi-plan__due-dots" x-show="dueOpen !== '{{ $date }}'" aria-hidden="true">
+                                            @for($dot = 0; $dot < min(5, count($flags)); $dot++)
+                                                <i></i>
+                                            @endfor
+                                        </span>
+                                        <span class="wi-plan__due-fold" x-show="dueOpen === '{{ $date }}'" x-cloak>Zwiń</span>
+                                        <i class="bi" :class="dueOpen === '{{ $date }}' ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                                    </button>
+                                    <div class="wi-plan__due-list"
+                                         x-show="dueOpen === '{{ $date }}'"
+                                         x-cloak
+                                         @click.stop
+                                         @pointerdown.stop>
+                                        @foreach($flags as $flag)
+                                            <a href="{{ $flag['url'] }}" class="wi-plan__flag" title="Termin: {{ $flag['title'] }}">
+                                                <i class="bi bi-flag-fill"></i>{{ \Illuminate\Support\Str::limit($flag['title'], 22) }}
+                                            </a>
+                                        @endforeach
+                                    </div>
                                 </div>
                             @endif
                             @foreach($allDayEvents as $slot)
@@ -805,7 +821,7 @@
 
                 @foreach($days as $day)
                     @php $date = $day->toDateString(); @endphp
-                    <div class="wi-plan__col {{ $date === $today ? 'is-today' : '' }}"
+                    <div class="wi-plan__col{{ $date === $today ? ' is-today' : '' }}{{ $date < $today ? ' is-debt' : '' }}{{ $date === $today && $debtCount > 0 ? ' is-debt-edge' : '' }}"
                          data-plan-col
                          data-date="{{ $date }}"
                          style="height: {{ $gridHeight }}px"
@@ -1053,7 +1069,7 @@
         <div class="wi-plan__composer-backdrop" wire:click="closeComposer"></div>
         <div class="wi-plan__composer" wire:click.stop>
             <div class="wi-plan__composer-head">
-                <span>{{ $composerUnscheduled ? 'Nowe spotkanie' : 'Nowy wpis' }}</span>
+                <span>{{ $composerUnscheduled ? ($composerType === 'meeting' ? 'Nowe spotkanie' : ($composerType === 'procedure' ? 'Nowa procedura' : 'Nowe zadanie')) : 'Nowy wpis' }}</span>
                 <button type="button" class="wi-plan__nav" wire:click="closeComposer">×</button>
             </div>
             <p class="wi-plan__composer-range font-mono">{{ $composerRangeLabel }}</p>
@@ -1159,10 +1175,25 @@
         border-radius: 14px; padding: .85rem .75rem 1rem; min-height: 0; overflow: auto;
     }
     .wi-plan__queue-head {
-        display: flex; align-items: center; justify-content: space-between;
-        font-size: .78rem; font-weight: 600; margin-bottom: .7rem; color: var(--text-main);
+        display: flex; flex-direction: column; align-items: stretch; gap: .4rem;
+        font-size: .78rem; font-weight: 600; margin-bottom: .65rem; color: var(--text-main);
     }
-    .wi-plan__queue-tools { display: inline-flex; align-items: center; gap: .35rem; }
+    .wi-plan__queue-add {
+        display: flex; flex-wrap: wrap; gap: .2rem .85rem;
+        font-weight: 600;
+    }
+    .wi-plan__queue-add button {
+        display: inline-flex; align-items: center; gap: .32rem;
+        background: none; border: 0; padding: 0; color: var(--text-muted);
+        font-size: .72rem; font-weight: 600; line-height: 1.2;
+    }
+    .wi-plan__queue-add button i {
+        font-size: .85rem;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        -webkit-background-clip: text; background-clip: text;
+        color: transparent; -webkit-text-fill-color: transparent;
+    }
+    .wi-plan__queue-add button:hover { color: var(--text-main); }
     .wi-plan__count {
         font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .68rem; color: var(--text-muted);
         background: rgba(255,255,255,.05); border-radius: 999px; padding: .1rem .5rem;
@@ -1234,9 +1265,34 @@
     .wi-plan__head, .wi-plan__grid, .wi-plan__allday {
         display: grid; grid-template-columns: 3.2rem repeat(7, minmax(5.5rem, 1fr)); min-width: 52rem;
     }
+    .wi-plan__head.has-debt { grid-template-rows: auto auto; }
+    .wi-plan__head.has-debt .wi-plan__gutter { grid-column: 1; grid-row: 1 / 3; }
+    .wi-plan__debt-banner {
+        grid-column: 2 / span var(--debt-span); grid-row: 1;
+        display: flex; align-items: center; justify-content: center; gap: .35rem; min-height: 1.15rem;
+        font-size: .58rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+        color: var(--text-muted);
+        background: rgba(255,255,255,.03);
+        border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .wi-plan__debt-sub {
+        font-weight: 400; letter-spacing: 0; text-transform: none; opacity: .55;
+    }
     .wi-plan__gutter { border-bottom: 1px solid rgba(255,255,255,.06); }
     .wi-plan__day-head { padding: .4rem .35rem .3rem; border-bottom: 1px solid rgba(255,255,255,.06); border-left: 1px solid rgba(255,255,255,.05); }
+    .wi-plan__head.has-debt .wi-plan__day-head:not(.is-debt) {
+        display: flex; flex-direction: column; justify-content: center;
+    }
+    .wi-plan__head.has-debt .wi-plan__day-head.is-debt { padding-top: .22rem; }
+    .wi-plan__day-head.is-debt .wi-plan__day-name,
+    .wi-plan__day-head.is-debt .wi-plan__day-num { opacity: .62; }
+    .wi-plan__day-head.is-debt, .wi-plan__allday-cell.is-debt, .wi-plan__col.is-debt {
+        background-color: rgba(7, 10, 19, .28);
+    }
     .wi-plan__day-head.is-today, .wi-plan__allday-cell.is-today, .wi-plan__col.is-today { background-color: rgba(59, 130, 246, .07); }
+    .wi-plan__day-head.is-debt-edge, .wi-plan__allday-cell.is-debt-edge, .wi-plan__col.is-debt-edge {
+        box-shadow: inset 1px 0 0 0 rgba(255,255,255,.14);
+    }
     .wi-plan__day-name { display: block; font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
     .wi-plan__day-num { font-size: .76rem; color: var(--text-main); }
     .wi-plan__allday { border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(245, 158, 11, .06); }
@@ -1252,11 +1308,31 @@
         padding: .1rem .3rem; font-size: .62rem; line-height: 1.2; cursor: pointer;
         text-decoration: none; overflow: hidden;
     }
-    .wi-plan__flag { background: rgba(251, 191, 36, .18); color: #fbbf24; }
-    .wi-plan__flag-more { font-weight: 600; background: rgba(251, 191, 36, .28); }
-    .wi-plan__flag-overflow {
-        display: flex; flex-direction: column; gap: .18rem;
+    .wi-plan__due { position: relative; }
+    .wi-plan__due-toggle {
+        display: flex; align-items: center; gap: .35rem; width: 100%;
+        border: 1px solid rgba(251, 191, 36, .32); border-radius: 8px;
+        background: rgba(251, 191, 36, .1); color: #fbbf24;
+        padding: .22rem .4rem; font-size: .62rem; line-height: 1.2; text-align: left; cursor: pointer;
     }
+    .wi-plan__due-toggle:hover, .wi-plan__due-toggle.is-open {
+        background: rgba(251, 191, 36, .16); border-color: rgba(251, 191, 36, .5);
+    }
+    .wi-plan__due-icon { font-size: .7rem; flex-shrink: 0; }
+    .wi-plan__due-label { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wi-plan__due-dots { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; opacity: .75; }
+    .wi-plan__due-dots i {
+        width: 3px; height: 3px; border-radius: 50%; background: #fbbf24; display: block;
+    }
+    .wi-plan__due-fold { flex-shrink: 0; font-weight: 600; opacity: .85; }
+    .wi-plan__due-list {
+        display: flex; flex-direction: column; gap: .18rem; margin-top: .18rem;
+        max-height: min(40vh, 16rem); overflow: auto;
+    }
+    .wi-plan__due-list .wi-plan__flag {
+        border: 1px solid rgba(251, 191, 36, .28); border-radius: 8px; padding: .22rem .4rem;
+    }
+    .wi-plan__flag { background: rgba(251, 191, 36, .18); color: #fbbf24; }
     .wi-plan__chip {
         position: relative;
         background: #3d4f7c; color: #fff; cursor: pointer;
@@ -1551,6 +1627,7 @@
     .wi-plan.is-dragging .wi-plan__event,
     .wi-plan.is-dragging .wi-plan__chip,
     .wi-plan.is-dragging .wi-plan__flag,
+    .wi-plan.is-dragging .wi-plan__due,
     .wi-plan.is-dragging .wi-plan__card { pointer-events: none; }
     .wi-plan.is-dragging.is-queue-drag .wi-plan__event[data-plan-session],
     .wi-plan.is-dragging.is-queue-drag .wi-plan__chip[data-plan-session] { pointer-events: auto; cursor: copy; }

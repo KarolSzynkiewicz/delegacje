@@ -399,6 +399,19 @@ class WorkItemPlanService
         $block->delete();
     }
 
+    public function clearMeetingSlot(WorkItem $item): void
+    {
+        $source = $item->source;
+        if (! $source instanceof ProjectTask || ! $item->isMeetingItem()) {
+            return;
+        }
+
+        $source->update([
+            'starts_at' => null,
+            'ends_at' => null,
+        ]);
+    }
+
     public function moveMeeting(WorkItem $item, CarbonInterface $startsAt): void
     {
         $source = $item->source;
@@ -482,6 +495,45 @@ class WorkItemPlanService
             'participant_ids' => $participants,
             'location' => $location !== '' ? $location : null,
             'due_date' => null,
+        ], $actor);
+    }
+
+    /**
+     * WI bez slotu — wpada do kolejki osoby z kalendarza.
+     *
+     * @param  array{
+     *     location?: string|null,
+     *     participant_ids?: list<int>,
+     *     template_id?: int|null,
+     *     subject_id?: int|null,
+     *     name_suffix?: string|null
+     * }  $extra
+     */
+    public function createUnscheduled(
+        string $type,
+        string $title,
+        User $calendarUser,
+        User $actor,
+        array $extra = [],
+    ): ProjectTask|ProcedureRun {
+        if ($type === 'meeting') {
+            return $this->createHangingMeeting($title, $calendarUser, $actor, $extra);
+        }
+
+        if ($type === 'procedure') {
+            return $this->startProcedureForUser($calendarUser, $extra);
+        }
+
+        $title = trim($title);
+        if ($title === '') {
+            throw ValidationException::withMessages([
+                'title' => 'Podaj nazwę.',
+            ]);
+        }
+
+        return app(TaskCreationService::class)->create([
+            'name' => $title,
+            'assigned_to' => $calendarUser->id,
         ], $actor);
     }
 
@@ -595,6 +647,24 @@ class WorkItemPlanService
         bool $allDay,
         array $extra,
     ): array {
+        $run = $this->startProcedureForUser($calendarUser, $extra);
+
+        $item = WorkItem::query()
+            ->where('source_type', $run->getMorphClass())
+            ->where('source_id', $run->id)
+            ->first();
+        if ($item) {
+            $this->placeFromQueue($item, $calendarUser, $actor, $startsAt, $allDay, $allDay ? null : $endsAt);
+        }
+
+        return ['procedure' => $run];
+    }
+
+    /**
+     * @param  array{template_id?: int|null, subject_id?: int|null, name_suffix?: string|null}  $extra
+     */
+    private function startProcedureForUser(User $calendarUser, array $extra): ProcedureRun
+    {
         $templateId = (int) ($extra['template_id'] ?? 0);
         $template = ProcedureTemplate::query()->find($templateId);
         if (! $template) {
@@ -607,7 +677,7 @@ class WorkItemPlanService
         $subjectId = isset($extra['subject_id']) ? (int) $extra['subject_id'] : 0;
 
         try {
-            $run = app(ProcedureRunService::class)->startRun($template, [
+            return app(ProcedureRunService::class)->startRun($template, [
                 'name_suffix' => $subjectType ? null : ($extra['name_suffix'] ?? null),
                 'assigned_to' => $calendarUser->id,
                 'subject_type' => $subjectType?->value,
@@ -618,16 +688,6 @@ class WorkItemPlanService
                 'template_id' => $e->getMessage(),
             ]);
         }
-
-        $item = WorkItem::query()
-            ->where('source_type', $run->getMorphClass())
-            ->where('source_id', $run->id)
-            ->first();
-        if ($item) {
-            $this->placeFromQueue($item, $calendarUser, $actor, $startsAt, $allDay, $allDay ? null : $endsAt);
-        }
-
-        return ['procedure' => $run];
     }
 
     /**

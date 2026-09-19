@@ -382,6 +382,62 @@ class WorkItemPlanTest extends TestCase
         $this->assertSame('2026-09-17 14:30:00', $task->ends_at->format('Y-m-d H:i:s'));
     }
 
+    public function test_unscheduled_queue_actions_assign_to_the_calendar_user(): void
+    {
+        $this->actingAs($this->user);
+        $ania = User::factory()->create(['name' => 'Ania']);
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Onboarding z kolejki',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                    ['id' => 'step-1', 'type' => 'task', 'name' => 'Krok'],
+                ],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'start-1', 'to' => 'step-1'],
+                ],
+            ],
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->assertSee('Dodaj zadanie')
+            ->assertSee('Uruchom procedurę')
+            ->assertSee('Umów spotkanie')
+            ->set('userId', $ania->id)
+            ->call('openUnscheduledComposer', 'task')
+            ->assertSet('composerUnscheduled', true)
+            ->assertSet('composerType', 'task')
+            ->set('composerTitle', 'Szybkie zadanie Ani')
+            ->call('submitComposer')
+            ->assertHasNoErrors();
+
+        $task = ProjectTask::query()->where('name', 'Szybkie zadanie Ani')->first();
+        $this->assertNotNull($task);
+        $this->assertSame($ania->id, $task->assigned_to);
+        $this->assertDatabaseMissing('work_item_time_blocks', [
+            'work_item_id' => WorkItem::query()->where('source_id', $task->id)->value('id'),
+        ]);
+
+        $queue = app(WorkItemPlanService::class)->queue($ania, now());
+        $this->assertTrue($queue->contains(fn (WorkItem $row) => $row->title === 'Szybkie zadanie Ani'));
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->set('userId', $ania->id)
+            ->call('openUnscheduledComposer', 'procedure')
+            ->set('composerProcedureTemplateId', (string) $template->id)
+            ->set('composerProcedureNameSuffix', 'Ania')
+            ->call('submitComposer')
+            ->assertHasNoErrors();
+
+        $item = WorkItem::query()->where('type', WorkItemType::ProcedureRun)->where('title', 'Onboarding z kolejki · Ania')->first();
+        $this->assertNotNull($item);
+        $this->assertSame($ania->id, $item->assignee_id);
+        $this->assertDatabaseMissing('work_item_time_blocks', ['work_item_id' => $item->id]);
+    }
+
     public function test_unschedule_deletes_a_block_not_the_work_item(): void
     {
         $this->actingAs($this->user);
@@ -1129,7 +1185,7 @@ class WorkItemPlanTest extends TestCase
         $this->assertSame('Dzwonienie do leadów', $session->fresh()->title);
     }
 
-    public function test_all_day_due_flags_collapse_after_three(): void
+    public function test_all_day_due_flags_start_collapsed(): void
     {
         $this->actingAs($this->user);
         $this->task('Alfa cel flagi unikat', '2026-09-18');
@@ -1139,9 +1195,10 @@ class WorkItemPlanTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(WorkItemPlan::class)
-            ->assertSee('Alfa cel flagi unikat')
-            ->assertSeeHtml('wi-plan__flag-more')
-            ->assertSee('+1');
+            ->assertSee('Terminy')
+            ->assertSeeHtml('wi-plan__due-toggle')
+            ->assertSeeHtml('· 4')
+            ->assertDontSeeHtml('wi-plan__flag-more');
     }
 
     public function test_unschedule_closes_the_plan_card_dialog(): void
@@ -1164,6 +1221,30 @@ class WorkItemPlanTest extends TestCase
             ->assertDontSeeLivewire(\App\Livewire\TaskShowQuickEdit::class);
 
         $this->assertDatabaseMissing('work_item_time_blocks', ['id' => $block->id]);
+    }
+
+    public function test_past_days_in_the_week_are_a_named_debt_zone(): void
+    {
+        $this->actingAs($this->user);
+        $this->travelTo(Carbon::parse('2026-09-17 12:00:00'));
+
+        Livewire::actingAs($this->user)
+            ->withQueryParams(['w' => '2026-09-14'])
+            ->test(WorkItemPlan::class)
+            ->assertSee('Niedokończone')
+            ->assertSee('strefa długu')
+            ->assertSeeHtml('class="wi-plan__debt-banner"')
+            ->assertSeeHtml('--debt-span: 3')
+            ->assertSeeHtml('wi-plan__col is-debt')
+            ->assertSeeHtml('wi-plan__col is-today is-debt-edge')
+            ->call('nextWeek')
+            ->assertDontSee('Niedokończone')
+            ->assertDontSeeHtml('class="wi-plan__debt-banner"')
+            ->call('previousWeek')
+            ->call('previousWeek')
+            ->assertSee('Niedokończone')
+            ->assertSeeHtml('--debt-span: 7')
+            ->assertDontSeeHtml('is-today is-debt-edge');
     }
 
     public function test_opening_an_approval_block_embeds_the_approval_card(): void

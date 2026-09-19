@@ -1,6 +1,6 @@
 ---
 name: task-copilot
-description: Playbooki pracy na zadaniach, backlogu i tablicy ChronoLogic przez serwer MCP chrono-tasks. Użyj, gdy użytkownik prosi o podsumowanie tygodnia, zadania, sprint, komentarz z @ / zadaniem / zatwierdzeniem, albo wątki na tablicy.
+description: Playbooki pracy na zadaniach, backlogu, tablicy i kalendarzu Planu ChronoLogic przez serwer MCP chrono-tasks. Użyj, gdy użytkownik prosi o podsumowanie tygodnia, zadania, sprint, komentarz z @ / zadaniem / zatwierdzeniem, wątki na tablicy, albo sprawdzenie / zaplanowanie dnia, dług, sesję, pin z kolejki.
 ---
 
 # Task Copilot
@@ -16,12 +16,15 @@ Czytające: `period_analytics`, `search_work_items`, `search_tasks`, `get_task`,
 `search_posts`, `get_post`, `get_post_comments`, `list_post_tags`,
 `list_users`, `list_categories`, `sprint_insights`, `tasks_without_category`,
 `backlog_overview`, `list_procedure_templates`, `list_procedure_runs`,
-`get_procedure_run`, `tasks_in_period` (dump – unikaj na rzecz analityki).
+`get_procedure_run`, `plan_occupancy`, `plan_queue`,
+`tasks_in_period` (dump – unikaj na rzecz analityki).
 
 Zapisujące (HITL): `set_task_categories`, `update_task`, `update_subtask`,
 `add_subtasks`, `add_comment`, `create_post`, `update_post`, `create_task`,
 `create_sprint`, `add_sprint_checklist_item`, `update_sprint_checklist_item`,
-`assign_tasks_to_sprint`, `start_procedure`, `advance_procedure`.
+`assign_tasks_to_sprint`, `start_procedure`, `advance_procedure`,
+`schedule_plan_item`, `move_plan_block`, `unschedule_plan_block`,
+`create_plan_session`.
 
 ## Zasada nadrzędna
 
@@ -91,6 +94,30 @@ Wyzwalacze: „odpal procedurę”, „co leci z onboardingu”, „następny kr
 5. Po zgodzie: `advance_procedure` (`begin`, `edge_id`, `checklist`, `back`).
    Kroku approval nie domykaj – musi zatwierdzający.
 
+## Playbook: Plan / dzień / dług / sesja
+
+Wyzwalacze: „sprawdź mój dzień”, „co ma Anna w planie”, „zwin dług”,
+„wrzuć Bug / UI na slot”, „zrób sesję”, „przesuń / odepnij klocek”.
+
+Kalendarz ≠ konto MCP. Domyślnie kalendarz = aktor. „U Ani”: `list_users`
+potem `assignee_name`. Szczegóły warstw (blok vs spotkanie vs sesja vs
+kolejka): `docs/MCP-TASKS.md`.
+
+1. Odczyt: `plan_occupancy` (tydzień / `date` / `debt_only`) i `plan_queue`
+   (`category`, `q`). Occupancy ma godziny; `search_work_items` ich nie ma.
+2. Propozycja po polsku: timed, sesje, spotkania, ghost (dług = slot
+   sprzed dziś, WI otwarte), kolejka. Link `plan_url`. ID z occupancy
+   (`block_id` albo meeting `work_item_id`).
+3. Po zgodzie, jedno narzędzie na zmianę, `confirmed_by_user: true`:
+   - pin z kolejki → `schedule_plan_item` (nowy blok; **nie** na długu)
+   - istniejący klocek / sesja / ghost → `move_plan_block` (`block_id`)
+   - spotkanie → `move_plan_block` (`work_item_id`)
+   - worek WI (nie spotkania) → `create_plan_session`
+   - zdjąć slot, karta zostaje → `unschedule_plan_block`
+4. `create_task` / `update_task` z `starts_at` robi spotkanie na karcie,
+   nie klocek WI. Drugi `schedule_plan_item` na zaplanowanym WI doda
+   drugi blok.
+
 ## Playbook: tworzenie zadania
 
 1. Propozycja (nazwa, opis, kategoria ze słownika, priorytet, termin, osoba,
@@ -140,6 +167,7 @@ Bez załączników.
 
 - Lokalny stdio (Cursor) działa na koncie z `MCP_ACTOR_USER_ID`.
 - HTTP `/mcp/tasks` (ChatGPT, Grok) działa na koncie użytkownika z OAuth.
+  OAuth, occupancy i HITL Planu: `docs/MCP-TASKS.md`.
 - Kategoria to zwykły tekst; preferuj częstszy wariant ze słownika
   (`Bug / UI` vs `UI / Bug`).
 - `update_task` nie zmienia kategorii ani nie wkłada do sprintu

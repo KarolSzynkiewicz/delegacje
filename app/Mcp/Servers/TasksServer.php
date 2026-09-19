@@ -8,6 +8,7 @@ use App\Mcp\Tools\AddSubtasksTool;
 use App\Mcp\Tools\AdvanceProcedureTool;
 use App\Mcp\Tools\AssignTasksToSprintTool;
 use App\Mcp\Tools\BacklogOverviewTool;
+use App\Mcp\Tools\CreatePlanSessionTool;
 use App\Mcp\Tools\CreatePostTool;
 use App\Mcp\Tools\CreateSprintTool;
 use App\Mcp\Tools\CreateTaskTool;
@@ -21,7 +22,11 @@ use App\Mcp\Tools\ListPostTagsTool;
 use App\Mcp\Tools\ListProcedureRunsTool;
 use App\Mcp\Tools\ListProcedureTemplatesTool;
 use App\Mcp\Tools\ListUsersTool;
+use App\Mcp\Tools\MovePlanBlockTool;
 use App\Mcp\Tools\PeriodAnalyticsTool;
+use App\Mcp\Tools\PlanOccupancyTool;
+use App\Mcp\Tools\PlanQueueTool;
+use App\Mcp\Tools\SchedulePlanItemTool;
 use App\Mcp\Tools\SearchPostsTool;
 use App\Mcp\Tools\SearchTasksTool;
 use App\Mcp\Tools\SearchWorkItemsTool;
@@ -30,6 +35,7 @@ use App\Mcp\Tools\SprintInsightsTool;
 use App\Mcp\Tools\StartProcedureTool;
 use App\Mcp\Tools\TasksInPeriodTool;
 use App\Mcp\Tools\TasksWithoutCategoryTool;
+use App\Mcp\Tools\UnschedulePlanBlockTool;
 use App\Mcp\Tools\UpdatePostTool;
 use App\Mcp\Tools\UpdateSprintChecklistItemTool;
 use App\Mcp\Tools\UpdateSubtaskTool;
@@ -40,10 +46,11 @@ class TasksServer extends Server
 {
     protected string $name = 'ChronoLogic Tasks';
 
-    protected string $version = '0.8.0';
+    protected string $version = '0.9.0';
 
     protected string $instructions = <<<'MARKDOWN'
-        Serwer daje dostęp do zadań, sprintów, procedur, backlogu i tablicy ChronoLogic.
+        Serwer daje dostęp do zadań, sprintów, procedur, backlogu, tablicy
+        i kalendarza Planu (`/plan`) ChronoLogic.
 
         # Odczyt
 
@@ -65,6 +72,9 @@ class TasksServer extends Server
         - `list_procedure_templates` – templatki SOP + ile aktywnych runów.
         - `list_procedure_runs` – przebiegi (domyślnie w trakcie).
         - `get_procedure_run` – aktualny krok i `prompt` do przeczytania na głos.
+        - `plan_occupancy` – bloki, sesje i spotkania osoby w tygodniu / dniu.
+          `ghost: true` = strefa długu (slot sprzed dziś, WI otwarte).
+        - `plan_queue` – „Do przypięcia”: otwarte WI bez slotu ≥ dziś.
 
         # Zapis (HITL, `confirmed_by_user: true`)
 
@@ -82,6 +92,13 @@ class TasksServer extends Server
           warunki startu, ukończenia i kamienie.
         - `start_procedure` / `advance_procedure` – odpalenie i krok procedury
           (`begin`, `back`, `abandon`).
+        - `schedule_plan_item` – pin z kolejki na slot (nowy blok / godzina
+          spotkania). Nie przesuwa istniejącego klocka.
+        - `move_plan_block` – przesuń / zmień koniec (`block_id` albo
+          `work_item_id` spotkania). Dług: ten sam block_id, nowy starts_at.
+        - `unschedule_plan_block` – zdejmij slot; WI zostaje.
+        - `create_plan_session` – nowy worek albo dokładka `work_item_ids`
+          do istniejącej sesji. Spotkania pomijane.
 
         # Przepływy
 
@@ -120,6 +137,13 @@ class TasksServer extends Server
 
         Tablica: `list_post_tags` / `search_posts` → `get_post` →
         `add_comment` z `post_id`. Nowy wątek: `create_post`.
+
+        Plan / dzień: `plan_occupancy` (osoba + date/week) + `plan_queue`.
+        Dług: occupancy `debt_only` → `move_plan_block`.
+        Kategoria bez slotu: `plan_queue` + `category` → `schedule_plan_item`
+        albo `create_plan_session`.
+        `update_task` / `create_task` z `starts_at` NIE rusza bloków WI
+        (starts_at na create_task = spotkanie na karcie).
 
         # Zasada nadrzędna
 
@@ -176,5 +200,11 @@ class TasksServer extends Server
         GetProcedureRunTool::class,
         StartProcedureTool::class,
         AdvanceProcedureTool::class,
+        PlanOccupancyTool::class,
+        PlanQueueTool::class,
+        SchedulePlanItemTool::class,
+        MovePlanBlockTool::class,
+        UnschedulePlanBlockTool::class,
+        CreatePlanSessionTool::class,
     ];
 }

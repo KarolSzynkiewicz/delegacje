@@ -580,8 +580,12 @@ class WorkItemPlan extends Component
         $this->composerOpen = true;
     }
 
-    public function openUnscheduledMeeting(): void
+    public function openUnscheduledComposer(string $type = 'meeting'): void
     {
+        if (! in_array($type, ['task', 'procedure', 'meeting'], true)) {
+            return;
+        }
+
         $this->closeEvent();
         $this->resetErrorBag();
         $this->composerDate = '';
@@ -589,7 +593,7 @@ class WorkItemPlan extends Component
         $this->composerEnd = 0;
         $this->composerAllDay = false;
         $this->composerUnscheduled = true;
-        $this->composerType = 'meeting';
+        $this->composerType = $type;
         $this->composerTitle = '';
         $this->composerLocation = '';
         $this->composerParticipantIds = [$this->calendarUser()->id];
@@ -597,6 +601,11 @@ class WorkItemPlan extends Component
         $this->composerProcedureSubjectId = '';
         $this->composerProcedureNameSuffix = '';
         $this->composerOpen = true;
+    }
+
+    public function openUnscheduledMeeting(): void
+    {
+        $this->openUnscheduledComposer('meeting');
     }
 
     public function closeComposer(): void
@@ -615,8 +624,8 @@ class WorkItemPlan extends Component
     public function updatedComposerType(): void
     {
         $this->resetErrorBag();
-        if ($this->composerUnscheduled && $this->composerType !== 'meeting') {
-            $this->composerType = 'meeting';
+        if ($this->composerUnscheduled && ! in_array($this->composerType, ['task', 'procedure', 'meeting'], true)) {
+            $this->composerType = 'task';
         }
         if ($this->composerType === 'meeting' && $this->composerParticipantIds === []) {
             $this->composerParticipantIds = [$this->calendarUser()->id];
@@ -642,14 +651,18 @@ class WorkItemPlan extends Component
 
         $service = app(WorkItemPlanService::class);
 
-        if ($this->composerType === 'meeting' && $this->composerUnscheduled) {
-            $service->createHangingMeeting(
+        if ($this->composerUnscheduled) {
+            $service->createUnscheduled(
+                $this->composerType,
                 $this->composerTitle,
                 $this->calendarUser(),
                 auth()->user(),
                 [
                     'location' => $this->composerLocation,
                     'participant_ids' => $this->composerParticipantIds,
+                    'template_id' => $this->composerProcedureTemplateId !== '' ? (int) $this->composerProcedureTemplateId : null,
+                    'subject_id' => $this->composerProcedureSubjectId !== '' ? (int) $this->composerProcedureSubjectId : null,
+                    'name_suffix' => $this->composerProcedureNameSuffix !== '' ? $this->composerProcedureNameSuffix : null,
                 ],
             );
             $this->closeComposer();
@@ -709,6 +722,14 @@ class WorkItemPlan extends Component
         $weekStart = $this->weekStart();
         $user = $this->calendarUser();
         $now = now();
+        $today = CarbonImmutable::parse($now)->toDateString();
+        $days = $service->weekDays($weekStart);
+        $debtCount = 0;
+        foreach ($days as $day) {
+            if ($day->toDateString() < $today) {
+                $debtCount++;
+            }
+        }
         $occupancy = $service->occupancy($user, $weekStart, $now);
         $pinnedTitle = $this->pinId
             ? WorkItem::query()->whereKey($this->pinId)->value('title')
@@ -719,13 +740,14 @@ class WorkItemPlan extends Component
             'users' => $this->users(),
             'weekStart' => $weekStart,
             'weekLabel' => $weekStart->format('d.m').'–'.$weekStart->addDays(6)->format('d.m.Y'),
-            'days' => $service->weekDays($weekStart),
+            'days' => $days,
             'hours' => range(WorkItemPlanService::GRID_START_HOUR, WorkItemPlanService::GRID_END_HOUR - 1),
             'pinnedTitle' => $pinnedTitle,
             'eventsByDay' => $occupancy['timed'],
             'allDayByDay' => $occupancy['allDay'],
             'dueFlags' => $service->dueFlags($user, $weekStart),
-            'today' => CarbonImmutable::parse($now)->toDateString(),
+            'today' => $today,
+            'debtCount' => $debtCount,
             'gridStartHour' => WorkItemPlanService::GRID_START_HOUR,
             'viewStartHour' => WorkItemPlanService::VIEW_START_HOUR,
             'snap' => WorkItemPlanService::SNAP_MINUTES,
