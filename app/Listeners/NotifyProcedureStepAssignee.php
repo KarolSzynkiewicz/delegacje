@@ -3,8 +3,9 @@
 namespace App\Listeners;
 
 use App\Events\ProcedureRunStepEntered;
-use App\Models\CommentMention;
 use App\Models\User;
+use App\Notifications\Notifier;
+use App\Notifications\ProcedureStepReady;
 use App\Services\UserMentionService;
 use Illuminate\Support\Facades\Auth;
 
@@ -58,28 +59,26 @@ class NotifyProcedureStepAssignee
         $stepName = $this->stepName($node);
         $body = '@'.$assignee->name.'! Krok: '.$stepName."\nZrób: ".$this->whatToDo($node);
         $comment = $task->addComment($body, $author);
-        $this->mentions->notifyCommentMentions($comment, $author);
+        $this->mentions->createCommentMentions($comment, $author);
 
-        $mentions = CommentMention::query()
-            ->where('comment_id', $comment->id)
-            ->get();
+        $mentions = $comment->mentions()->get();
 
         foreach ($mentions as $mention) {
             $mention->update(['title' => $stepName]);
         }
 
         $ids = $mentions->pluck('id')->all();
-        if ($ids === []) {
-            return;
+        if ($ids !== []) {
+            $variables = $event->run->variables ?? [];
+            $key = (string) $assigneeId;
+            $variables['step_mentions'][$key] = array_values(array_unique(array_merge(
+                $variables['step_mentions'][$key] ?? [],
+                $ids
+            )));
+            $event->run->update(['variables' => $variables]);
         }
 
-        $variables = $event->run->variables ?? [];
-        $key = (string) $assigneeId;
-        $variables['step_mentions'][$key] = array_values(array_unique(array_merge(
-            $variables['step_mentions'][$key] ?? [],
-            $ids
-        )));
-        $event->run->update(['variables' => $variables]);
+        Notifier::send($assignee, new ProcedureStepReady($event->run, $node, $author), $author);
     }
 
     /**

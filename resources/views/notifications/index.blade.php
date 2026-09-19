@@ -2,9 +2,15 @@
     <x-slot name="header">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
             <h2 class="fw-semibold fs-4 mb-0">Powiadomienia</h2>
-            <x-ui.button variant="ghost" href="{{ route('tasks.index', ['myTasksOnly' => 'true']) }}" class="btn-sm">
-                <i class="bi bi-list-check me-1"></i> Moje zadania
-            </x-ui.button>
+            <div class="d-flex gap-2">
+                <form method="post" action="{{ route('notifications.read-all') }}">
+                    @csrf
+                    <x-ui.button variant="ghost" type="submit" class="btn-sm">Oznacz przeczytane</x-ui.button>
+                </form>
+                <x-ui.button variant="ghost" href="{{ route('tasks.index', ['myTasksOnly' => 'true']) }}" class="btn-sm">
+                    <i class="bi bi-list-check me-1"></i> Moje zadania
+                </x-ui.button>
+            </div>
         </div>
     </x-slot>
 

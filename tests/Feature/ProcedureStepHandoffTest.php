@@ -8,6 +8,8 @@ use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
 use App\Models\User;
 use App\Notifications\CommentMentioned;
+use App\Notifications\ProcedureStepReady;
+use App\Notifications\TaskAssigned;
 use App\Services\ProcedureRunService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -70,7 +72,9 @@ class ProcedureStepHandoffTest extends TestCase
         $this->assertSame('Odbiór auta', $mention->title);
         $this->assertSame(WorkItemStatus::Pending, $mention->status);
         $this->assertSame($comment->id, $mention->comment_id);
-        Notification::assertSentTo($this->mirek, CommentMentioned::class);
+        Notification::assertSentTo($this->mirek, ProcedureStepReady::class);
+        Notification::assertSentTo($this->mirek, TaskAssigned::class);
+        Notification::assertNotSentTo($this->mirek, CommentMentioned::class);
     }
 
     public function test_two_consecutive_steps_for_the_same_user_create_one_comment(): void

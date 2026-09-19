@@ -2,23 +2,20 @@
 
 namespace App\Notifications;
 
+use App\Enums\NotificationEvent;
 use App\Models\Comment;
 use App\Models\User;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 
-class CommentMentioned extends Notification
+class CommentMentioned extends ChronoNotification
 {
-    use Queueable;
-
     public function __construct(
         public readonly Comment $comment,
         public readonly User $mentionedBy,
     ) {}
 
-    public function via(object $notifiable): array
+    public function event(): NotificationEvent
     {
-        return ['database'];
+        return NotificationEvent::CommentMentioned;
     }
 
     public function toDatabase(object $notifiable): array

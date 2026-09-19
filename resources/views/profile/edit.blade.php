@@ -193,6 +193,10 @@
                     </div>
                 </div>
             </div>
+
+            <div class="mt-4">
+                <livewire:notification-preferences />
+            </div>
         </div>
     </div>
 </x-app-layout>

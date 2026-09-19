@@ -2,23 +2,20 @@
 
 namespace App\Notifications;
 
+use App\Enums\NotificationEvent;
 use App\Models\ApprovalRequest;
 use App\Models\User;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 
-class ApprovalRequested extends Notification
+class ApprovalRequested extends ChronoNotification
 {
-    use Queueable;
-
     public function __construct(
         public readonly ApprovalRequest $approval,
         public readonly User $requestedBy,
     ) {}
 
-    public function via(object $notifiable): array
+    public function event(): NotificationEvent
     {
-        return ['database'];
+        return NotificationEvent::ApprovalRequested;
     }
 
     public function toDatabase(object $notifiable): array

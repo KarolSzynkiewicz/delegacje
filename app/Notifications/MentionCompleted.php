@@ -2,23 +2,20 @@
 
 namespace App\Notifications;
 
+use App\Enums\NotificationEvent;
 use App\Models\CommentMention;
 use App\Models\User;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 
-class MentionCompleted extends Notification
+class MentionCompleted extends ChronoNotification
 {
-    use Queueable;
-
     public function __construct(
         public readonly CommentMention $mention,
         public readonly ?User $completedBy,
     ) {}
 
-    public function via(object $notifiable): array
+    public function event(): NotificationEvent
     {
-        return ['database'];
+        return NotificationEvent::MentionCompleted;
     }
 
     public function toDatabase(object $notifiable): array

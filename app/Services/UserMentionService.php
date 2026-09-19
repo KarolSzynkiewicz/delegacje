@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\WorkItemStatus;
+use App\Events\CommentPosted;
 use App\Models\ApprovalRequest;
 use App\Models\Attachment;
 use App\Models\Comment;
@@ -10,8 +11,6 @@ use App\Models\CommentMention;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\User;
-use App\Notifications\CommentMentioned;
-use App\Notifications\TaskAssigned;
 
 class UserMentionService
 {
@@ -200,17 +199,28 @@ class UserMentionService
     }
 
     /**
-     * Wysyła powiadomienia o wzmiance w komentarzu.
+     * Tworzy wzmianki / wnioski i emituje CommentPosted (powiadomienia idą listenerem).
      *
-     * @return list<int> ID użytkowników, którzy dostali powiadomienie
+     * @return list<int> ID użytkowników wspomnianych @nazwa (bez @nazwa?)
      */
-    public function notifyCommentMentions(Comment $comment, User $author): array
+    public function processComment(Comment $comment, User $author): array
+    {
+        $mentionUserIds = $this->mentionUserIds($comment, $author);
+        $this->createCommentMentions($comment, $author);
+        $this->createApprovalRequests($comment, $author);
+        CommentPosted::dispatch($comment, $author, $mentionUserIds);
+
+        return $mentionUserIds;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function mentionUserIds(Comment $comment, User $author): array
     {
         $notifiedIds = [];
         $notifyEveryone = false;
         $notifyHandles = [];
-
-        $comment->loadMissing('commentable');
 
         preg_match_all(self::MENTION_REGEX, (string) ($comment->body ?? ''), $matches, PREG_SET_ORDER);
         foreach ($matches as $match) {
@@ -232,28 +242,23 @@ class UserMentionService
         foreach (array_values(array_unique($notifyHandles)) as $name) {
             $user = self::resolveUserByMentionHandle($name);
 
-            if (! $user) {
+            if (! $user || (int) $user->id === (int) $author->id) {
                 continue;
             }
 
-            $user->notify(new CommentMentioned($comment, $author));
             $notifiedIds[] = $user->id;
         }
 
         if ($notifyEveryone) {
             User::where('id', '!=', $author->id)
                 ->whereNotIn('id', $notifiedIds)
-                ->get()
-                ->each(function (User $user) use ($comment, $author, &$notifiedIds): void {
-                    $user->notify(new CommentMentioned($comment, $author));
-                    $notifiedIds[] = $user->id;
+                ->pluck('id')
+                ->each(function ($id) use (&$notifiedIds): void {
+                    $notifiedIds[] = (int) $id;
                 });
         }
 
-        $this->createCommentMentions($comment, $author);
-        $this->createApprovalRequests($comment, $author);
-
-        return $notifiedIds;
+        return array_values(array_unique($notifiedIds));
     }
 
     /**
@@ -288,17 +293,13 @@ class UserMentionService
                 continue;
             }
 
-            $mention = CommentMention::query()->create([
+            CommentMention::query()->create([
                 'comment_id' => $comment->id,
                 'assigned_to' => $user->id,
                 'created_by' => $author->id,
                 'title' => $this->mentionTitle($comment, $author),
                 'status' => WorkItemStatus::Pending,
             ]);
-
-            if ($user->id !== $author->id) {
-                $user->notify(new TaskAssigned($mention, $author));
-            }
         }
     }
 
@@ -434,9 +435,5 @@ class UserMentionService
             'name' => $work !== '' ? $work : $name,
             'assigned_to' => $assignee->id,
         ]);
-
-        if ($assignee->id !== $author->id) {
-            $assignee->notify(new TaskAssigned($subtask->fresh() ?? $subtask, $author));
-        }
     }
 }

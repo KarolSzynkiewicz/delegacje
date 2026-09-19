@@ -39,6 +39,11 @@
         >
             <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom" style="border-color: var(--glass-border) !important;">
                 <span class="fw-semibold small">Powiadomienia</span>
+                @if($unreadCount > 0)
+                    <button type="button" class="btn btn-link btn-sm p-0 text-muted" wire:click="markAllRead">
+                        Oznacz przeczytane
+                    </button>
+                @endif
             </div>
 
             @if($notifications->isEmpty())

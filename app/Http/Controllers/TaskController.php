@@ -8,8 +8,6 @@ use App\Http\Requests\UpdateProjectTaskRequest;
 use App\Models\Attachment;
 use App\Models\ProjectTask;
 use App\Models\TaskGridView;
-use App\Models\User;
-use App\Notifications\TaskAssigned;
 use App\Support\TasksGridUrlParams;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -105,12 +103,6 @@ class TaskController extends Controller
 
             \Log::info('Task created', ['task_id' => $task->id]);
 
-            // Powiadomienie dla przypisanego użytkownika (jeśli inny niż tworzący)
-            if ($task->assigned_to && $task->assigned_to !== auth()->id()) {
-                $assignee = User::find($task->assigned_to);
-                $assignee?->notify(new TaskAssigned($task, auth()->user()));
-            }
-
             // Jeśli status to COMPLETED, ustaw completed_at
             if ($status === TaskStatus::COMPLETED && ! $task->completed_at) {
                 $task->update(['completed_at' => now()]);
@@ -177,17 +169,7 @@ class TaskController extends Controller
             ? TaskStatus::from($request->input('status'))
             : $task->status;
 
-        $previousAssignee = $task->assigned_to;
-
-        // Aktualizuj podstawowe pola
         $task->update($request->only(['name', 'description', 'assigned_to', 'due_date', 'priority', 'category', 'sprint_id', 'location']));
-
-        // Powiadomienie jeśli przypisano do nowego użytkownika
-        $newAssignee = (int) $request->input('assigned_to');
-        if ($newAssignee && $newAssignee !== $previousAssignee && $newAssignee !== auth()->id()) {
-            $assignee = User::find($newAssignee);
-            $assignee?->notify(new TaskAssigned($task->fresh(), auth()->user()));
-        }
 
         // Jeśli status się zmienił, użyj metod domenowych lub zaktualizuj bezpośrednio
         if ($newStatus !== $oldStatus) {

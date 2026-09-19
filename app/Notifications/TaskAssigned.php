@@ -2,26 +2,23 @@
 
 namespace App\Notifications;
 
+use App\Enums\NotificationEvent;
 use App\Models\Comment;
 use App\Models\CommentMention;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\User;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 
-class TaskAssigned extends Notification
+class TaskAssigned extends ChronoNotification
 {
-    use Queueable;
-
     public function __construct(
         public readonly ProjectTask|TaskSubtask|CommentMention $task,
         public readonly User $assignedBy,
     ) {}
 
-    public function via(object $notifiable): array
+    public function event(): NotificationEvent
     {
-        return ['database'];
+        return NotificationEvent::TaskAssigned;
     }
 
     public function toDatabase(object $notifiable): array

@@ -11,7 +11,6 @@ use App\Models\ForumPost;
 use App\Models\ProjectTask;
 use App\Models\Sprint;
 use App\Models\User;
-use App\Notifications\TaskCommentAdded;
 use App\Services\UserMentionService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -123,8 +122,7 @@ class AddCommentTool extends Tool
         }
 
         $comment = $task->addComment($body, $user, $parent);
-        $mentionNotifiedIds = app(UserMentionService::class)->notifyCommentMentions($comment, $user);
-        $this->notifyAssignee($task, $comment, $user, $mentionNotifiedIds);
+        app(UserMentionService::class)->processComment($comment, $user);
 
         $comment = $comment->fresh('user');
 
@@ -169,7 +167,7 @@ class AddCommentTool extends Tool
         }
 
         $comment = $post->addComment($body, $user, $parent);
-        app(UserMentionService::class)->notifyCommentMentions($comment, $user);
+        app(UserMentionService::class)->processComment($comment, $user);
 
         $comment = $comment->fresh('user');
 
@@ -268,7 +266,7 @@ class AddCommentTool extends Tool
         }
 
         $comment = $sprint->addComment($body, $user, $parent);
-        app(UserMentionService::class)->notifyCommentMentions($comment, $user);
+        app(UserMentionService::class)->processComment($comment, $user);
 
         $comment = $comment->fresh('user');
 
@@ -286,24 +284,6 @@ class AddCommentTool extends Tool
                 'url' => route('sprints.show', $sprint),
             ],
         ]);
-    }
-
-    /**
-     * @param  list<int>  $mentionNotifiedIds
-     */
-    private function notifyAssignee(ProjectTask $task, Comment $comment, User $author, array $mentionNotifiedIds): void
-    {
-        $assigneeId = $task->assigned_to;
-        if (! $assigneeId || $assigneeId === $author->id) {
-            return;
-        }
-
-        if (in_array($assigneeId, $mentionNotifiedIds, true)) {
-            return;
-        }
-
-        $assignee = User::query()->find($assigneeId);
-        $assignee?->notify(new TaskCommentAdded($task, $comment, $author));
     }
 
     /**

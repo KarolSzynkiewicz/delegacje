@@ -8,7 +8,6 @@ use App\Mcp\Concerns\ParsesTaskId;
 use App\Mcp\Support\TaskPayload;
 use App\Models\ProjectTask;
 use App\Models\User;
-use App\Notifications\TaskAssigned;
 use App\WorkItems\ProjectTaskFields;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -140,12 +139,8 @@ class UpdateTaskTool extends Tool
             $task->reassign(null);
             $changed[] = 'assigned_to';
         } elseif (array_key_exists('assigned_to', $validated) && $validated['assigned_to'] !== null) {
-            $previous = $task->assigned_to;
             $assignee = User::query()->find((int) $validated['assigned_to']);
             $task->reassign($assignee);
-            if ($assignee && $assignee->id !== $previous && $assignee->id !== $user->id) {
-                $assignee->notify(new TaskAssigned($task->fresh(), $user));
-            }
             $changed[] = 'assigned_to';
         }
 

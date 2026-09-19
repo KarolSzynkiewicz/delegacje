@@ -301,15 +301,8 @@ class TaskSubtasks extends Component
             abort(403, 'Nieprawidłowe podzadanie.');
         }
 
-        $previous = $subtask->assigned_to;
         $newAssignee = $this->assignSubtaskUserId === '' ? null : (int) $this->assignSubtaskUserId;
-
         $subtask->update(['assigned_to' => $newAssignee]);
-
-        if ($newAssignee && $newAssignee !== $previous && $newAssignee !== auth()->id()) {
-            $assignee = User::find($newAssignee);
-            $assignee?->notify(new \App\Notifications\TaskAssigned($subtask->fresh() ?? $subtask, auth()->user()));
-        }
 
         $this->cancelAssignSubtask();
         $this->refreshTask();

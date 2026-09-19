@@ -3,8 +3,6 @@
 namespace App\Livewire\Concerns;
 
 use App\Models\ProjectTask;
-use App\Models\User;
-use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
 use Illuminate\Support\Facades\Validator;
 
@@ -189,15 +187,8 @@ trait WithTaskQuickEdit
             ]
         )->validate();
 
-        $previousAssignee = $task->assigned_to;
         $newAssignee = $this->qeAssignedTo === '' ? null : (int) $this->qeAssignedTo;
-
         $task->update(['assigned_to' => $newAssignee]);
-
-        if ($newAssignee && $newAssignee !== $previousAssignee && $newAssignee !== auth()->id()) {
-            $assignee = User::find($newAssignee);
-            $assignee?->notify(new TaskAssigned($task->fresh(), auth()->user()));
-        }
     }
 
     protected function saveQuickEditSprint(ProjectTask $task): void

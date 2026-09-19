@@ -8,15 +8,13 @@ use App\Enums\ProcedureSubjectType;
 use App\Enums\TaskStatus;
 use App\Events\ProcedureRunStepCompleted;
 use App\Events\ProcedureRunStepEntered;
+use App\Events\ProcedureWaitFinished;
 use App\Models\ApprovalRequest;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureRunStep;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentProcess;
-use App\Models\User;
-use App\Notifications\ProcedureWaitElapsed;
-use App\Notifications\TaskAssigned;
 use App\ProcedureActions\ActionCatalog;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -70,8 +68,7 @@ class ProcedureRunService
             throw new RuntimeException('Procedura nie ma węzła startowego.');
         }
 
-        $createdTask = null;
-        $run = DB::transaction(function () use ($template, $version, $startNode, $params, &$createdTask) {
+        $run = DB::transaction(function () use ($template, $version, $startNode, $params) {
             $now = now();
 
             $run = ProcedureRun::create([
@@ -105,7 +102,7 @@ class ProcedureRunService
                     ? ($params['subject_id'] ?? null)
                     : null);
 
-            $createdTask = ProjectTask::create([
+            ProjectTask::create([
                 'name' => $params['task_name'],
                 'description' => $params['description'] ?? null,
                 'category' => ($params['category'] ?? null) ?: 'Procedura',
@@ -119,12 +116,6 @@ class ProcedureRunService
 
             return $run;
         });
-
-        $actor = Auth::user();
-        $assigneeId = $createdTask?->assigned_to;
-        if ($createdTask && $assigneeId && $actor && (int) $assigneeId !== (int) $actor->id) {
-            User::query()->find($assigneeId)?->notify(new TaskAssigned($createdTask, $actor));
-        }
 
         $this->dispatchStepEntered($run->load(['task', 'version']), $startNode, null);
         $this->leaveStartNodes($run);
@@ -1064,27 +1055,10 @@ class ProcedureRunService
             }
 
             $this->advanceNode($run, $step->node_id, null, ['wait_elapsed' => true]);
-            $this->notifyWaitElapsed($run->fresh(), $step);
+            ProcedureWaitFinished::dispatch($run->fresh(), $step);
             $count++;
         }
 
         return $count;
-    }
-
-    protected function notifyWaitElapsed(ProcedureRun $run, ProcedureRunStep $step): void
-    {
-        $run->loadMissing(['task', 'startedBy', 'version']);
-        $node = $run->findNodeById($step->node_id);
-        $ids = array_filter([
-            (int) ($node['assigned_user_id'] ?? 0),
-            (int) ($run->task?->assigned_to ?? 0),
-        ]);
-
-        foreach (array_unique($ids) as $userId) {
-            if ($userId <= 0) {
-                continue;
-            }
-            User::query()->find($userId)?->notify(new ProcedureWaitElapsed($run, $step, $run->startedBy));
-        }
     }
 }

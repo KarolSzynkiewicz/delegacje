@@ -642,7 +642,12 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
 
         Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
             ->name('notifications.index')
-            // Powiadomienia są ściśle związane z zadaniami, więc opieramy dostęp o istniejące uprawnienie `tasks.view`
+            ->defaults('resource', 'tasks');
+        Route::get('/notifications/{notification}/open', [\App\Http\Controllers\NotificationController::class, 'open'])
+            ->name('notifications.open')
+            ->defaults('resource', 'tasks');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllRead'])
+            ->name('notifications.read-all')
             ->defaults('resource', 'tasks');
 
         Route::get('/system-actions', function () {

@@ -11,6 +11,7 @@ use App\Models\Adjustment;
 use App\Models\ApprovalRequest;
 use App\Models\Attachment;
 use App\Models\Comment;
+use App\Models\CommentLike;
 use App\Models\CommentMention;
 use App\Models\Employee;
 use App\Models\LogisticsEvent;
@@ -31,7 +32,9 @@ use App\Models\VehicleAssignment;
 use App\Models\WarehouseDispatch;
 use App\Observers\AdvancesProcedureOnApproval;
 use App\Observers\AuditableModelObserver;
-use App\Observers\NotifiesApprovalAssignee;
+use App\Observers\DispatchesApprovalEvents;
+use App\Observers\DispatchesCommentLikeEvents;
+use App\Observers\DispatchesWorkItemNotificationEvents;
 use App\Observers\ProcedureTemplateObserver;
 use App\Observers\SyncsWorkItems;
 use App\Repositories\Llm\DatabaseLlmCredentialRepository;
@@ -116,8 +119,13 @@ class AppServiceProvider extends ServiceProvider
         WarehouseDispatch::observe(SyncsWorkItems::class);
         CommentMention::observe(SyncsWorkItems::class);
         ApprovalRequest::observe(SyncsWorkItems::class);
-        ApprovalRequest::observe(NotifiesApprovalAssignee::class);
+        ApprovalRequest::observe(DispatchesApprovalEvents::class);
         ApprovalRequest::observe(AdvancesProcedureOnApproval::class);
+
+        ProjectTask::observe(DispatchesWorkItemNotificationEvents::class);
+        TaskSubtask::observe(DispatchesWorkItemNotificationEvents::class);
+        CommentMention::observe(DispatchesWorkItemNotificationEvents::class);
+        CommentLike::observe(DispatchesCommentLikeEvents::class);
 
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,

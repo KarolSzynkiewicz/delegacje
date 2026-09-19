@@ -2,25 +2,22 @@
 
 namespace App\Notifications;
 
+use App\Enums\NotificationEvent;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureRunStep;
 use App\Models\User;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 
-class ProcedureWaitElapsed extends Notification
+class ProcedureWaitElapsed extends ChronoNotification
 {
-    use Queueable;
-
     public function __construct(
         public readonly ProcedureRun $run,
         public readonly ProcedureRunStep $step,
         public readonly ?User $actor = null,
     ) {}
 
-    public function via(object $notifiable): array
+    public function event(): NotificationEvent
     {
-        return ['database'];
+        return NotificationEvent::ProcedureWaitElapsed;
     }
 
     public function toDatabase(object $notifiable): array

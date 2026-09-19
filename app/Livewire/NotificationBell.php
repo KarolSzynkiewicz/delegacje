@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use Illuminate\Notifications\DatabaseNotification;
 use Livewire\Component;
 
 class NotificationBell extends Component
@@ -26,11 +25,11 @@ class NotificationBell extends Component
     public function toggle(): void
     {
         $this->open = ! $this->open;
+    }
 
-        // Oznacz wszystkie jako przeczytane przy otwarciu
-        if ($this->open) {
-            auth()->user()->unreadNotifications->markAsRead();
-        }
+    public function markAllRead(): void
+    {
+        auth()->user()->unreadNotifications->markAsRead();
     }
 
     public function markRead(string $id): void

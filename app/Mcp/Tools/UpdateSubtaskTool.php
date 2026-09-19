@@ -7,8 +7,6 @@ use App\Mcp\Concerns\ParsesTaskId;
 use App\Mcp\Support\TaskPayload;
 use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
-use App\Models\User;
-use App\Notifications\TaskAssigned;
 use App\Services\UserMentionService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -128,14 +126,7 @@ class UpdateSubtaskTool extends Tool
             $subtask->update(['assigned_to' => null]);
             $changed[] = 'assigned_to';
         } elseif (array_key_exists('assigned_to', $validated) && $validated['assigned_to'] !== null) {
-            $previous = $subtask->assigned_to;
-            $assigneeId = (int) $validated['assigned_to'];
-            $subtask->update(['assigned_to' => $assigneeId]);
-            if ($assigneeId !== $previous && $assigneeId !== $user->id) {
-                User::query()->find($assigneeId)?->notify(
-                    new TaskAssigned($subtask->fresh() ?? $subtask, $user)
-                );
-            }
+            $subtask->update(['assigned_to' => (int) $validated['assigned_to']]);
             $changed[] = 'assigned_to';
         }
 

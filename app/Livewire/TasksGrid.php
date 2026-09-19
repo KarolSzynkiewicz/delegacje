@@ -19,7 +19,6 @@ use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
 use App\Models\User;
 use App\Models\WorkItem;
-use App\Notifications\TaskAssigned;
 use App\Policies\ProjectTaskPolicy;
 use App\Services\Llm\TasksFilterImportService;
 use App\Services\Llm\TasksFilterMutateService;
@@ -1714,13 +1713,7 @@ class TasksGrid extends Component
     protected function applyAssigneeChange(ProjectTask $task, string $value): void
     {
         $newAssignee = $value === '' ? null : (int) $value;
-        $previousAssignee = $task->assigned_to;
         $task->update(['assigned_to' => $newAssignee]);
-
-        if ($newAssignee && $newAssignee !== $previousAssignee && $newAssignee !== auth()->id()) {
-            $assignee = User::find($newAssignee);
-            $assignee?->notify(new TaskAssigned($task->fresh(), auth()->user()));
-        }
     }
 
     public function quickStatusChange(int $taskId, string $status): void
@@ -1774,11 +1767,6 @@ class TasksGrid extends Component
             'status' => TaskStatus::PENDING,
             'created_by' => auth()->id(),
         ]);
-
-        if ($task->assigned_to && $task->assigned_to !== auth()->id()) {
-            $assignee = User::find($task->assigned_to);
-            $assignee?->notify(new TaskAssigned($task, auth()->user()));
-        }
 
         $this->resetAddForm();
         $this->flash = 'Zadanie dodane.';

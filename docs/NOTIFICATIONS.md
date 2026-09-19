@@ -1,41 +1,61 @@
-# Powiadomienia w aplikacji (dzwonek w navbarze)
+# Powiadomienia
 
-Powiadomienia są zapisywane w tabeli `notifications` (kanał Laravel `database`) i wyświetlane w dropdownie obok menu użytkownika. Przy otwarciu listy nieprzeczytane wpisy są oznaczane jako przeczytane (ikonka dzwonka przestaje świecić).
+Inbox (dzwonek) to kanał Laravel `database`. Wybór kanału idzie przez
+`NotificationRouter` + katalog `NotificationEvent`. Faza 0 implementuje
+tylko dzwonek; defaulty mail/push siedzą w katalogu, ale nie są wysyłane.
 
-## Typy powiadomień
+## Warstwy
 
-| Typ (`data.type`) | Kiedy | Odbiorca |
-|-------------------|--------|----------|
-| `task_assigned` | Utworzenie zadania lub zmiana osoby w polu „przypisany” | Nowy przypisany użytkownik (nie autor zmiany) |
-| `task_comment_added` | Nowy komentarz przy **zadaniu** (`ProjectTask`) | Użytkownik przypisany do zadania — **bez konieczności @wzmianki**. Nie wysyłamy, jeśli komentarz dodał sam przypisany lub jeśli przypisany już dostał powiadomienie `comment_mentioned` w tym samym komentarzu. |
-| `comment_mentioned` | W treści komentarza występuje `@NazwaUżytkownika` (nazwa jak w bazie `users.name`, także gdy jest to adres e-mail) | Wspomniani użytkownicy (nie autor) |
-| `subtask_mentioned` | W **nazwie podzadania** (dodanie lub edycja) jest @wzmianka | Wspomniani użytkownicy (nie autor) |
+```
+fakt domenowy (Event)     listener              powiadomienie           kanał
+─────────────────────     ────────              ─────────────           ─────
+TaskAssigneeChanged    →  SendTaskAssigned   →  TaskAssigned         →  database
+CommentPosted          →  SendComment…       →  CommentMentioned /
+                                                TaskCommentAdded
+ApprovalAssigneeChanged→  SendApprovalRequested
+…
+```
 
-## Gdzie działa @wzmianka
+Kontroler / Livewire / MCP **zapisuje model**. Observer albo serwis emituje
+event. Jedyny `->notify()` w aplikacji jest w `App\Notifications\Notifier`.
 
-- **Komentarze** (wszystkie miejsca używające komponentu `x-comments`): autocomplete po `@`, ten sam regex co po stronie serwera (`UserMentionService::MENTION_REGEX`).
-- **Podzadania** (Livewire `TaskSubtasks` na widoku zadania): to samo przy dodawaniu i edycji nazwy; w liście podzadań fragmenty `@…` są podświetlone na niebiesko.
+Preferencje: Profil → macierz (na razie kolumna dzwonek). Brak wiersza w
+`notification_preferences` = default z katalogu.
 
-## Podzadania — autocomplete @ (UI)
+## Typy (`data.type` / `NotificationEvent`)
 
-Logika Alpine jest w **`resources/js/app.js`** jako `window.taskSubtaskMentionLine` (musi być dostępna przed inicjalizacją Alpine; skrypt z `@script` w komponencie Livewire uruchamiał się za późno).
+| Typ | Kiedy | Odbiorca |
+|-----|--------|----------|
+| `task_assigned` | Zmiana `assigned_to` na zadaniu, podzadaniu albo wzmiance `@x!` | Nowy przypisany (nie aktor) |
+| `comment_mentioned` | `@Nazwa` w komentarzu | Wspomniani (nie autor) |
+| `task_comment_added` | Komentarz przy `ProjectTask` | Assignee, jeśli nie dostał wzmianki |
+| `approval_requested` | Wniosek `@x?` albo zmiana zatwierdzającego | Zatwierdzający |
+| `approval_decided` | Decyzja we wniosku | Autor wniosku |
+| `mention_completed` | Odhaczenie wzmianki `@x!` | Autor wzmianki |
+| `comment_liked` | Polubienie komentarza | Autor komentarza |
+| `procedure_wait_elapsed` | Minął wait w procedurze | Assignee kroku i karty |
+| `procedure_step_ready` | Wejście w krok innej osoby | Assignee kroku |
+| `meeting_invited` | Nowy wpis w `participant_ids` | Uczestnik (nie aktor, nie assignee karty) |
 
-Pola używają **`wire:model.defer`**, nie `wire:model.live`: przy `.live` każdy znak wysyła żądanie do serwera i Livewire **przerysowuje** komponent, co zrywa stan Alpine i znika lista podpowiedzi.
+## Rozszerzanie (nowy fakt, np. wyjazd)
 
-Po zmianach w JS: `npm run build` lub `npm run dev`.
+1. Event domenowy (`DepartureCreated`) + `event(...)` w serwisie po zapisie.
+2. Listener `SendDepartureNotification` w `EventServiceProvider`.
+3. Klasa `extends ChronoNotification` z `event(): NotificationEvent::…` i `toDatabase()`.
+4. Case w `NotificationEvent` (label, grupa, defaulty kanałów, ikona).
+5. Macierz w profilu dokłada wiersz sama.
 
-## Rozszerzanie
+Kolejny kanał: driver w `NotificationChannel::implemented()` + `toMail()`
+na klasach. Call site’ów zapisu nie ruszasz.
 
-1. Nowa klasa w `App\Notifications` z `via(['database'])` i `toDatabase()` zwracającym m.in. pole `type` oraz `task_url` lub `url` i sensowny tekst linku (`task_name`, `context_name` albo `subtask_name`).
-2. Wywołanie `$user->notify(new …)` z kontrolera, Livewire lub listenera.
-3. W `resources/views/livewire/notification-bell.blade.php` dodać ikonę dla nowego `type` (sekcja `@class` przy `bi …`).
+## Kolejka
 
-Wspólna logika wyciągania @z tekstu: `App\Services\UserMentionService` (`extractHandles`, `notifyCommentMentions`, `notifySubtaskMentions`).
+Klasy `ChronoNotification` implementują `ShouldQueue`. Testy i `.env.example`
+zostają na `QUEUE_CONNECTION=sync`. W Sail jest serwis `queue`
+(`php artisan queue:work`). Produkcja: `database` albo `redis` + worker.
 
-## Linki w dropdownie
+## Dzwonek
 
-Skrót **„Moje zadania”** prowadzi do listy zadań z filtrem `?myTasksOnly=true` (`route('tasks.index', ['myTasksOnly' => 'true'])`).
-
-## Migracja
-
-Tabela: `php artisan migrate` (migracja `*_create_notifications_table`).
+Otwarcie listy **nie** oznacza wszystkiego przeczytanym. Klik w wpis idzie na
+`notifications.open` (jedno jako przeczytane + redirect do karty).
+„Oznacz przeczytane” jest osobnym przyciskiem.

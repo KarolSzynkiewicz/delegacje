@@ -111,6 +111,11 @@ class User extends Authenticatable
         return $this->hasMany(WorkItemTimeBlock::class);
     }
 
+    public function notificationPreferences(): HasMany
+    {
+        return $this->hasMany(NotificationPreference::class);
+    }
+
     /**
      * Check if user is an admin.
      */

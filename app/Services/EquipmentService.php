@@ -16,10 +16,8 @@ use App\Models\EquipmentStockMovement;
 use App\Models\EquipmentVariant;
 use App\Models\LogisticsEvent;
 use App\Models\ProjectTask;
-use App\Models\User;
 use App\Models\Warehouse;
 use App\Models\WarehouseDispatch;
-use App\Notifications\TaskAssigned;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -498,10 +496,6 @@ class EquipmentService
             'subject_type' => $dispatch->getMorphClass(),
             'subject_id' => $dispatch->id,
         ]);
-
-        if ($assigneeId !== auth()->id()) {
-            User::query()->find($assigneeId)?->notify(new TaskAssigned($task, auth()->user()));
-        }
 
         return $task;
     }

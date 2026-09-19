@@ -7,7 +7,6 @@ use App\Models\CommentMention;
 use App\Models\Sprint;
 use App\Models\User;
 use App\Models\WorkItem;
-use App\Notifications\TaskAssigned;
 
 class FollowUpHandler implements HandlesWorkItem
 {
@@ -92,10 +91,6 @@ class FollowUpHandler implements HandlesWorkItem
         }
 
         $mention->update(['assigned_to' => $newAssignee]);
-
-        if ($newAssignee !== auth()->id()) {
-            User::query()->find($newAssignee)?->notify(new TaskAssigned($mention->fresh() ?? $mention, auth()->user()));
-        }
     }
 
     private function writeSprint(WorkItem $item, string $value): void

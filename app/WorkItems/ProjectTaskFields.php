@@ -6,7 +6,6 @@ use App\Enums\TaskStatus;
 use App\Models\ProjectTask;
 use App\Models\Sprint;
 use App\Models\User;
-use App\Notifications\TaskAssigned;
 
 class ProjectTaskFields
 {
@@ -65,12 +64,7 @@ class ProjectTaskFields
             return;
         }
 
-        $previous = $task->assigned_to;
         $task->update(['assigned_to' => $newAssignee]);
-
-        if ($newAssignee && $newAssignee !== $previous && $newAssignee !== auth()->id()) {
-            User::query()->find($newAssignee)?->notify(new TaskAssigned($task->fresh(), auth()->user()));
-        }
     }
 
     public function writePriority(ProjectTask $task, string $value): void
