@@ -499,10 +499,11 @@
             });
         },
         onQueueGrip(event) {
-            const grip = event.target.closest('[data-plan-queue-grip]');
-            if (!grip) return;
-            const host = grip.closest('[data-plan-drag]');
-            if (!host) return;
+            if (event.target.closest('input, textarea, select, button, .tg-select, .wi-plan__queue-add, .tg-toolbar, .rp-active-filters')) {
+                return;
+            }
+            const host = event.target.closest('[data-plan-drag]');
+            if (!host || !host.closest('[data-plan-queue]')) return;
             const raw = host.dataset.planDrag || '';
             const parts = raw.split(':');
             if (parts[0] !== 'queue' || !parts[1]) return;
@@ -514,12 +515,16 @@
                 host.dataset.planTitle || '',
                 host.dataset.planType || 'task',
                 true,
+                true,
             );
         },
-        beginDrag(event, kind, id, duration, title, itemType, immediate) {
+        beginDrag(event, kind, id, duration, title, itemType, immediate, fromQueue) {
             if (this.resizing || this.drawing || !id) return;
             if (event.pointerType === 'mouse' && event.button !== 0) return;
-            if (event.target.closest('.wi-plan__resize, .wi-plan__chip-off, a, button')) return;
+            const blocked = fromQueue
+                ? '.wi-plan__resize, .wi-plan__chip-off, input, textarea, select, button'
+                : '.wi-plan__resize, .wi-plan__chip-off, a, button';
+            if (event.target.closest(blocked)) return;
             event.preventDefault();
             event.stopPropagation();
             this.payload = {
@@ -699,14 +704,19 @@
                     </div>
                 @endunless
             </div>
-            @if($pinId && $pinnedTitle)
+            @if($pinNeedsAssignee && $pinnedTitle)
+                <p class="wi-plan__pin-hint wi-plan__pin-hint--warn">
+                    <strong>{{ $pinnedTitle }}</strong> nie ma przypisanej osoby.
+                    Przypisz kogoś w backlogu — bez tego zadanie nie wejdzie do kolejki.
+                </p>
+            @elseif($pinId && $pinnedTitle)
                 <p class="wi-plan__pin-hint">Nowe: <strong>{{ $pinnedTitle }}</strong> — przeciągnij na godzinę w siatce.</p>
             @endif
             <livewire:tasks-grid
                 :plan-queue="true"
                 :plan-user-id="$calendarUser->id"
-                :plan-pin-id="$pinId"
-                :key="'plan-q-'.$calendarUser->id.'-'.($pinId ?? 0)"
+                :plan-pin-id="$pinNeedsAssignee ? null : $pinId"
+                :key="'plan-q-'.$calendarUser->id.'-'.($pinNeedsAssignee ? 'na' : ($pinId ?? 0))"
             />
         </aside>
 
@@ -1212,6 +1222,13 @@
         font-size: .72rem; color: var(--text-muted); margin: 0 0 .7rem; line-height: 1.35;
     }
     .wi-plan__pin-hint strong { color: var(--text-main); font-weight: 600; }
+    .wi-plan__pin-hint--warn {
+        color: #fdba74;
+        padding: .45rem .6rem;
+        border-radius: 8px;
+        background: rgba(245, 158, 11, .12);
+        border: 1px solid rgba(245, 158, 11, .32);
+    }
     .wi-plan__card-icon { color: var(--accent); margin-top: .12rem; font-size: .85rem; }
     .wi-plan__card-body { min-width: 0; flex: 1; }
     .wi-plan__card-title { color: var(--text-main); font-size: .78rem; font-weight: 600; display: block; }
@@ -1223,8 +1240,13 @@
     .wi-plan__queue .tg-add-actions { display: none !important; }
     .wi-plan__queue .tg-cards { display: flex; flex-direction: column; gap: .35rem; }
     .wi-plan__queue .dt-card.card {
-        padding: .4rem .55rem .4rem 2.2rem !important;
+        padding: .4rem .65rem .4rem .7rem !important;
         border-radius: 10px !important;
+        cursor: grab;
+        user-select: none;
+    }
+    .wi-plan__queue .dt-card.card:active {
+        cursor: grabbing;
     }
     .wi-plan__queue .dt-card__title {
         font-size: .82rem;
@@ -1238,15 +1260,6 @@
         border-bottom: 1px solid rgba(255,255,255,.1);
     }
     .wi-plan__queue .dt-card__row { font-size: .7rem; }
-    .wi-plan__queue .tg-dt-card .wi-plan__grip {
-        position: absolute;
-        left: 0; top: 0; bottom: 0;
-        width: 1.15rem;
-        z-index: 3;
-        border-radius: 10px 0 0 10px;
-        cursor: grab;
-        touch-action: none;
-    }
     .wi-plan__queue .tg-dt-card.is-pin {
         border-color: rgba(168, 85, 247, .55);
         box-shadow: 0 0 0 1px rgba(59, 130, 246, .45), 0 8px 22px rgba(59, 130, 246, .18);
@@ -1453,9 +1466,7 @@
     .wi-plan__event:focus-within .wi-plan__grip,
     .wi-plan__event:focus-within .wi-plan__resize,
     .wi-plan__chip:hover .wi-plan__grip,
-    .wi-plan__chip:focus-within .wi-plan__grip,
-    .wi-plan__queue .tg-dt-card:hover .wi-plan__grip,
-    .wi-plan__queue .tg-dt-card:focus-within .wi-plan__grip {
+    .wi-plan__chip:focus-within .wi-plan__grip {
         opacity: 1;
     }
     @media (hover: none) {

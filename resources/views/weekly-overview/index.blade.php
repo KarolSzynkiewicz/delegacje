@@ -549,9 +549,9 @@
                                                         <div class="wo-fulfill__center">
                                                             <div class="wo-fulfill__total">{{ $fulfill['center'] }}</div>
                                                             @if($fulfillUrl)
-                                                                <a href="{{ $fulfillUrl }}" class="wo-fulfill__caption text-decoration-none" title="{{ $fulfill['label'] }}">{{ Str::limit($fulfill['label'], 16) }}</a>
+                                                                <a href="{{ $fulfillUrl }}" class="wo-fulfill__caption text-decoration-none" data-tip="{{ $fulfill['label'] }}">{{ Str::limit($fulfill['label'], 16) }}</a>
                                                             @else
-                                                                <div class="wo-fulfill__caption" title="{{ $fulfill['label'] }}">{{ Str::limit($fulfill['label'], 16) }}</div>
+                                                                <div class="wo-fulfill__caption" data-tip="{{ $fulfill['label'] }}">{{ Str::limit($fulfill['label'], 16) }}</div>
                                                             @endif
                                                         </div>
                                                     </div>

@@ -479,7 +479,7 @@ class WorkItemBacklogTest extends TestCase
         );
     }
 
-    public function test_sprint_name_in_the_grid_links_to_the_sprint(): void
+    public function test_sprint_name_opens_sprint_and_chevron_opens_picker(): void
     {
         $sprint = Sprint::factory()->create(['name' => 'Sprint HQ', 'created_by' => $this->user->id]);
         $task = ProjectTask::query()->create([
@@ -497,7 +497,9 @@ class WorkItemBacklogTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
             ->assertSeeHtml('href="'.e(route('sprints.show', $sprint)).'"')
+            ->assertSeeHtml('Zmień sprint')
             ->assertSee('Sprint HQ')
+            ->assertSeeHtml("quickSprintChange({$item->id}, '{$sprint->id}')")
             ->assertSeeHtml("startEdit({$item->id}, 'name'")
             ->assertDontSeeHtml("startEdit({$item->id}, 'sprint'");
     }
@@ -517,10 +519,90 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml("startEdit({$item->id}, 'sprint'")
-            ->call('startEdit', $item->id, 'sprint')
-            ->assertSet('editingField', 'sprint')
-            ->assertSee('Poza sprintem');
+            ->assertSeeHtml("quickSprintChange({$item->id}, '')")
+            ->assertSee('Poza sprintem')
+            ->call('quickSprintChange', $item->id, '')
+            ->assertSet('editingField', '');
+    }
+
+    public function test_quick_sprint_change_moves_the_task_without_leaving_the_grid(): void
+    {
+        $from = Sprint::factory()->create(['name' => 'Sprint A', 'created_by' => $this->user->id]);
+        $to = Sprint::factory()->create(['name' => 'Sprint B', 'created_by' => $this->user->id]);
+        $task = ProjectTask::query()->create([
+            'name' => 'DR do Berlina',
+            'sprint_id' => $from->id,
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $task->getMorphClass())
+            ->where('source_id', $task->id)
+            ->first();
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('quickSprintChange', $item->id, (string) $to->id);
+
+        $this->assertSame($to->id, $task->fresh()->sprint_id);
+        $this->assertSame($to->id, $item->fresh()->sprint_id);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('quickSprintChange', $item->id, '');
+
+        $this->assertNull($task->fresh()->sprint_id);
+        $this->assertNull($item->fresh()->sprint_id);
+    }
+
+    public function test_category_chip_jumps_to_filter_and_side_pencil_edits(): void
+    {
+        $task = ProjectTask::query()->create([
+            'name' => 'DR do Berlina',
+            'category' => 'Wyjazdy',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $task->getMorphClass())
+            ->where('source_id', $task->id)
+            ->first();
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml("filterByCategory('Wyjazdy')")
+            ->assertSeeHtml("startEdit({$item->id}, 'category'")
+            ->call('filterByCategory', 'Wyjazdy')
+            ->assertSet('searchCategory', 'Wyjazdy')
+            ->call('startEdit', $item->id, 'category')
+            ->assertSet('editingField', 'category')
+            ->assertSet('editingValue', 'Wyjazdy');
+    }
+
+    public function test_priority_chip_opens_status_like_picker(): void
+    {
+        $task = ProjectTask::query()->create([
+            'name' => 'DR do Berlina',
+            'priority' => 5,
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $task->getMorphClass())
+            ->where('source_id', $task->id)
+            ->first();
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml("quickPriorityChange({$item->id}, '5')")
+            ->assertSeeHtml("quickPriorityChange({$item->id}, '')")
+            ->call('quickPriorityChange', $item->id, '3');
+
+        $this->assertSame(3, $task->fresh()->priority);
+        $this->assertSame(3, $item->fresh()->priority);
     }
 
     public function test_subtask_row_uses_binary_status_without_in_progress(): void
@@ -555,6 +637,8 @@ class WorkItemBacklogTest extends TestCase
         $this->assertStringNotContainsString("quickStatusChange({$item->id}, 'cancelled')", $html);
         $this->assertStringNotContainsString("startEdit({$item->id}, 'sprint')", $html);
         $this->assertStringNotContainsString("startEdit({$item->id}, 'category')", $html);
+        $this->assertStringNotContainsString("quickSprintChange({$item->id}", $html);
+        $this->assertStringNotContainsString("quickPriorityChange({$item->id}", $html);
         $this->assertStringNotContainsString("toggleExpand({$item->id})", $html);
         $this->assertStringNotContainsString('W zadaniu:', $html);
     }
@@ -597,7 +681,8 @@ class WorkItemBacklogTest extends TestCase
             ->assertSee('weź klucze')
             ->assertSee('Magazyn')
             ->assertDontSeeHtml("startEdit({$item->id}, 'category')")
-            ->assertDontSeeHtml("startEdit({$item->id}, 'sprint')");
+            ->assertDontSeeHtml("startEdit({$item->id}, 'sprint')")
+            ->assertDontSeeHtml("quickSprintChange({$item->id}");
     }
 
     public function test_partial_dispatch_work_item_is_completed_and_hidden_from_active_grid(): void

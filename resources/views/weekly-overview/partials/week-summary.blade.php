@@ -13,6 +13,8 @@
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
         transform: translateY(-1px);
         border-color: rgba(148, 163, 184, 0.35) !important;
+        z-index: 5;
+        position: relative;
     }
     button.weekly-logistics-metric:focus-visible {
         outline: 2px solid var(--bs-primary);
@@ -98,7 +100,7 @@
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    title="Lista transferów"
+                    data-tip="Lista transferów"
                     @click.prevent="openPanel('transfers', $event)"
                 >
                     <i class="bi bi-arrow-left-right weekly-logistics-metric__icon" aria-hidden="true"></i>
@@ -110,7 +112,7 @@
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    title="Lista wyjazdów"
+                    data-tip="Lista wyjazdów"
                     @click.prevent="openPanel('departures', $event)"
                 >
                     <i class="bi bi-arrow-right-circle weekly-logistics-metric__icon" aria-hidden="true"></i>
@@ -122,7 +124,7 @@
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    title="Lista zjazdów"
+                    data-tip="Lista zjazdów"
                     @click.prevent="openPanel('returns', $event)"
                 >
                     <i class="bi bi-arrow-return-left weekly-logistics-metric__icon" aria-hidden="true"></i>
@@ -134,7 +136,7 @@
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    title="Ile osób w którym projekcie (przypisanie przecina ten tydzień)"
+                    data-tip="Ile osób w którym projekcie (przypisanie przecina ten tydzień)"
                     @click.prevent="openPanel('employees-by-project', $event)"
                 >
                     <i class="bi bi-people weekly-logistics-metric__icon" aria-hidden="true"></i>
@@ -151,8 +153,8 @@
                     <button
                         type="button"
                         class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                        title="Lista dokumentów"
-                        @click.prevent="openPanel('expiring-documents', $event)"
+                    data-tip="Lista dokumentów"
+                    @click.prevent="openPanel('expiring-documents', $event)"
                     >
                         <i class="bi bi-file-earmark-text weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Dokumenty</div>
@@ -163,8 +165,8 @@
                     <button
                         type="button"
                         class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                        title="Lista najmów"
-                        @click.prevent="openPanel('expiring-leases', $event)"
+                    data-tip="Lista najmów"
+                    @click.prevent="openPanel('expiring-leases', $event)"
                     >
                         <i class="bi bi-house-door weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Najmy</div>
@@ -175,8 +177,8 @@
                     <button
                         type="button"
                         class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                        title="OC i przegląd — liczba terminów (auto może mieć oba)"
-                        @click.prevent="openPanel('expiring-vehicles', $event)"
+                    data-tip="OC i przegląd — liczba terminów (auto może mieć oba)"
+                    @click.prevent="openPanel('expiring-vehicles', $event)"
                     >
                         <i class="bi bi-car-front weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Auta</div>
@@ -187,8 +189,8 @@
                     <button
                         type="button"
                         class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                        title="Lista projektów z datą zakończenia w tym miesiącu"
-                        @click.prevent="openPanel('expiring-projects', $event)"
+                    data-tip="Lista projektów z datą zakończenia w tym miesiącu"
+                    @click.prevent="openPanel('expiring-projects', $event)"
                     >
                         <i class="bi bi-kanban weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Projekty</div>
@@ -318,7 +320,7 @@
                                         @endif
                                         <span class="text-muted">|</span>
                                         @if($participantsCount > 0)
-                                            <span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $participantNames }}">
+                                            <span data-tip="{{ $participantNames }}">
                                                 {{ $participantsCount }} os.
                                             </span>
                                         @endif

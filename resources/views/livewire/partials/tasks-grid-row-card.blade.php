@@ -1,7 +1,6 @@
 @php
     $isWorkItem   = $task instanceof \App\Models\WorkItem;
     $openUrl      = $this->itemOpenUrl($task);
-    $sprintUrl    = $task->sprint ? route('sprints.show', $task->sprint) : null;
     $canAddSubtask = $this->rowSupports($task, 'subtasks');
     $canExpand   = $this->rowExpandable($task);
     $isExpanded  = $canExpand && in_array($task->id, $expandedTasks);
@@ -50,17 +49,6 @@
         }
     }
 
-    $dueStyle = 'color:rgba(255,255,255,0.4)';
-    if ($task->due_date) {
-        if ($task->due_date->isPast() || $task->due_date->isToday()) {
-            $dueStyle = 'color:#f87171;font-weight:600';
-        } elseif ($task->due_date->diffInDays(now()) <= 3) {
-            $dueStyle = 'color:#fb923c;font-weight:600';
-        } else {
-            $dueStyle = 'color:#60a5fa';
-        }
-    }
-
     $sourceCard = $task->sourceCard();
     $ediName = $this->ediCell($task, 'name');
     $canPickStatus = in_array($statusWidget, [\App\WorkItems\StatusWidget::TaskSelect, \App\WorkItems\StatusWidget::BinarySelect], true)
@@ -77,12 +65,6 @@
     data-plan-title="{{ $this->isPlanQueue() && $isWorkItem ? $task->name : '' }}"
     data-plan-type="{{ $this->isPlanQueue() && $isWorkItem ? $task->type->value : '' }}"
 >
-    @if($this->isPlanQueue() && $isWorkItem)
-        <span class="wi-plan__grip tg-dt-hit"
-              data-plan-queue-grip
-              title="Przesuń"
-              aria-label="Przesuń na kalendarz"></span>
-    @endif
     <div class="dt-card__title">
         <div class="tg-dt-card__heading">
             @if($canExpand && ! $this->isPlanQueue())
@@ -101,7 +83,7 @@
                 </span>
             @endif
             @if($canAddSubtask && $subtaskTotal > 0 && (! $this->isPlanQueue() || in_array('subtasks', $visibleColumns, true)))
-                <span class="tg-card-subtask-badge" data-tg-sub-stats="{{ $task->id }}" title="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
+                <span class="tg-card-subtask-badge" data-tg-sub-stats="{{ $task->id }}" data-tip="{{ $subtaskDone }}/{{ $subtaskTotal }} podzadań">
                     {{ $subtaskDone }}/{{ $subtaskTotal }}
                 </span>
             @endif
@@ -115,7 +97,7 @@
                        x-data x-init="$el.focus(); $el.select()">
             @elseif($this->isPlanQueue() && $isWorkItem)
                 <a href="{{ $openUrl }}"
-                   class="stretched-link tg-dt-card__name"
+                   class="tg-dt-card__name"
                    title="{{ $task->name }}"
                    wire:click.prevent="$parent.openEvent('item', {{ $task->id }})">
                     {{ $task->name }}
@@ -166,16 +148,18 @@
                     <div x-data="{ open: false, top: 0, left: 0 }" class="tg-dt-hit">
                         <button type="button"
                                 @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.min(r.left, window.innerWidth-165); open=true"
-                                class="tg-status-badge {{ $sc['cls'] }}"
+                                class="tg-status-badge tg-col-chip--split {{ $sc['cls'] }}"
                                 style="cursor:pointer">
-                            {{ $sc['icon'] }} {{ $statusLabel }}
-                            <i class="bi bi-chevron-down"></i>
+                            <span class="tg-col-chip__main">{{ $sc['icon'] }} {{ $statusLabel }}</span>
+                            <span class="tg-col-chip__side" aria-hidden="true">
+                                <i class="bi bi-chevron-down"></i>
+                            </span>
                         </button>
                         <template x-teleport="body">
                             <ul x-show="open" x-cloak
                                 @click.outside="open = false"
                                 :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:155px;font-size:0.84rem`"
-                                class="dropdown-menu show py-1 shadow-lg">
+                                class="dropdown-menu show py-1 shadow-lg tg-teleport-menu">
                                 <li>
                                     <button type="button"
                                             class="dropdown-item py-2 {{ $task->status->value === 'pending' ? 'active' : '' }}"
@@ -226,21 +210,28 @@
         <div class="dt-card__row">
             <span class="dt-card__label">Sprint</span>
             <span class="dt-card__value">
-                @if($isEditing && $editingField === 'sprint')
-                    <select wire:model="editingValue" class="form-select form-select-sm"
-                            wire:change="saveEdit" wire:keydown.escape="cancelEdit"
-                            x-data x-init="$el.focus()">
-                        <option value="">Poza sprintem</option>
-                        @foreach($allSprints as $sprintOption)
-                            <option value="{{ $sprintOption->id }}">{{ $sprintOption->label() }}</option>
-                        @endforeach
-                    </select>
-                @elseif($sprintUrl)
-                    <x-tasks.col-chip variant="sprint" :href="$sprintUrl" class="tg-dt-hit" title="{{ $task->sprint->name }}">
-                        {{ $task->sprint->name }}
-                    </x-tasks.col-chip>
-                @elseif($this->rowWritable($task, 'sprint'))
-                    <span wire:click.stop="startEdit({{ $task->id }}, 'sprint')" class="tg-hover-edit text-muted">—</span>
+                @php $canPickSprint = $this->rowWritable($task, 'sprint') && ! $this->isLockedToSprint(); @endphp
+                @if($canPickSprint)
+                    <x-tasks.quick-menu
+                        class="tg-col-chip tg-col-chip--sprint tg-dt-hit"
+                        :min-width="220"
+                        :href="$task->sprint ? route('sprints.show', $task->sprint) : null"
+                        open-label="Otwórz sprint"
+                        change-label="Zmień sprint"
+                    >
+                        <x-slot:trigger>
+                            <i class="bi bi-flag" aria-hidden="true"></i>
+                            <span class="tg-col-chip__label">{{ $task->sprint?->name ?: '—' }}</span>
+                        </x-slot:trigger>
+                        <x-slot:menu>
+                            @include('livewire.partials.tasks-grid-sprint-menu')
+                        </x-slot:menu>
+                    </x-tasks.quick-menu>
+                @elseif($task->sprint)
+                    <a href="{{ route('sprints.show', $task->sprint) }}" class="tg-col-chip tg-col-chip--sprint" data-tip="Otwórz sprint">
+                        <i class="bi bi-flag" aria-hidden="true"></i>
+                        <span class="tg-col-chip__label">{{ $task->sprint->name }}</span>
+                    </a>
                 @else
                     <span class="text-muted">—</span>
                 @endif
@@ -261,27 +252,32 @@
                     <input type="text" wire:model="editingValue" class="form-control form-control-sm"
                            wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                            x-data x-init="$el.focus(); $el.select()">
-                @elseif($this->rowWritable($task, 'category') || $task->category)
-                    <div class="tg-facet tg-dt-hit">
-                        @if($task->category)
-                            <x-tasks.col-chip
-                                variant="category"
-                                wire:click.stop="filterByCategory({{ \Illuminate\Support\Js::from($task->category) }})"
-                                title="Zawęź listę do tej kategorii"
-                            >{{ $task->category }}</x-tasks.col-chip>
-                        @else
-                            <span class="text-muted">—</span>
-                        @endif
-                        @if($this->rowWritable($task, 'category'))
-                            <button type="button"
-                                    class="tg-facet__edit"
-                                    wire:click.stop="startEdit({{ $task->id }}, 'category')"
-                                    title="Edytuj kategorię"
-                                    aria-label="Edytuj kategorię">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                        @endif
-                    </div>
+                @elseif($this->rowWritable($task, 'category') && $task->category)
+                    <x-tasks.col-chip
+                        variant="category"
+                        side="edit"
+                        class="tg-dt-hit"
+                        :side-task-id="$task->id"
+                        :filter-category="$task->category"
+                        side-tip="Edytuj kategorię"
+                        side-label="Edytuj kategorię"
+                    >{{ $task->category }}</x-tasks.col-chip>
+                @elseif($this->rowWritable($task, 'category'))
+                    <x-tasks.col-chip
+                        variant="category"
+                        side="edit"
+                        class="tg-dt-hit"
+                        :side-task-id="$task->id"
+                        :edit-category="true"
+                        side-tip="Wpisz kategorię"
+                        side-label="Wpisz kategorię"
+                    >—</x-tasks.col-chip>
+                @elseif($task->category)
+                    <x-tasks.col-chip
+                        variant="category"
+                        class="tg-dt-hit"
+                        :filter-category="$task->category"
+                    >{{ $task->category }}</x-tasks.col-chip>
                 @else
                     <span class="text-muted">—</span>
                 @endif
@@ -341,39 +337,21 @@
                     <span class="tg-edi tg-edi--{{ $ediPriority['kind'] }}">
                         @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediPriority, 'rowId' => $task->id, 'field' => 'priority'])
                     </span>
-                @elseif($isEditing && $editingField === 'priority')
-                    <select wire:model="editingValue" class="form-select form-select-sm"
-                            wire:change="saveEdit" wire:keydown.escape="cancelEdit"
-                            x-data x-init="$el.focus()">
-                        <option value="">Brak</option>
-                        <option value="1">1 – Najniższy</option>
-                        <option value="2">2 – Niski</option>
-                        <option value="3">3 – Średni</option>
-                        <option value="4">4 – Wysoki</option>
-                        <option value="5">5 – Krytyczny</option>
-                    </select>
-                @elseif($this->rowWritable($task, 'priority') || $pc)
-                    <div class="tg-facet tg-dt-hit">
-                        @if($pc)
-                            <x-tasks.col-chip
-                                variant="priority"
-                                :tone="$pc['tone']"
-                                wire:click.stop="filterByPriority('{{ $task->priority }}')"
-                                title="Zawęź listę do tego priorytetu"
-                            >{{ $pc['label'] }}</x-tasks.col-chip>
-                        @else
-                            <span class="tg-mono" style="color:rgba(255,255,255,0.35)">—</span>
-                        @endif
-                        @if($this->rowWritable($task, 'priority'))
-                            <button type="button"
-                                    class="tg-facet__edit"
-                                    wire:click.stop="startEdit({{ $task->id }}, 'priority')"
-                                    title="Edytuj priorytet"
-                                    aria-label="Edytuj priorytet">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                        @endif
-                    </div>
+                @elseif($this->rowWritable($task, 'priority'))
+                    <x-tasks.quick-menu class="tg-col-chip tg-col-chip--priority {{ $pc ? 'tg-col-chip--'.$pc['tone'] : 'tg-col-chip--p1' }} tg-dt-hit" :min-width="160">
+                        <x-slot:trigger>
+                            <i class="bi bi-fire" aria-hidden="true"></i>
+                            <span class="tg-col-chip__label">{{ $pc['label'] ?? '—' }}</span>
+                        </x-slot:trigger>
+                        <x-slot:menu>
+                            @include('livewire.partials.tasks-grid-priority-menu')
+                        </x-slot:menu>
+                    </x-tasks.quick-menu>
+                @elseif($pc)
+                    <span class="tg-col-chip tg-col-chip--priority tg-col-chip--{{ $pc['tone'] }}">
+                        <i class="bi bi-fire" aria-hidden="true"></i>
+                        <span class="tg-col-chip__label">{{ $pc['label'] }}</span>
+                    </span>
                 @else
                     <span class="tg-mono" style="color:rgba(255,255,255,0.35)">—</span>
                 @endif
@@ -384,7 +362,7 @@
     @if(in_array('due_date', $visibleColumns))
         @php $ediDue = $this->ediCell($task, 'due_date'); @endphp
         <div class="dt-card__row">
-            <span class="dt-card__label">Termin</span>
+            <span class="dt-card__label">Do kiedy</span>
             <span class="dt-card__value">
                 @if($ediDue)
                     <span class="tg-edi tg-edi--{{ $ediDue['kind'] }}">
@@ -394,31 +372,8 @@
                     <input type="date" wire:model="editingValue" class="form-control form-control-sm"
                            wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
                            x-data x-init="$el.focus()">
-                @elseif($this->rowWritable($task, 'due_date') || $task->due_date)
-                    <div class="tg-facet tg-dt-hit">
-                        @if($task->due_date)
-                            <button type="button"
-                                    class="tg-facet__value tg-mono"
-                                    wire:click.stop="filterByDueDate('{{ $task->due_date->format('Y-m-d') }}')"
-                                    title="Zawęź listę do tego dnia"
-                                    style="{{ $dueStyle }}">
-                                {{ $task->due_date->format('d.m.Y') }}
-                            </button>
-                        @else
-                            <span class="tg-mono" style="{{ $dueStyle }}">—</span>
-                        @endif
-                        @if($this->rowWritable($task, 'due_date'))
-                            <button type="button"
-                                    class="tg-facet__edit"
-                                    wire:click.stop="startEdit({{ $task->id }}, 'due_date')"
-                                    title="Edytuj termin"
-                                    aria-label="Edytuj termin">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                        @endif
-                    </div>
                 @else
-                    <span class="tg-mono" style="{{ $dueStyle }}">—</span>
+                    @include('livewire.partials.tg-due-chip', ['task' => $task, 'dueClickStop' => true])
                 @endif
             </span>
         </div>
@@ -426,10 +381,10 @@
 
     @if(in_array('blocks', $visibleColumns))
         <div class="dt-card__row">
-            <span class="dt-card__label">Bloki</span>
+            <span class="dt-card__label">W kalendarzu</span>
             <span class="dt-card__value">
                 @if($isWorkItem)
-                    @include('livewire.partials.tg-schedule-cell', ['item' => $task])
+                    @include('livewire.partials.tg-schedule-cell', ['item' => $task, 'assignFirst' => true, 'assignClickStop' => true])
                 @else
                     <span class="text-muted">—</span>
                 @endif
@@ -468,14 +423,20 @@
     @if(in_array('created_at', $visibleColumns))
         <div class="dt-card__row">
             <span class="dt-card__label">Utworzono</span>
-            <span class="dt-card__value font-mono">{{ $task->created_at?->format('d.m.Y') ?? '—' }}</span>
+            <span class="dt-card__value tg-date-plain tg-mono">
+                <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                {{ $task->created_at?->format('d.m.Y') ?? '—' }}
+            </span>
         </div>
     @endif
 
     @if(in_array('updated_at', $visibleColumns))
         <div class="dt-card__row">
             <span class="dt-card__label">Zmieniono</span>
-            <span class="dt-card__value font-mono">{{ $task->updated_at?->format('d.m.Y') ?? '—' }}</span>
+            <span class="dt-card__value tg-date-plain tg-mono">
+                <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                {{ $task->updated_at?->format('d.m.Y') ?? '—' }}
+            </span>
         </div>
     @endif
     @endunless

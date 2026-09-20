@@ -63,22 +63,69 @@
             color: var(--text-main, #f1f5f9);
             background: rgba(168, 85, 247, 0.16);
         }
-        .task-show-meta .tg-schedule {
-            position: relative;
-            z-index: 2;
+        .task-show-meta .tg-time-chip {
             display: inline-flex;
-            max-width: 100%;
-            font-family: 'JetBrains Mono', ui-monospace, monospace;
-            font-size: .78rem;
-            font-variant-numeric: tabular-nums;
-            text-decoration: none;
-            border-radius: 4px;
+            align-items: center;
+            gap: 0.4rem;
+            width: 100%;
+            max-width: 18rem;
+            box-sizing: border-box;
+            min-width: 0;
+            padding: 3px 8px 3px 3px;
+            border-radius: 20px;
+            border: 1px solid transparent;
+            font-size: 0.76rem;
+            font-weight: 600;
+            line-height: 1.3;
+            text-decoration: none !important;
+            white-space: nowrap;
+            color: inherit;
+            background: rgba(255, 255, 255, 0.04);
         }
-        .task-show-meta .tg-schedule--scheduled { color: var(--primary, #3b82f6); }
-        .task-show-meta .tg-schedule--stale { color: #f59e0b; font-weight: 600; }
-        .task-show-meta .tg-schedule--none { color: var(--text-muted, #94a3b8); }
-        .task-show-meta .tg-schedule:hover {
-            outline: 1px dashed rgba(168, 85, 247, .45);
+        .task-show-meta .tg-time-chip__icon {
+            flex-shrink: 0;
+            width: 1.45rem;
+            height: 1.45rem;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .task-show-meta .tg-time-chip__label {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .task-show-meta .tg-time-chip__go {
+            flex-shrink: 0;
+            margin-left: auto;
+            font-size: 0.62rem;
+            opacity: 0.7;
+        }
+        .task-show-meta .tg-time-chip--scheduled {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(168, 85, 247, 0.38);
+            color: #c4b5fd;
+        }
+        .task-show-meta .tg-time-chip--scheduled .tg-time-chip__icon {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(168, 85, 247, 0.4));
+            color: #ede9fe;
+        }
+        .task-show-meta .tg-time-chip--stale {
+            background: rgba(245, 158, 11, 0.12);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fdba74;
+        }
+        .task-show-meta .tg-time-chip--stale .tg-time-chip__icon {
+            background: rgba(245, 158, 11, 0.22);
+        }
+        .task-show-meta .tg-time-chip--none {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.08);
+            color: rgba(241, 245, 249, 0.45);
         }
         @media (hover: none) {
             .task-show-meta .tg-facet__edit { opacity: 0.85; }
@@ -247,7 +294,7 @@
             @endunless
 
             <div class="dt-card__row">
-                <span class="dt-card__label">Termin</span>
+                <span class="dt-card__label">Do kiedy</span>
                 <span class="dt-card__value">
                     @php
                         $dueDate = $task->due_date;
@@ -292,7 +339,7 @@
 
             @if($workItem)
                 <div class="dt-card__row">
-                    <span class="dt-card__label">Bloki</span>
+                    <span class="dt-card__label">W kalendarzu</span>
                     <span class="dt-card__value">
                         @include('livewire.partials.tg-schedule-cell', ['item' => $workItem])
                     </span>

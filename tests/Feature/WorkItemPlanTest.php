@@ -248,6 +248,53 @@ class WorkItemPlanTest extends TestCase
             ->assertSee('Inne zadanie z kolejki');
     }
 
+    public function test_pin_opens_the_assignee_calendar_even_when_another_user_is_selected(): void
+    {
+        $this->actingAs($this->user);
+        $ola = User::factory()->create(['name' => 'Ola Plan']);
+        $item = $this->workItem('U Oli');
+        $item->source->update(['assigned_to' => $ola->id]);
+        $item->refresh();
+
+        $this->assertStringContainsString('u='.$ola->id, $item->planPinUrl());
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class, [
+                'userId' => $this->user->id,
+                'pinId' => $item->id,
+            ])
+            ->assertSet('userId', $ola->id)
+            ->assertSee('U Oli')
+            ->assertSee('przeciągnij na godzinę', false);
+    }
+
+    public function test_pin_without_assignee_explains_that_someone_must_be_assigned(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Emitenci bez osoby');
+        $item->source->update(['assigned_to' => null]);
+        $this->workItem('Inne zadanie z kolejki');
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class, ['pinId' => $item->id])
+            ->assertSee('Emitenci bez osoby')
+            ->assertSee('nie ma przypisanej osoby')
+            ->assertDontSee('przeciągnij na godzinę', false)
+            ->assertSee('Inne zadanie z kolejki');
+    }
+
+    public function test_unassigned_schedule_chip_starts_assignee_edit(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Bez osoby');
+        $item->source->update(['assigned_to' => null]);
+
+        Livewire::test(TasksGrid::class)
+            ->assertSee('Brak')
+            ->assertSeeHtml("startEdit({$item->id}, 'assigned_to')")
+            ->assertDontSeeHtml('pin='.$item->id);
+    }
+
     public function test_plan_queue_embeds_backlog_cards_with_locked_overlay(): void
     {
         $this->actingAs($this->user);
@@ -273,7 +320,7 @@ class WorkItemPlanTest extends TestCase
             ->assertOk()
             ->assertSeeLivewire(TasksGrid::class)
             ->assertSee('Kartka z kolejki Planu')
-            ->assertSee('data-plan-queue-grip', false)
+            ->assertDontSee('data-plan-queue-grip', false)
             ->assertSee('data-plan-drag="queue:'.$mine->id.'"', false)
             ->assertDontSee('Zadanie Marka poza overlay');
 
@@ -1339,6 +1386,7 @@ class WorkItemPlanTest extends TestCase
 
         $this->assertSame('stale', $item->scheduleState());
         $this->assertSame('skisło', $item->scheduleLabel());
+        $this->assertSame('Zaległy · 1', $item->scheduleChipLabel());
         $this->assertStringContainsString('pin='.$item->id, $item->planPinUrl());
         $this->assertStringContainsString('w=2026-09-14', $item->planPinUrl());
     }
@@ -1356,9 +1404,38 @@ class WorkItemPlanTest extends TestCase
         ]);
 
         Livewire::test(TasksGrid::class)
-            ->assertSee('skisło')
+            ->assertSee('Zaległy · 1')
             ->assertSeeHtml('pin='.$item->id)
-            ->assertSeeHtml('tg-schedule--stale');
+            ->assertSeeHtml('tg-schedule--stale')
+            ->assertSeeHtml('tg-time-chip--stale')
+            ->assertSeeHtml('bi-calendar-event');
+    }
+
+    public function test_grid_shows_schedule_and_due_chips(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Dwa sloty', '2026-09-24');
+        foreach (['08:00:00', '10:00:00'] as $time) {
+            WorkItemTimeBlock::query()->create([
+                'work_item_id' => $item->id,
+                'user_id' => $this->user->id,
+                'starts_at' => '2026-09-17 '.$time,
+                'ends_at' => '2026-09-17 '.str_replace('00:00', '30:00', $time),
+                'created_by_id' => $this->user->id,
+            ]);
+        }
+        $this->workItem('Bez terminu');
+        $item->load('timeBlocks');
+
+        $this->assertSame('Zaplanowane · 2 sloty', $item->scheduleChipLabel());
+
+        Livewire::test(TasksGrid::class)
+            ->assertSee('Zaplanowane · 2 sloty')
+            ->assertSee('24.09.2026')
+            ->assertSee('Brak terminu')
+            ->assertSeeHtml('bi-bullseye')
+            ->assertSeeHtml('tg-time-chip--due')
+            ->assertSeeHtml('tg-time-chip--scheduled');
     }
 
     public function test_task_show_links_blocks_facet_to_the_plan(): void
@@ -1374,7 +1451,7 @@ class WorkItemPlanTest extends TestCase
         ]);
 
         Livewire::test(\App\Livewire\TaskShowQuickEdit::class, ['task' => $item->source])
-            ->assertSee('Bloki')
+            ->assertSee('W kalendarzu')
             ->assertSeeHtml('pin='.$item->id);
     }
 

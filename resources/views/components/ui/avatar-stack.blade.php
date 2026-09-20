@@ -25,7 +25,7 @@
                     ? $person->initials
                     : mb_substr($person->first_name ?? '', 0, 1).mb_substr($person->last_name ?? '', 0, 1);
             @endphp
-            <span class="avatar-stack__item" title="{{ $label }}">
+            <span class="avatar-stack__item" data-tip="{{ $label }}" aria-label="{{ $label }}">
                 <x-ui.avatar
                     :image-url="$person->image_url"
                     :alt="$label"
@@ -39,7 +39,8 @@
             <span
                 class="avatar-stack__more"
                 style="width: {{ $size }}; height: {{ $size }};"
-                title="+{{ $overflow }} więcej"
+                data-tip="+{{ $overflow }} więcej"
+                aria-label="+{{ $overflow }} więcej"
             >+{{ $overflow }}</span>
         @endif
     </div>

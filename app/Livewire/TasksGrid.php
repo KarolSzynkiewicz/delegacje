@@ -573,7 +573,7 @@ class TasksGrid extends Component
         }
 
         $fields['priority'] = 'Priorytet';
-        $fields['due_date'] = 'Termin';
+        $fields['due_date'] = 'Do kiedy';
 
         return $fields;
     }
@@ -959,8 +959,8 @@ class TasksGrid extends Component
             'assigned_to' => ['label' => 'Przypisany', 'sortable' => false],
             'created_by' => ['label' => 'Utworzono przez', 'sortable' => false],
             'priority' => ['label' => 'Priorytet', 'sortable' => true],
-            'due_date' => ['label' => 'Termin', 'sortable' => true],
-            'blocks' => ['label' => 'Bloki', 'sortable' => false],
+            'due_date' => ['label' => 'Do kiedy', 'sortable' => true],
+            'blocks' => ['label' => 'W kalendarzu', 'sortable' => false],
             'subtasks' => ['label' => 'Podzadania', 'sortable' => false],
             'comments' => ['label' => 'Komentarze', 'sortable' => false],
             'created_at' => ['label' => 'Utworzono', 'sortable' => true],
@@ -1066,7 +1066,7 @@ class TasksGrid extends Component
         }
 
         if ($this->filterDueDate !== '') {
-            $chips[] = ['key' => 'filterDueDate', 'label' => 'Termin: '.$this->dueDateChipLabel($this->filterDueDate)];
+            $chips[] = ['key' => 'filterDueDate', 'label' => 'Do kiedy: '.$this->dueDateChipLabel($this->filterDueDate)];
         }
 
         // "all" to jedyna wartość statusu, która niczego nie odfiltrowuje —
@@ -1756,6 +1756,60 @@ class TasksGrid extends Component
         $this->applyStatusChange($task, $status);
         $this->invalidateViewCounts();
         $this->flash = 'Status zaktualizowany.';
+    }
+
+    public function quickSprintChange(int $taskId, string $sprintId): void
+    {
+        if ($this->isLockedToSprint() || ! $this->rowWritable($taskId, 'sprint')) {
+            return;
+        }
+
+        $item = $this->resolveWorkItem($taskId);
+        if ($item) {
+            $item->handler()->write($item, GridField::Sprint, $sprintId);
+            $this->invalidateViewCounts();
+            $this->flash = 'Sprint zaktualizowany.';
+
+            return;
+        }
+
+        $task = $this->resolveProjectTask($taskId);
+        if (! $task || ! $this->canEditTask($task)) {
+            return;
+        }
+
+        $this->applySprintChange($task, $sprintId);
+        $this->invalidateViewCounts();
+        $this->flash = 'Sprint zaktualizowany.';
+    }
+
+    public function quickPriorityChange(int $taskId, string $priority): void
+    {
+        if (! $this->rowWritable($taskId, 'priority')) {
+            return;
+        }
+
+        if (! in_array($priority, ['', '1', '2', '3', '4', '5'], true)) {
+            return;
+        }
+
+        $item = $this->resolveWorkItem($taskId);
+        if ($item) {
+            $item->handler()->write($item, GridField::Priority, $priority);
+            $this->invalidateViewCounts();
+            $this->flash = 'Priorytet zaktualizowany.';
+
+            return;
+        }
+
+        $task = $this->resolveProjectTask($taskId);
+        if (! $task || ! $this->canEditTask($task)) {
+            return;
+        }
+
+        $task->update(['priority' => $priority === '' ? null : (int) $priority]);
+        $this->invalidateViewCounts();
+        $this->flash = 'Priorytet zaktualizowany.';
     }
 
     public function addTask(): void
@@ -4850,7 +4904,8 @@ class TasksGrid extends Component
 
         $needsSprintOptions = $this->showAddRow
             || $this->editingField === 'sprint'
-            || ($this->normalizedSelectedIds() !== [] && $this->bulkField === 'sprint');
+            || ($this->normalizedSelectedIds() !== [] && $this->bulkField === 'sprint')
+            || (in_array('sprint', $this->visibleColumns, true) && ! $this->isLockedToSprint());
         $needsProcedureTemplates = $this->usesWorkItems() && $this->showAddRow && $this->addKind === 'procedure';
         $activeViewName = $this->activeViewId
             ? ($savedViews->firstWhere('id', $this->activeViewId)?->name ?? $this->view)

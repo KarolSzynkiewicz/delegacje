@@ -141,6 +141,10 @@ body {
     white-space: nowrap;
     vertical-align: middle;
 }
+.weekly-overview-assigned-table .wo-cell-truncate:hover,
+.weekly-overview-assigned-table .wo-cell-truncate:focus-visible {
+    overflow: visible;
+}
 
 .weekly-overview-assigned-table th:nth-child(2),
 .weekly-overview-assigned-table td:nth-child(2) {
@@ -1339,6 +1343,7 @@ textarea.form-control {
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 .badge-success { 
     background: rgba(16, 185, 129, 0.15) !important; 
@@ -1386,11 +1391,13 @@ textarea.form-control {
     line-height: 1.3;
     white-space: nowrap;
     border: none;
-    transition: filter 0.15s;
+    transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 button.tg-status-badge:hover {
     filter: brightness(1.18);
     cursor: pointer;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.28);
 }
 .tg-status-badge.s-pending {
     background: rgba(245, 158, 11, 0.18);
@@ -1505,58 +1512,166 @@ a.role-ribbon:hover {
     border-color: color-mix(in srgb, var(--ribbon) 50%, rgba(255, 255, 255, 0.2));
 }
 
-/* Clickable badge - hover effect podobny do przycisku */
-/* Używamy takiej samej struktury jak w buttonach */
+/* Clickable badge — hover jak na przeglądzie tygodnia (uniesienie + kolorowa poświata). */
 .badge-clickable {
     cursor: pointer;
     text-decoration: none;
-    transition: all 0.3s;
 }
 
-/* Hover effects dla różnych wariantów badge'ów - dokładnie jak w buttonach */
-.badge-clickable.badge-success:hover {
-    background: rgba(16, 185, 129, 0.25);
-    border-color: rgba(16, 185, 129, 0.5);
-    filter: brightness(1.3);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-    text-decoration: none;
+@media (hover: hover) {
+    .badge-success:hover,
+    .badge-clickable.badge-success:hover {
+        background: rgba(16, 185, 129, 0.25);
+        border-color: rgba(16, 185, 129, 0.5);
+        filter: brightness(1.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        text-decoration: none;
+    }
+
+    .badge-danger:hover,
+    .badge-clickable.badge-danger:hover {
+        background: rgba(239, 68, 68, 0.25);
+        border-color: rgba(239, 68, 68, 0.5);
+        filter: brightness(1.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        text-decoration: none;
+    }
+
+    .badge-warning:hover,
+    .badge-clickable.badge-warning:hover {
+        background: rgba(245, 158, 11, 0.25);
+        border-color: rgba(245, 158, 11, 0.5);
+        filter: brightness(1.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+        text-decoration: none;
+    }
+
+    .badge-info:hover,
+    .badge-clickable.badge-info:hover {
+        background: rgba(59, 130, 246, 0.25);
+        border-color: rgba(59, 130, 246, 0.5);
+        filter: brightness(1.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        text-decoration: none;
+    }
+
+    .badge-accent:hover,
+    .badge-clickable.badge-accent:hover {
+        background: rgba(168, 85, 247, 0.25);
+        border-color: rgba(168, 85, 247, 0.5);
+        filter: brightness(1.3);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+        text-decoration: none;
+    }
+
+    .badge-secondary:hover {
+        background: rgba(148, 163, 184, 0.25);
+        border-color: rgba(148, 163, 184, 0.5);
+        filter: brightness(1.2);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(148, 163, 184, 0.28);
+    }
 }
 
-.badge-clickable.badge-danger:hover {
-    background: rgba(239, 68, 68, 0.25);
-    border-color: rgba(239, 68, 68, 0.5);
-    filter: brightness(1.3);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
-    text-decoration: none;
+@media (prefers-reduced-motion: reduce) {
+    .badge,
+    .badge-clickable,
+    .tg-col-chip,
+    .tg-status-badge,
+    .avatar-stack__item {
+        transition: none;
+    }
+    .badge:hover,
+    .badge-clickable:hover,
+    .tg-col-chip:hover,
+    .tg-status-badge:hover,
+    .avatar-stack__item:hover {
+        transform: none;
+    }
 }
 
-.badge-clickable.badge-warning:hover {
-    background: rgba(245, 158, 11, 0.25);
-    border-color: rgba(245, 158, 11, 0.5);
-    filter: brightness(1.3);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
-    text-decoration: none;
+/* Ciemny tooltip CSS zamiast natywnego białego `title`. */
+[data-tip] {
+    position: relative;
+}
+[data-tip]:not([data-tip=""])::after,
+[data-tip]:not([data-tip=""])::before {
+    position: absolute;
+    left: 50%;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 80;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+[data-tip]:not([data-tip=""])::after {
+    content: attr(data-tip);
+    top: calc(100% + 8px);
+    transform: translateX(-50%) translateY(-2px);
+    max-width: min(18rem, 70vw);
+    padding: 0.38rem 0.62rem;
+    border-radius: 8px;
+    background: rgba(13, 18, 30, 0.96);
+    color: var(--text-main);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
+    white-space: normal;
+    width: max-content;
+    text-align: center;
+}
+[data-tip]:not([data-tip=""])::before {
+    content: '';
+    top: calc(100% + 2px);
+    transform: translateX(-50%) translateY(-2px);
+    border: 6px solid transparent;
+    border-bottom-color: rgba(13, 18, 30, 0.96);
+}
+@media (hover: hover) {
+    [data-tip]:not([data-tip=""]):hover::after,
+    [data-tip]:not([data-tip=""]):hover::before,
+    [data-tip]:not([data-tip=""]):focus-visible::after,
+    [data-tip]:not([data-tip=""]):focus-visible::before {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+td:has(> [data-tip]:hover),
+td:has([data-tip]:hover),
+td:has(.avatar-stack:hover),
+.sp-progress-cell:has([data-tip]:hover) {
+    overflow: visible;
+    z-index: 8;
+    position: relative;
 }
 
-.badge-clickable.badge-info:hover {
-    background: rgba(59, 130, 246, 0.25);
-    border-color: rgba(59, 130, 246, 0.5);
-    filter: brightness(1.3);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-    text-decoration: none;
+/* Bootstrap tooltip — ten sam ciemny panel, nigdy jasny chrome. */
+.tooltip {
+    --bs-tooltip-bg: rgba(13, 18, 30, 0.96);
+    --bs-tooltip-color: #f1f5f9;
+    --bs-tooltip-opacity: 1;
+    --bs-tooltip-font-size: 0.72rem;
 }
-
-.badge-clickable.badge-accent:hover {
-    background: rgba(168, 85, 247, 0.25);
-    border-color: rgba(168, 85, 247, 0.5);
-    filter: brightness(1.3);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
-    text-decoration: none;
+.tooltip .tooltip-inner {
+    max-width: 18rem;
+    padding: 0.38rem 0.62rem;
+    background: rgba(13, 18, 30, 0.96);
+    color: var(--text-main);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-weight: 600;
 }
 
 /* --- TABELA --- */
@@ -10072,6 +10187,17 @@ span.eq-wh-card {
     border-radius: 50%;
     box-shadow: 0 0 0 2px var(--bg-card, #16182a);
     flex-shrink: 0;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    z-index: 0;
+}
+@media (hover: hover) {
+    .avatar-stack__item:hover,
+    .avatar-stack__more:hover {
+        z-index: 3;
+        transform: translateY(-2px);
+        filter: brightness(1.12);
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.55), 0 6px 16px rgba(59, 130, 246, 0.35);
+    }
 }
 .avatar-stack__item:first-child {
     margin-left: 0;
@@ -11080,12 +11206,15 @@ body:has(.attachment-overlay[data-open="true"]) {
     font-size: 0.7rem;
     line-height: 1;
     text-decoration: none;
-    transition: background 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, filter 0.15s ease;
 }
 
 a.rc-chip:hover {
     background: rgba(var(--rc-c-rgb), 0.3);
     color: #fff;
+    transform: translateY(-1px);
+    filter: brightness(1.12);
+    box-shadow: 0 4px 14px rgba(var(--rc-c-rgb), 0.35);
 }
 
 .rc-chip.is-cont-before {

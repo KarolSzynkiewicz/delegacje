@@ -31,7 +31,7 @@
     @if($event->url) href="{{ $event->url }}" @endif
     class="{{ $classes }}"
     style="{{ $style }}"
-    title="{{ $tooltip }}"
+    data-tip="{{ $tooltip }}"
 >
     @if($continuesBefore)
         <i class="bi bi-caret-left-fill rc-chip__cont" aria-hidden="true"></i>

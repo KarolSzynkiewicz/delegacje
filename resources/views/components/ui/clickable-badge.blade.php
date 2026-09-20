@@ -19,8 +19,10 @@
     
     // Określ URL
     $url = $href ?? ($route ? route($route, $routeParams) : '#');
+    $tip = $attributes->get('title');
+    $attributes = $attributes->except('title');
 @endphp
 
-<a href="{{ $url }}" {{ $attributes->merge(['class' => $classes]) }}>
+<a href="{{ $url }}" {{ $attributes->merge(['class' => $classes]) }} @if(filled($tip)) data-tip="{{ $tip }}" @endif>
     {{ $slot }}
 </a>

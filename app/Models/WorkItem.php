@@ -144,8 +144,44 @@ class WorkItem extends Model
         return match ($this->scheduleState()) {
             'stale' => 'skisło',
             'scheduled' => implode(' · ', $this->schedulePills()) ?: 'w planie',
-            default => 'brak',
+            default => '—',
         };
+    }
+
+    public function scheduleSlotCount(): int
+    {
+        if ($this->isMeetingItem()) {
+            $source = $this->source;
+
+            return ($source instanceof ProjectTask && $source->starts_at) ? 1 : 0;
+        }
+
+        return $this->itemScheduleBlocks()->count();
+    }
+
+    public function scheduleChipLabel(): string
+    {
+        $count = $this->scheduleSlotCount();
+
+        return match ($this->scheduleState()) {
+            'stale' => 'Zaległy · '.$count,
+            'scheduled' => 'Zaplanowane · '.$this->polishSlotWord($count),
+            default => 'Brak',
+        };
+    }
+
+    protected function polishSlotWord(int $count): string
+    {
+        $mod10 = $count % 10;
+        $mod100 = $count % 100;
+        if ($count === 1) {
+            return '1 slot';
+        }
+        if ($mod10 >= 2 && $mod10 <= 4 && ($mod100 < 12 || $mod100 > 14)) {
+            return $count.' sloty';
+        }
+
+        return $count.' slotów';
     }
 
     public function planPinUrl(): string

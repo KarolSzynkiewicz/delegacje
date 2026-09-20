@@ -79,9 +79,15 @@ class WorkItemPlan extends Component
     {
         $service = app(WorkItemPlanService::class);
         $this->week = $service->weekStart($this->week !== '' ? $this->week : now())->toDateString();
+        $this->followPinnedAssignee();
         if (! $this->userId) {
             $this->userId = auth()->id();
         }
+    }
+
+    public function updatedPinId(): void
+    {
+        $this->followPinnedAssignee();
     }
 
     public function previousWeek(): void
@@ -731,9 +737,8 @@ class WorkItemPlan extends Component
             }
         }
         $occupancy = $service->occupancy($user, $weekStart, $now);
-        $pinnedTitle = $this->pinId
-            ? WorkItem::query()->whereKey($this->pinId)->value('title')
-            : null;
+        $pinned = $this->pinnedWorkItem();
+        $pinNeedsAssignee = $pinned !== null && $pinned->assignee_id === null;
 
         return view('livewire.work-item-plan', [
             'calendarUser' => $user,
@@ -742,7 +747,8 @@ class WorkItemPlan extends Component
             'weekLabel' => $weekStart->format('d.m').'–'.$weekStart->addDays(6)->format('d.m.Y'),
             'days' => $days,
             'hours' => range(WorkItemPlanService::GRID_START_HOUR, WorkItemPlanService::GRID_END_HOUR - 1),
-            'pinnedTitle' => $pinnedTitle,
+            'pinnedTitle' => $pinned?->title,
+            'pinNeedsAssignee' => $pinNeedsAssignee,
             'eventsByDay' => $occupancy['timed'],
             'allDayByDay' => $occupancy['allDay'],
             'dueFlags' => $service->dueFlags($user, $weekStart),
@@ -1177,6 +1183,23 @@ class WorkItemPlan extends Component
     protected function weekStart(): CarbonImmutable
     {
         return app(WorkItemPlanService::class)->weekStart($this->week !== '' ? $this->week : now());
+    }
+
+    protected function followPinnedAssignee(): void
+    {
+        $item = $this->pinnedWorkItem();
+        if ($item?->assignee_id) {
+            $this->userId = (int) $item->assignee_id;
+        }
+    }
+
+    protected function pinnedWorkItem(): ?WorkItem
+    {
+        if (! $this->pinId) {
+            return null;
+        }
+
+        return WorkItem::query()->find($this->pinId);
     }
 
     protected function calendarUser(): User

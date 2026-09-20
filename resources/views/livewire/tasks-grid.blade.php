@@ -407,6 +407,16 @@
         outline: 1px dashed rgba(168,85,247,0.5);
         border-radius: 4px;
     }
+    button.tg-hover-edit {
+        appearance: none;
+        background: none;
+        border: 0;
+        padding: 2px 4px;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        text-align: left;
+    }
     .tg-dt-card .tg-hover-edit {
         display: flex;
         align-items: center;
@@ -440,10 +450,9 @@
         box-sizing: border-box;
         justify-content: flex-start;
     }
-    .xuiv2-tasks .tg-status-badge .bi-chevron-down {
-        margin-left: auto;
-        font-size: 0.55rem;
-        opacity: .65;
+    .xuiv2-tasks .tg-status-badge.tg-col-chip--split {
+        gap: 0;
+        padding: 2px 2px 2px 0;
     }
     .xuiv2-tasks button.tg-status-badge:hover { filter: brightness(1.18); cursor: pointer; }
     .xuiv2-tasks .tg-status-badge.s-pending    { background: rgba(245,158,11,.18); color: #f59e0b; border: 1px solid rgba(245,158,11,.35); }
@@ -451,15 +460,18 @@
     .xuiv2-tasks .tg-status-badge.s-completed  { background: rgba(16,185,129,.18); color: #34d399; border: 1px solid rgba(16,185,129,.35); }
     .xuiv2-tasks .tg-status-badge.s-cancelled  { background: rgba(239,68,68,.18);  color: #f87171; border: 1px solid rgba(239,68,68,.35); }
 
-    .xuiv2-tasks td:has(> .tg-col-chip--sprint),
-    .xuiv2-tasks td:has(> a.tg-col-chip--sprint) {
+    .xuiv2-tasks td:has(.tg-col-chip--sprint),
+    .xuiv2-tasks td:has(.tg-col-chip--category),
+    .xuiv2-tasks td:has(.tg-col-chip--priority) {
         overflow: hidden;
         min-width: 0;
+        position: relative;
+        z-index: 1;
+    }
+    .xuiv2-tasks td:has(.tg-col-chip--sprint) {
         max-width: var(--tg-w-sprint, 16rem);
     }
-    .xuiv2-tasks td:has(> .tg-facet .tg-col-chip--category) {
-        overflow: hidden;
-        min-width: 0;
+    .xuiv2-tasks td:has(.tg-col-chip--category) {
         max-width: var(--tg-w-category, 16rem);
     }
     .xuiv2-tasks td > [x-data]:has(> .tg-status-badge) {
@@ -483,10 +495,45 @@
         white-space: nowrap;
         appearance: none;
         cursor: pointer;
-        transition: filter 0.15s;
+        transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
         overflow: hidden;
     }
-    .xuiv2-tasks .tg-col-chip i:first-child {
+    .xuiv2-tasks .tg-col-chip--split {
+        gap: 0;
+        padding: 2px 2px 2px 0;
+    }
+    .xuiv2-tasks .tg-col-chip__main {
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 2px 8px 2px 10px;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        font-weight: inherit;
+        line-height: inherit;
+        text-align: left;
+        text-decoration: none !important;
+        cursor: pointer;
+    }
+    .xuiv2-tasks span.tg-col-chip__main {
+        cursor: default;
+    }
+    .xuiv2-tasks button.tg-col-chip--split > .tg-col-chip__main,
+    .xuiv2-tasks button.tg-status-badge > .tg-col-chip__main {
+        cursor: inherit;
+        pointer-events: none;
+    }
+    .xuiv2-tasks button.tg-col-chip--split > .tg-col-chip__side,
+    .xuiv2-tasks button.tg-status-badge > .tg-col-chip__side {
+        pointer-events: none;
+    }
+    .xuiv2-tasks .tg-col-chip > i:first-child,
+    .xuiv2-tasks .tg-col-chip__main > i:first-child {
         flex-shrink: 0;
         font-size: 0.82rem;
         opacity: 0.9;
@@ -504,9 +551,146 @@
         font-size: 0.62rem;
         opacity: 0.65;
     }
-    .xuiv2-tasks a.tg-col-chip:hover,
-    .xuiv2-tasks button.tg-col-chip:hover {
-        filter: brightness(1.18);
+    .xuiv2-tasks .tg-col-chip__side {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        appearance: none;
+        width: 1.55rem;
+        min-height: 1.45rem;
+        margin-left: auto;
+        padding: 0;
+        border: 0;
+        border-left: 1px solid color-mix(in srgb, currentColor 38%, transparent);
+        border-radius: 9px;
+        background: rgba(255, 255, 255, 0.05);
+        color: inherit;
+        font-size: 0.68rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .xuiv2-tasks .tg-col-chip__side i {
+        font-size: 0.68rem;
+        opacity: 0.85;
+    }
+    .xuiv2-tasks span.tg-col-chip__side {
+        cursor: inherit;
+    }
+    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__main,
+    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__side {
+        transform: none;
+        box-shadow: none;
+        filter: none;
+        position: relative;
+        z-index: 1;
+    }
+    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__side {
+        z-index: 2;
+    }
+    @media (hover: hover) {
+        .xuiv2-tasks .tg-col-chip__side:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        .xuiv2-tasks a.tg-col-chip--sprint:hover,
+        .xuiv2-tasks button.tg-col-chip--sprint:hover,
+        .xuiv2-tasks .tg-col-chip--sprint.tg-col-chip--split:hover {
+            background: rgba(168, 85, 247, 0.28);
+            border-color: rgba(168, 85, 247, 0.55);
+            color: #d8b4fe;
+            filter: brightness(1.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+        }
+        .xuiv2-tasks a.tg-col-chip--category:hover,
+        .xuiv2-tasks button.tg-col-chip--category:hover,
+        .xuiv2-tasks .tg-col-chip--category.tg-col-chip--split:hover {
+            background: rgba(59, 130, 246, 0.28);
+            border-color: rgba(59, 130, 246, 0.55);
+            color: #93c5fd;
+            filter: brightness(1.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        .xuiv2-tasks a.tg-col-chip--p1:hover,
+        .xuiv2-tasks button.tg-col-chip--p1:hover,
+        .xuiv2-tasks a.tg-col-chip--p2:hover,
+        .xuiv2-tasks button.tg-col-chip--p2:hover {
+            background: rgba(148, 163, 184, 0.22);
+            border-color: rgba(148, 163, 184, 0.5);
+            filter: brightness(1.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(148, 163, 184, 0.28);
+        }
+        .xuiv2-tasks a.tg-col-chip--p3:hover,
+        .xuiv2-tasks button.tg-col-chip--p3:hover {
+            background: rgba(245, 158, 11, 0.26);
+            border-color: rgba(245, 158, 11, 0.55);
+            color: #fdba74;
+            filter: brightness(1.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+        }
+        .xuiv2-tasks a.tg-col-chip--p4:hover,
+        .xuiv2-tasks button.tg-col-chip--p4:hover,
+        .xuiv2-tasks a.tg-col-chip--p5:hover,
+        .xuiv2-tasks button.tg-col-chip--p5:hover {
+            background: rgba(239, 68, 68, 0.28);
+            border-color: rgba(239, 68, 68, 0.55);
+            color: #fca5a5;
+            filter: brightness(1.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+        .xuiv2-tasks button.tg-status-badge:hover {
+            filter: brightness(1.18);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.28);
+        }
+        .xuiv2-tasks button.tg-status-badge.s-in_progress:hover {
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
+        }
+        .xuiv2-tasks button.tg-status-badge.s-completed:hover {
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+        }
+        .xuiv2-tasks button.tg-status-badge.s-cancelled:hover {
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);
+        }
+        .xuiv2-tasks a.tg-time-chip--cal.tg-time-chip--scheduled:hover,
+        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--ok:hover {
+            background: rgba(59, 130, 246, 0.28);
+            border-color: rgba(168, 85, 247, 0.55);
+            color: #ddd6fe;
+            filter: brightness(1.12);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.38);
+        }
+        .xuiv2-tasks a.tg-time-chip--cal.tg-time-chip--stale:hover,
+        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--soon:hover {
+            background: rgba(245, 158, 11, 0.26);
+            border-color: rgba(245, 158, 11, 0.55);
+            color: #fdba74;
+            filter: brightness(1.12);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+        }
+        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--late:hover {
+            background: rgba(239, 68, 68, 0.28);
+            border-color: rgba(239, 68, 68, 0.55);
+            color: #fca5a5;
+            filter: brightness(1.12);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+        .xuiv2-tasks a.tg-time-chip--none:hover,
+        .xuiv2-tasks button.tg-time-chip--none:hover {
+            background: rgba(148, 163, 184, 0.18);
+            border-color: rgba(148, 163, 184, 0.42);
+            color: #cbd5e1;
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(148, 163, 184, 0.22);
+        }
     }
     .xuiv2-tasks .tg-col-chip--sprint {
         background: rgba(168, 85, 247, 0.16);
@@ -543,7 +727,7 @@
         color: #fb7185;
         border: 1px solid rgba(244, 63, 94, 0.5);
     }
-    .xuiv2-tasks td:has(> .tg-facet .tg-col-chip--priority) {
+    .xuiv2-tasks td:has(.tg-col-chip--priority) {
         overflow: hidden;
         min-width: 0;
         max-width: var(--tg-w-priority, 10rem);
@@ -554,8 +738,12 @@
         width: 100%;
         max-width: none;
     }
-    .xuiv2-tasks .tg-facet:has(.tg-col-chip) .tg-col-chip {
-        flex: 1 1 auto;
+    .xuiv2-tasks .tg-quick-menu {
+        width: 100%;
+    }
+    .xuiv2-tasks .tg-quick-menu > button,
+    .xuiv2-tasks .tg-quick-menu > .tg-col-chip {
+        width: 100%;
     }
     .xuiv2-tasks .tg-facet:has(.tg-facet__edit) .tg-col-chip {
         padding-right: 1.7rem;
@@ -1010,27 +1198,110 @@
         border-color: var(--glass-border, rgba(255,255,255,.1));
         color: var(--text-main, #f1f5f9);
     }
-    .tg-schedule {
-        position: relative;
-        z-index: 2;
-        display: inline-flex;
-        max-width: 100%;
+    .xuiv2-tasks td:has(.tg-time-chip),
+    .xuiv2-tasks .dt-card__value:has(.tg-time-chip) {
         min-width: 0;
-        align-items: center;
-        font-family: 'JetBrains Mono', ui-monospace, monospace;
-        font-size: .72rem;
-        font-variant-numeric: tabular-nums;
-        line-height: 1.35;
-        text-decoration: none;
-        border-radius: 4px;
-        word-break: break-word;
+        overflow: hidden;
     }
-    .tg-schedule--scheduled { color: var(--primary, #3b82f6); }
-    .tg-schedule--stale { color: #f59e0b; font-weight: 600; }
-    .tg-schedule--none { color: rgba(255,255,255,.25); }
-    .tg-schedule:hover {
-        outline: 1px dashed rgba(168, 85, 247, .45);
+    .xuiv2-tasks .tg-time-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
+        padding: 3px 8px 3px 3px;
+        border-radius: 20px;
+        border: 1px solid transparent;
+        font-size: 0.76rem;
+        font-weight: 600;
+        line-height: 1.3;
+        text-align: left;
+        text-decoration: none !important;
+        white-space: nowrap;
+        appearance: none;
+        cursor: pointer;
         color: inherit;
+        background: rgba(255, 255, 255, 0.04);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+    }
+    .xuiv2-tasks .tg-time-chip--static {
+        cursor: default;
+    }
+    .xuiv2-tasks .tg-time-chip__icon {
+        flex-shrink: 0;
+        width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.72rem;
+        background: rgba(255, 255, 255, 0.08);
+    }
+    .xuiv2-tasks .tg-time-chip__label {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .xuiv2-tasks .tg-time-chip__go {
+        flex-shrink: 0;
+        margin-left: auto;
+        font-size: 0.62rem;
+        opacity: 0.7;
+    }
+    .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--scheduled,
+    .xuiv2-tasks .tg-time-chip--due.tg-time-chip--ok {
+        background: rgba(59, 130, 246, 0.12);
+        border-color: rgba(168, 85, 247, 0.38);
+        color: #c4b5fd;
+    }
+    .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--scheduled .tg-time-chip__icon,
+    .xuiv2-tasks .tg-time-chip--due.tg-time-chip--ok .tg-time-chip__icon {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(168, 85, 247, 0.4));
+        color: #ede9fe;
+    }
+    .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--stale,
+    .xuiv2-tasks .tg-time-chip--due.tg-time-chip--soon {
+        background: rgba(245, 158, 11, 0.12);
+        border-color: rgba(245, 158, 11, 0.4);
+        color: #fdba74;
+    }
+    .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--stale .tg-time-chip__icon,
+    .xuiv2-tasks .tg-time-chip--due.tg-time-chip--soon .tg-time-chip__icon {
+        background: rgba(245, 158, 11, 0.22);
+        color: #fdba74;
+    }
+    .xuiv2-tasks .tg-time-chip--due.tg-time-chip--late {
+        background: rgba(239, 68, 68, 0.12);
+        border-color: rgba(239, 68, 68, 0.4);
+        color: #fca5a5;
+    }
+    .xuiv2-tasks .tg-time-chip--due.tg-time-chip--late .tg-time-chip__icon {
+        background: rgba(239, 68, 68, 0.22);
+        color: #fca5a5;
+    }
+    .xuiv2-tasks .tg-time-chip--none {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(255, 255, 255, 0.08);
+        color: rgba(241, 245, 249, 0.45);
+    }
+    .xuiv2-tasks .tg-time-chip--none .tg-time-chip__icon {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(241, 245, 249, 0.45);
+    }
+    .xuiv2-tasks .tg-date-plain {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        white-space: nowrap;
+        font-size: 0.72rem;
+        color: rgba(255, 255, 255, 0.42);
+    }
+    .xuiv2-tasks .tg-date-plain .bi {
+        font-size: 0.78rem;
+        opacity: 0.75;
     }
 
     /* ── Karty zadań (mobile) — ten sam szkielet label/wartość co /rotations ── */
@@ -1709,6 +1980,16 @@
 @endif
 
 <script>
+    document.addEventListener('livewire:init', function () {
+        if (!window.Livewire || typeof Livewire.hook !== 'function') return;
+        Livewire.hook('commit', function ({ succeed }) {
+            succeed(function () {
+                document.querySelectorAll('body > ul.tg-teleport-menu').forEach(function (el) {
+                    el.remove();
+                });
+            });
+        });
+    });
 @unless($this->isPlanQueue())
     (function () {
         function applyTgSelection(d) {
@@ -2143,7 +2424,7 @@
             if (!root) return;
             root.querySelectorAll('[data-tg-sub-stats="' + id + '"]').forEach(function (el) {
                 el.textContent = done + '/' + total;
-                el.setAttribute('title', done + '/' + total + ' podzadań');
+                el.setAttribute('data-tip', done + '/' + total + ' podzadań');
             });
             root.querySelectorAll('[data-tg-sub-bar="' + id + '"]').forEach(function (el) {
                 const pct = total > 0 ? Math.round((done / total) * 100) : 0;

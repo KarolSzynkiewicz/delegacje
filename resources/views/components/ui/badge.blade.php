@@ -14,8 +14,10 @@
         default => 'info'
     };
     $classes = 'badge badge-' . $bootstrapVariant;
+    $tip = $attributes->get('title');
+    $attributes = $attributes->except('title');
 @endphp
 
-<span {{ $attributes->merge(['class' => $classes]) }}>
+<span {{ $attributes->merge(['class' => $classes]) }} @if(filled($tip)) data-tip="{{ $tip }}" @endif>
     {{ $slot }}
 </span>
