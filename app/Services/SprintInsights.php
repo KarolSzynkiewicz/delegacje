@@ -214,12 +214,12 @@ class SprintInsights
         int $remaining,
         int $daysLeft,
     ): string {
-        if ($sprint->isScheduled()) {
-            return 'upcoming';
+        if ($sprint->isClosed() || $sprint->isPast()) {
+            return $remaining === 0 ? 'done' : 'unfinished';
         }
 
-        if ($sprint->isPast()) {
-            return $remaining === 0 ? 'done' : 'unfinished';
+        if ($sprint->isScheduled()) {
+            return 'upcoming';
         }
 
         if ($remaining === 0) {
@@ -250,8 +250,12 @@ class SprintInsights
     ): string {
         return match ($health) {
             'upcoming' => 'Sprint jeszcze nie wystartował. Ułóż kolejność i kamienie milowe, zanim wejdziecie w scope.',
-            'done' => 'Sprint domknięty — wszystkie zadania w zakresie są skończone.',
-            'unfinished' => 'Termin minął, a w zakresie zostało '.$remaining.' otwartych zadań. Czas na retrospekcję albo przeniesienie reszty.',
+            'done' => $sprint->isClosed()
+                ? 'Sprint zakończony — w zakresie zostały tylko dowiezione (i ewentualnie anulowane) karty.'
+                : 'Sprint domknięty — wszystkie zadania w zakresie są skończone.',
+            'unfinished' => $sprint->isClosed()
+                ? 'Sprint zakończony, ale w zakresie zostało '.$remaining.' otwartych zadań. Nie zostały odpięte do backlogu.'
+                : 'Termin minął, a w zakresie zostało '.$remaining.' otwartych zadań. Czas zamknąć sprint albo odpiąć resztę.',
             'off_track' => $overdue > 0
                 ? 'Tempo nie dogania zakresu: '.$overdue.' po terminie. Ściągnij scope albo odblokuj wąskie gardło.'
                 : 'Jesteście '.$progress.'% przy idealnym '.$idealProgress.'%. Bez korekty nie domkniecie sprintu.',

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\TaskStatus;
 use App\Http\Requests\StoreSprintRequest;
 use App\Http\Requests\UpdateSprintRequest;
 use App\Models\Attachment;
@@ -15,15 +14,7 @@ class SprintController extends Controller
 {
     public function index(): View
     {
-        $sprints = Sprint::query()
-            ->withCount([
-                'tasks',
-                'tasks as completed_tasks_count' => fn ($q) => $q->where('status', TaskStatus::COMPLETED),
-            ])
-            ->orderByDesc('start_date')
-            ->get();
-
-        return view('sprints.index', compact('sprints'));
+        return view('sprints.index');
     }
 
     public function create(): View

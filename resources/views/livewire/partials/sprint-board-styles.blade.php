@@ -1,9 +1,20 @@
 <style>
     .sb { --sb-line: rgba(255,255,255,.08); }
     .sb-hero { display:grid; grid-template-columns: auto 1fr auto; gap:1.35rem; align-items:center; }
+    .sb-hero--show { grid-template-columns: minmax(0, 1.2fr) minmax(20rem, .95fr); align-items:start; gap:1.4rem 1.75rem; }
+    .sb-hero__goal { min-width:0; }
+    .sb-hero__chips { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin:0 0 .7rem; }
+    .sb-hero__dates { display:flex; align-items:flex-start; gap:.5rem; color:var(--text-muted); font-size:.88rem; line-height:1.4; margin-bottom:.85rem; }
+    .sb-hero__dates i { color:var(--accent); margin-top:.12rem; }
+    .sb-hero__dates-sep { margin:0 .35rem; opacity:.6; }
+    .sb-hero__coach { display:flex; align-items:flex-start; gap:.5rem; color:var(--text-muted) !important; font-size:.85rem; line-height:1.45; }
+    .sb-hero__coach i { color:var(--accent); margin-top:.12rem; flex-shrink:0; }
+    .sb-hero__stats { min-width:0; padding:1rem 1.1rem .9rem; border-radius:16px; background:rgba(15,23,42,.45); border:1px solid var(--sb-line); }
+    .sb-hero__countdown { display:flex; flex-wrap:wrap; align-items:center; gap:.15rem .2rem; margin-top:.85rem; color:var(--text-muted); font-size:.8rem; }
     .sb-goal-icon { width:72px; height:72px; border-radius:20px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:linear-gradient(135deg, rgba(59,130,246,.2), rgba(168,85,247,.22)); border:1px solid rgba(168,85,247,.38); color:var(--accent); font-size:1.85rem; }
     .sb-goal-kicker { display:inline-flex; align-items:center; gap:.4rem; color:var(--accent) !important; font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; font-weight:700; margin-bottom:.35rem; }
     .sb-goal-text { font-size:1.32rem; font-weight:600; letter-spacing:-.03em; line-height:1.35; color:var(--text-main) !important; margin:0 0 .7rem; }
+    .sb-hero--show .sb-goal-text { font-size:1.5rem; margin-bottom:.85rem; }
     .sb-goal-text.is-empty { color:var(--text-muted) !important; font-weight:500; font-size:1.05rem; }
     .sb-ring { position:relative; width:110px; height:110px; }
     .sb-ring svg { transform:rotate(-90deg); }
@@ -59,8 +70,9 @@
     .sb-ghost { color:rgba(255,255,255,.32) !important; }
     .sb-ghost:hover { color:var(--danger) !important; }
     @media (max-width: 992px) {
-        .sb-hero, .sb-grid, .sb-kpis { grid-template-columns:1fr; }
+        .sb-hero, .sb-hero--show, .sb-grid, .sb-kpis { grid-template-columns:1fr; }
         .sb-goal-icon { margin-inline: auto; }
         .sb-hero .text-end { text-align:center !important; }
+        .sb-hero__stats { width:100%; }
     }
 </style>

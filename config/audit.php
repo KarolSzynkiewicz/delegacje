@@ -82,6 +82,8 @@ return [
         'task_id' => 'Zadanie nadrzędne',
         'body' => 'Treść',
         'goal' => 'Cel',
+        'closed_at' => 'Zakończono sprint',
+        'parked_at' => 'Odstawiono na później',
         'original_name' => 'Nazwa pliku',
         'parent_id' => 'Odpowiedź na',
     ],

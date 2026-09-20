@@ -107,6 +107,8 @@ class BacklogOverviewTool extends Tool
         return Sprint::query()
             ->with(['readinessItems', 'doneItems', 'milestones'])
             ->withCount('tasks')
+            ->orderByRaw('closed_at is not null')
+            ->orderByRaw('parked_at is not null')
             ->orderByDesc('start_date')
             ->limit(10)
             ->get()

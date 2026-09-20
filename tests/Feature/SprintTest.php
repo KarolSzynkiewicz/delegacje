@@ -68,11 +68,14 @@ class SprintTest extends TestCase
             ->assertOk()
             ->assertSee('HQ Sprint')
             ->assertSee('Kartka')
-            ->assertSee('Burndown')
-            ->assertSee('Backlog sprintu')
+            ->assertSeeInOrder(['Backlog sprintu', 'Burndown'])
             ->assertSee('Komentarze')
             ->assertSee('Historia')
             ->assertSee('Cel sprintu')
+            ->assertSee('Zakończ sprint')
+            ->assertSee('Odstaw na później')
+            ->assertSee('sp-progress--side')
+            ->assertSee('ukończone')
             ->assertSee('Co potrzeba, by zacząć pracę?')
             ->assertSee('Kiedy uznamy, że zrobione?')
             ->assertSee('Przełomowe osiągnięcia');
@@ -517,6 +520,82 @@ class SprintTest extends TestCase
         } finally {
             Model::preventLazyLoading(false);
         }
+    }
+
+    public function test_completion_snapshot_averages_four_equal_metrics(): void
+    {
+        $sprint = Sprint::factory()->create();
+
+        for ($i = 1; $i <= 7; $i++) {
+            $this->makeTask("Zadanie {$i}", [
+                'sprint_id' => $sprint->id,
+                'status' => $i <= 3 ? TaskStatus::COMPLETED : TaskStatus::PENDING,
+                'completed_at' => $i <= 3 ? now() : null,
+            ]);
+        }
+
+        foreach (['A', 'B', 'C'] as $i => $name) {
+            \App\Models\SprintReadinessItem::query()->create([
+                'sprint_id' => $sprint->id,
+                'name' => 'DoR '.$name,
+                'position' => $i + 1,
+                'completed_at' => $i < 2 ? now() : null,
+            ]);
+        }
+        foreach (['A', 'B', 'C', 'D', 'E'] as $i => $name) {
+            \App\Models\SprintDodItem::query()->create([
+                'sprint_id' => $sprint->id,
+                'name' => 'DoD '.$name,
+                'position' => $i + 1,
+                'completed_at' => $i < 1 ? now() : null,
+            ]);
+        }
+        foreach (['A', 'B', 'C'] as $i => $name) {
+            \App\Models\SprintMilestone::query()->create([
+                'sprint_id' => $sprint->id,
+                'name' => 'Kamień '.$name,
+                'due_date' => $sprint->end_date,
+                'position' => $i + 1,
+            ]);
+        }
+
+        $snapshot = $sprint->fresh()->completionSnapshot();
+        $byKey = collect($snapshot['metrics'])->keyBy('key');
+
+        $this->assertSame(67, $byKey['dor']['pct']);
+        $this->assertSame(20, $byKey['dod']['pct']);
+        $this->assertSame(43, $byKey['work']['pct']);
+        $this->assertSame(0, $byKey['milestones']['pct']);
+        $this->assertSame(32, $snapshot['percent']);
+
+        $this->actingAs($this->user)
+            ->get(route('sprints.index'))
+            ->assertOk()
+            ->assertSee('32%')
+            ->assertDontSee('DoR / DoD');
+    }
+
+    public function test_sprint_list_status_matches_task_chips_and_category_opens_backlog(): void
+    {
+        $sprint = Sprint::factory()->create([
+            'name' => 'Z kategoriami',
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addDays(5)->toDateString(),
+        ]);
+        $this->makeTask('Kartka', [
+            'sprint_id' => $sprint->id,
+            'category' => 'Wyjazdy',
+        ]);
+
+        $this->assertSame('s-in_progress', $sprint->statusChip()['cls']);
+        $this->assertSame('▶', $sprint->statusChip()['icon']);
+
+        $this->actingAs($this->user)
+            ->get(route('sprints.index'))
+            ->assertOk()
+            ->assertSee('tg-status-badge')
+            ->assertSee('Wyjazdy')
+            ->assertSee('searchCategory=Wyjazdy');
     }
 
     /**

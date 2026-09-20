@@ -430,18 +430,144 @@
     }
 
     /* ── Status badge pill ── */
-    .tg-status-badge {
+    .xuiv2-tasks .tg-status-badge {
         display: inline-flex; align-items: center; gap: 4px;
         padding: 4px 10px; border-radius: 20px;
         font-size: 0.76rem; font-weight: 600; line-height: 1.3;
         white-space: nowrap; border: none;
         transition: filter .15s;
+        width: 100%;
+        box-sizing: border-box;
+        justify-content: flex-start;
     }
-    button.tg-status-badge:hover { filter: brightness(1.18); cursor: pointer; }
-    .tg-status-badge.s-pending    { background: rgba(245,158,11,.18); color: #f59e0b; border: 1px solid rgba(245,158,11,.35); }
-    .tg-status-badge.s-in_progress{ background: rgba(168,85,247,.18); color: #c084fc; border: 1px solid rgba(168,85,247,.35); }
-    .tg-status-badge.s-completed  { background: rgba(16,185,129,.18); color: #34d399; border: 1px solid rgba(16,185,129,.35); }
-    .tg-status-badge.s-cancelled  { background: rgba(239,68,68,.18);  color: #f87171; border: 1px solid rgba(239,68,68,.35); }
+    .xuiv2-tasks .tg-status-badge .bi-chevron-down {
+        margin-left: auto;
+        font-size: 0.55rem;
+        opacity: .65;
+    }
+    .xuiv2-tasks button.tg-status-badge:hover { filter: brightness(1.18); cursor: pointer; }
+    .xuiv2-tasks .tg-status-badge.s-pending    { background: rgba(245,158,11,.18); color: #f59e0b; border: 1px solid rgba(245,158,11,.35); }
+    .xuiv2-tasks .tg-status-badge.s-in_progress{ background: rgba(168,85,247,.18); color: #c084fc; border: 1px solid rgba(168,85,247,.35); }
+    .xuiv2-tasks .tg-status-badge.s-completed  { background: rgba(16,185,129,.18); color: #34d399; border: 1px solid rgba(16,185,129,.35); }
+    .xuiv2-tasks .tg-status-badge.s-cancelled  { background: rgba(239,68,68,.18);  color: #f87171; border: 1px solid rgba(239,68,68,.35); }
+
+    .xuiv2-tasks td:has(> .tg-col-chip--sprint),
+    .xuiv2-tasks td:has(> a.tg-col-chip--sprint) {
+        overflow: hidden;
+        min-width: 0;
+        max-width: var(--tg-w-sprint, 16rem);
+    }
+    .xuiv2-tasks td:has(> .tg-facet .tg-col-chip--category) {
+        overflow: hidden;
+        min-width: 0;
+        max-width: var(--tg-w-category, 16rem);
+    }
+    .xuiv2-tasks td > [x-data]:has(> .tg-status-badge) {
+        width: 100%;
+    }
+
+    .xuiv2-tasks .tg-col-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        width: 100%;
+        box-sizing: border-box;
+        min-width: 0;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.76rem;
+        font-weight: 600;
+        line-height: 1.3;
+        text-align: left;
+        text-decoration: none !important;
+        white-space: nowrap;
+        appearance: none;
+        cursor: pointer;
+        transition: filter 0.15s;
+        overflow: hidden;
+    }
+    .xuiv2-tasks .tg-col-chip i:first-child {
+        flex-shrink: 0;
+        font-size: 0.82rem;
+        opacity: 0.9;
+    }
+    .xuiv2-tasks .tg-col-chip__label {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .xuiv2-tasks .tg-col-chip__go {
+        flex-shrink: 0;
+        margin-left: auto;
+        font-size: 0.62rem;
+        opacity: 0.65;
+    }
+    .xuiv2-tasks a.tg-col-chip:hover,
+    .xuiv2-tasks button.tg-col-chip:hover {
+        filter: brightness(1.18);
+    }
+    .xuiv2-tasks .tg-col-chip--sprint {
+        background: rgba(168, 85, 247, 0.16);
+        color: #c084fc;
+        border: 1px solid rgba(168, 85, 247, 0.4);
+    }
+    .xuiv2-tasks .tg-col-chip--category {
+        background: rgba(59, 130, 246, 0.16);
+        color: #60a5fa;
+        border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+    .xuiv2-tasks .tg-col-chip--p1 {
+        background: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+    .xuiv2-tasks .tg-col-chip--p2 {
+        background: rgba(148, 163, 184, 0.12);
+        color: #cbd5e1;
+        border: 1px solid rgba(148, 163, 184, 0.38);
+    }
+    .xuiv2-tasks .tg-col-chip--p3 {
+        background: rgba(245, 158, 11, 0.14);
+        color: #fb923c;
+        border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+    .xuiv2-tasks .tg-col-chip--p4 {
+        background: rgba(239, 68, 68, 0.16);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.42);
+    }
+    .xuiv2-tasks .tg-col-chip--p5 {
+        background: rgba(239, 68, 68, 0.22);
+        color: #fb7185;
+        border: 1px solid rgba(244, 63, 94, 0.5);
+    }
+    .xuiv2-tasks td:has(> .tg-facet .tg-col-chip--priority) {
+        overflow: hidden;
+        min-width: 0;
+        max-width: var(--tg-w-priority, 10rem);
+    }
+    .xuiv2-tasks .tg-facet:has(.tg-col-chip) {
+        position: relative;
+        display: flex;
+        width: 100%;
+        max-width: none;
+    }
+    .xuiv2-tasks .tg-facet:has(.tg-col-chip) .tg-col-chip {
+        flex: 1 1 auto;
+    }
+    .xuiv2-tasks .tg-facet:has(.tg-facet__edit) .tg-col-chip {
+        padding-right: 1.7rem;
+    }
+    .xuiv2-tasks .tg-facet:has(.tg-col-chip) .tg-facet__edit {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+        background: rgba(13, 18, 30, 0.88);
+    }
 
     /* ── Avatar initials ── */
     .tg-avatar {
@@ -1301,6 +1427,7 @@
 
 @if($layout !== 'cards')
 <div class="card border-0 shadow-sm tg-table-wrap"
+     :style="Object.entries(colWidths).map(([k, v]) => `--tg-w-${k}:${Number(v)}px`).join(';')"
      x-data="{
          resizing: null,
          startX: 0,
@@ -1332,7 +1459,9 @@
              if (col) {
                  col.style.width = w + 'px';
                  col.style.minWidth = w + 'px';
+                 col.style.maxWidth = w + 'px';
              }
+             this.$el.style.setProperty('--tg-w-' + this.resizing, w + 'px');
          },
          endResize() {
              if (!this.resizing) return;
@@ -1388,7 +1517,14 @@
                 <col style="width:36px; min-width:36px">
                 <col style="width:36px; min-width:36px">
                 @foreach($visibleColumns as $colKey)
-                <col data-col="{{ $colKey }}" :style="colWidths['{{ $colKey }}'] ? `width:${colWidths['{{ $colKey }}']}px;min-width:${colWidths['{{ $colKey }}']}px` : ''">
+                @php
+                    $defaultColStyle = match ($colKey) {
+                        'priority' => 'width:10rem;max-width:10rem',
+                        'sprint', 'category' => 'width:16rem;max-width:16rem',
+                        default => '',
+                    };
+                @endphp
+                <col data-col="{{ $colKey }}" :style="colWidths['{{ $colKey }}'] ? `width:${colWidths['{{ $colKey }}']}px;min-width:${colWidths['{{ $colKey }}']}px;max-width:${colWidths['{{ $colKey }}']}px` : '{{ $defaultColStyle }}'">
                 @endforeach
             </colgroup>
 

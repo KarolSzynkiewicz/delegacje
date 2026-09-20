@@ -2,17 +2,20 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\ClosesAndParksSprints;
 use App\Models\Attachment;
 use App\Models\Sprint;
 use App\Models\SprintDodItem;
 use App\Models\SprintMilestone;
 use App\Models\SprintReadinessItem;
 use App\Services\SprintInsights;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
 class SprintBoard extends Component
 {
+    use ClosesAndParksSprints;
     use WithFileUploads;
 
     public Sprint $sprint;
@@ -34,6 +37,19 @@ class SprintBoard extends Component
     {
         $this->sprint = $sprint;
         $this->newMilestoneDue = $sprint->end_date?->format('Y-m-d') ?? now()->toDateString();
+    }
+
+    #[On('sprint-lifecycle-changed')]
+    public function refreshFromLifecycle(string $action = ''): void
+    {
+        $this->sprint->refresh();
+        $this->loadBoard();
+        $this->flash = match ($action) {
+            'closed' => 'Sprint zakończony.',
+            'parked' => 'Sprint odstawiony na później.',
+            'unparked' => 'Sprint wrócił z później.',
+            default => $this->flash,
+        };
     }
 
     public function addMilestone(): void
@@ -193,9 +209,26 @@ class SprintBoard extends Component
 
     private function authorizeMutate(): void
     {
+        $this->assertCanMutateSprints();
+    }
+
+    protected function assertCanMutateSprints(): void
+    {
         if (! $this->canMutate()) {
             abort(403);
         }
+    }
+
+    protected function onSprintLifecycleChanged(Sprint $sprint, string $action): void
+    {
+        $this->sprint = $sprint;
+        $this->flash = match ($action) {
+            'closed' => 'Sprint zakończony.',
+            'parked' => 'Sprint odstawiony na później.',
+            'unparked' => 'Sprint wrócił z później.',
+            default => null,
+        };
+        $this->loadBoard();
     }
 
     private function refreshSprint(): void

@@ -19,6 +19,8 @@ class SprintFactory extends Factory
             'goal' => fake()->sentence(),
             'start_date' => $start->toDateString(),
             'end_date' => $start->copy()->addDays(13)->toDateString(),
+            'closed_at' => null,
+            'parked_at' => null,
             'created_by' => null,
         ];
     }

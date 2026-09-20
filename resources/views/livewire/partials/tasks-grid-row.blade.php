@@ -35,11 +35,11 @@
 
     // Priority config
     $priorityMap = [
-        1 => ['color' => '#94a3b8', 'label' => '↓ Najniższy'],
-        2 => ['color' => '#60a5fa', 'label' => '↓ Niski'],
-        3 => ['color' => '#fb923c', 'label' => '→ Średni'],
-        4 => ['color' => '#f87171', 'label' => '↑ Wysoki'],
-        5 => ['color' => '#c084fc', 'label' => '↑ Krytyczny'],
+        1 => ['tone' => 'p1', 'label' => 'Najniższy'],
+        2 => ['tone' => 'p2', 'label' => 'Niski'],
+        3 => ['tone' => 'p3', 'label' => 'Średni'],
+        4 => ['tone' => 'p4', 'label' => 'Wysoki'],
+        5 => ['tone' => 'p5', 'label' => 'Krytyczny'],
     ];
     $pc = $priorityMap[$task->priority] ?? null;
 
@@ -179,7 +179,7 @@
                         class="tg-status-badge tg-mono {{ $sc['cls'] }}"
                         style="cursor:pointer">
                     {{ $sc['icon'] }} {{ $sc['label'] }}
-                    <i class="bi bi-chevron-down" style="font-size:0.5rem;opacity:.6;margin-left:3px"></i>
+                    <i class="bi bi-chevron-down"></i>
                 </button>
                 <template x-teleport="body">
                     <ul x-show="open" x-cloak
@@ -233,7 +233,7 @@
 
     {{-- ── Sprint ── --}}
     @case('sprint')
-    <td style="max-width:180px">
+    <td>
         @if($isEditing && $editingField === 'sprint')
             <select wire:model="editingValue" class="form-select form-select-sm"
                     wire:change="saveEdit" wire:keydown.escape="cancelEdit"
@@ -244,9 +244,9 @@
                 @endforeach
             </select>
         @elseif($sprintUrl)
-            <a href="{{ $sprintUrl }}" class="text-decoration-none d-block" style="padding:2px 4px">
-                <x-ui.badge variant="accent" class="text-truncate" style="max-width:160px">{{ $task->sprint->name }}</x-ui.badge>
-            </a>
+            <x-tasks.col-chip variant="sprint" :href="$sprintUrl" title="{{ $task->sprint->name }}">
+                {{ $task->sprint->name }}
+            </x-tasks.col-chip>
         @elseif($this->rowWritable($task, 'sprint'))
             <span wire:click="startEdit({{ $task->id }}, 'sprint')" class="tg-hover-edit d-block text-muted" style="cursor:pointer; padding:2px 4px; border-radius:3px; font-size:0.82rem">—</span>
         @else
@@ -258,7 +258,7 @@
     {{-- ── Category ── --}}
     @case('category')
     @php $ediCategory = $this->ediCell($task, 'category'); @endphp
-    <td class="{{ $ediCategory ? 'tg-edi tg-edi--'.$ediCategory['kind'] : '' }}" style="max-width:140px">
+    <td class="{{ $ediCategory ? 'tg-edi tg-edi--'.$ediCategory['kind'] : '' }}">
         @if($ediCategory)
             @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediCategory, 'rowId' => $task->id, 'field' => 'category'])
         @elseif($isEditing && $editingField === 'category')
@@ -268,12 +268,11 @@
         @else
             <div class="tg-facet">
                 @if($task->category)
-                    <button type="button"
-                            class="tg-facet__value"
-                            wire:click="filterByCategory({{ \Illuminate\Support\Js::from($task->category) }})"
-                            title="Zawęź listę do tej kategorii">
-                        <x-ui.badge variant="info" class="text-truncate" style="max-width:120px">{{ $task->category }}</x-ui.badge>
-                    </button>
+                    <x-tasks.col-chip
+                        variant="category"
+                        wire:click="filterByCategory({{ \Illuminate\Support\Js::from($task->category) }})"
+                        title="Zawęź listę do tej kategorii"
+                    >{{ $task->category }}</x-tasks.col-chip>
                 @else
                     <span class="text-muted" style="font-size:0.82rem">—</span>
                 @endif
@@ -338,7 +337,7 @@
     {{-- ── Priority ── --}}
     @case('priority')
     @php $ediPriority = $this->ediCell($task, 'priority'); @endphp
-    <td class="{{ $ediPriority ? 'tg-edi tg-edi--'.$ediPriority['kind'] : '' }}" style="white-space:nowrap; min-width:90px">
+    <td class="{{ $ediPriority ? 'tg-edi tg-edi--'.$ediPriority['kind'] : '' }}">
         @if($ediPriority)
             @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediPriority, 'rowId' => $task->id, 'field' => 'priority'])
         @elseif($isEditing && $editingField === 'priority')
@@ -355,13 +354,12 @@
         @else
             <div class="tg-facet">
                 @if($pc)
-                    <button type="button"
-                            class="tg-facet__value tg-mono"
-                            wire:click="filterByPriority('{{ $task->priority }}')"
-                            title="Zawęź listę do tego priorytetu"
-                            style="font-weight:600; color:{{ $pc['color'] }}; font-size:0.78rem">
-                        {{ $pc['label'] }}
-                    </button>
+                    <x-tasks.col-chip
+                        variant="priority"
+                        :tone="$pc['tone']"
+                        wire:click="filterByPriority('{{ $task->priority }}')"
+                        title="Zawęź listę do tego priorytetu"
+                    >{{ $pc['label'] }}</x-tasks.col-chip>
                 @else
                     <span class="tg-mono" style="font-size:0.78rem; color:rgba(255,255,255,0.2)">—</span>
                 @endif

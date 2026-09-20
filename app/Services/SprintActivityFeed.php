@@ -799,12 +799,25 @@ final class SprintActivityFeed
             return $this->entry($at, $actor, 'usunął sprint', $sprint->name, null, null, 'trash', 'danger', 'sprint.deleted');
         }
 
-        $changes = $this->withoutNoise($this->changed($log));
-        if ($changes === []) {
+        $changes = $this->changed($log);
+        if (array_key_exists('closed_at', $changes) && $this->stringVal($changes['closed_at']['after'] ?? null) !== null) {
+            return $this->entry($at, $actor, 'zakończył sprint', $sprint->name, null, null, 'flag', 'success', 'sprint.closed');
+        }
+
+        if (array_key_exists('parked_at', $changes)) {
+            $parked = $this->stringVal($changes['parked_at']['after'] ?? null) !== null;
+
+            return $parked
+                ? $this->entry($at, $actor, 'odstawił sprint na później', $sprint->name, null, null, 'pause-circle', 'warning', 'sprint.parked')
+                : $this->entry($at, $actor, 'przywrócił sprint z później', $sprint->name, null, null, 'play-circle', 'info', 'sprint.unparked');
+        }
+
+        $interesting = $this->withoutNoise($changes);
+        if ($interesting === []) {
             return null;
         }
 
-        return $this->entry($at, $actor, 'zaktualizował sprint', $sprint->name, null, $this->detailLines($changes), 'pencil', 'muted', 'sprint.updated');
+        return $this->entry($at, $actor, 'zaktualizował sprint', $sprint->name, null, $this->detailLines($interesting), 'pencil', 'muted', 'sprint.updated');
     }
 
     /**
@@ -1157,7 +1170,9 @@ final class SprintActivityFeed
             fn (string $key) => ! in_array($key, self::NOISE_KEYS, true)
                 && $key !== 'sprint_id'
                 && $key !== 'sprint_position'
-                && $key !== 'completed_at',
+                && $key !== 'completed_at'
+                && $key !== 'closed_at'
+                && $key !== 'parked_at',
             ARRAY_FILTER_USE_KEY
         );
     }

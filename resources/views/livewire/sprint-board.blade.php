@@ -9,9 +9,6 @@
             'done' => ['label' => 'Domknięty', 'variant' => 'success', 'icon' => 'trophy'],
             default => ['label' => 'Niedomknięty', 'variant' => 'danger', 'icon' => 'flag'],
         };
-        $ring = 2 * pi() * 42;
-        $dash = $ring * (1 - ($insights['progress'] / 100));
-        $statusVariant = $sprint->isCurrentlyActive() ? 'success' : ($sprint->isScheduled() ? 'info' : 'secondary');
     @endphp
 
     @include('livewire.partials.sprint-board-styles')
@@ -21,67 +18,55 @@
     @endif
 
     <x-ui.card class="mb-3">
-        <div class="sb-hero">
-            <div class="sb-goal-icon" aria-hidden="true">
-                <i class="bi bi-bullseye"></i>
-            </div>
-
-            <div>
+        <div class="sb-hero sb-hero--show">
+            <div class="sb-hero__goal">
                 <div class="sb-goal-kicker">Cel sprintu</div>
                 @if($sprint->goal)
                     <p class="sb-goal-text">{{ $sprint->goal }}</p>
                 @else
                     <p class="sb-goal-text is-empty">Brak celu — dopisz, po co ten sprint istnieje.</p>
                 @endif
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <x-ui.badge :variant="$statusVariant">{{ $sprint->statusLabel() }}</x-ui.badge>
+                <div class="sb-hero__chips">
+                    <x-sprint.status-badge :sprint="$sprint" />
                     <x-ui.badge :variant="$healthMeta['variant']">
                         <i class="bi bi-{{ $healthMeta['icon'] }} me-1"></i>{{ $healthMeta['label'] }}
                     </x-ui.badge>
-                    <span class="text-muted small">
-                        {{ $sprint->start_date->format('d.m.Y') }} – {{ $sprint->end_date->format('d.m.Y') }}
-                        · {{ $insights['days_total'] }} dni
+                </div>
+                <div class="sb-hero__dates">
+                    <i class="bi bi-calendar3" aria-hidden="true"></i>
+                    <span>
+                        {{ $sprint->start_date->translatedFormat('j F Y') }} – {{ $sprint->end_date->translatedFormat('j F Y') }}
+                        <span class="sb-hero__dates-sep">·</span>
+                        {{ $insights['days_total'] }} dni
                     </span>
                 </div>
-                <p class="mb-0 text-muted small">{{ $insights['coach'] }}</p>
+                <p class="sb-hero__coach mb-0">
+                    <i class="bi bi-lightbulb" aria-hidden="true"></i>
+                    {{ $insights['coach'] }}
+                </p>
             </div>
 
-            <div class="text-end">
-                <div class="sb-ring mx-auto mb-2">
-                    <svg width="110" height="110" viewBox="0 0 110 110">
-                        <circle cx="55" cy="55" r="42" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/>
-                        <circle cx="55" cy="55" r="42" fill="none" stroke="url(#sbGrad)" stroke-width="8"
-                                stroke-linecap="round"
-                                stroke-dasharray="{{ $ring }}"
-                                stroke-dashoffset="{{ $dash }}"/>
-                        <defs>
-                            <linearGradient id="sbGrad" x1="0" y1="0" x2="1" y2="1">
-                                <stop offset="0%" stop-color="#3b82f6"/>
-                                <stop offset="100%" stop-color="#a855f7"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
-                    <div class="sb-ring-label">
-                        <strong style="font-size:1.35rem; letter-spacing:-.04em">{{ $insights['progress'] }}%</strong>
-                        <span class="small text-muted">zrobione</span>
-                    </div>
-                </div>
-                @if($sprint->isScheduled())
-                    <div class="v" style="font-size:1.8rem; font-weight:700; letter-spacing:-.04em">{{ $insights['starts_in'] }}</div>
-                    <div class="small text-muted">dni do startu</div>
-                @elseif($sprint->isCurrentlyActive())
-                    <div style="font-size:1.5rem; font-weight:700; letter-spacing:-.04em">{{ $insights['days_left'] }}</div>
-                    <div class="small text-muted">dni do końca</div>
-                    <div class="small text-muted mt-1">dzień {{ $insights['days_elapsed'] }}/{{ $insights['days_total'] }}</div>
-                @else
-                    <div class="small text-muted">Sprint zamknięty kalendarzowo</div>
-                    @if($insights['forecast_finish'])
-                        <div class="small">Prognoza: {{ \Carbon\Carbon::parse($insights['forecast_finish'])->format('d.m') }}</div>
+            <div class="sb-hero__stats">
+                <x-sprint.progress :sprint="$sprint" size="lg" layout="side" />
+                <div class="sb-hero__countdown">
+                    @if($sprint->isClosed())
+                        Zakończony {{ $sprint->closed_at->format('d.m.Y') }}
+                    @elseif($sprint->isParked())
+                        Odstawiony na później
+                    @elseif($sprint->isScheduled())
+                        <i class="bi bi-calendar-event me-1" aria-hidden="true"></i>
+                        {{ (int) $insights['starts_in'] }} {{ (int) $insights['starts_in'] === 1 ? 'dzień do startu' : 'dni do startu' }}
+                    @elseif($sprint->isCurrentlyActive())
+                        {{ $insights['days_left'] }} dni do końca
+                        <span class="sb-hero__dates-sep">·</span>
+                        dzień {{ $insights['days_elapsed'] }}/{{ $insights['days_total'] }}
+                    @else
+                        Termin minął — sprint wciąż otwarty
                     @endif
-                @endif
-                @if($sprint->createdBy)
-                    <div class="small text-muted mt-2">{{ $sprint->createdBy->name }}</div>
-                @endif
+                    @if($sprint->createdBy)
+                        <span class="sb-hero__dates-sep">·</span>{{ $sprint->createdBy->name }}
+                    @endif
+                </div>
             </div>
         </div>
     </x-ui.card>
@@ -111,7 +96,7 @@
         <div class="col-lg-4 d-flex">
             <x-ui.card class="h-100 w-100 sb-list-card">
                 @include('livewire.partials.sprint-list-head', [
-                    'icon' => 'check2-all',
+                    'icon' => 'flag',
                     'title' => 'Kiedy uznamy, że zrobione?',
                     'hint' => 'Warunki, bez których zadanie nie schodzi z tablicy.',
                     'items' => $sprint->doneItems,
@@ -132,7 +117,7 @@
         <div class="col-lg-4 d-flex">
             <x-ui.card class="h-100 w-100 sb-list-card">
                 @include('livewire.partials.sprint-list-head', [
-                    'icon' => 'flag',
+                    'icon' => 'diamond',
                     'title' => 'Przełomowe osiągnięcia',
                     'hint' => 'Kamienie milowe — demo, freeze, wdrożenie.',
                     'items' => $sprint->milestones,
@@ -200,6 +185,11 @@
                 </div>
             </x-ui.card>
         </div>
+    </div>
+
+    <div class="mb-4">
+        <div class="fw-semibold mb-2">Backlog sprintu</div>
+        <livewire:tasks-grid :locked-sprint-id="$sprint->id" :key="'sprint-grid-'.$sprint->id" />
     </div>
 
     <div class="sb-kpis mb-3">

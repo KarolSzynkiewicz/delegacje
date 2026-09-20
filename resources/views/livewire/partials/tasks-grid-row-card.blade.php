@@ -22,11 +22,11 @@
     $approvalDecision = $isWorkItem ? $task->approvalDecision() : null;
 
     $priorityMap = [
-        1 => ['color' => '#94a3b8', 'label' => '↓ Najniższy'],
-        2 => ['color' => '#60a5fa', 'label' => '↓ Niski'],
-        3 => ['color' => '#fb923c', 'label' => '→ Średni'],
-        4 => ['color' => '#f87171', 'label' => '↑ Wysoki'],
-        5 => ['color' => '#c084fc', 'label' => '↑ Krytyczny'],
+        1 => ['tone' => 'p1', 'label' => 'Najniższy'],
+        2 => ['tone' => 'p2', 'label' => 'Niski'],
+        3 => ['tone' => 'p3', 'label' => 'Średni'],
+        4 => ['tone' => 'p4', 'label' => 'Wysoki'],
+        5 => ['tone' => 'p5', 'label' => 'Krytyczny'],
     ];
     $pc = $priorityMap[$task->priority] ?? null;
 
@@ -169,7 +169,7 @@
                                 class="tg-status-badge {{ $sc['cls'] }}"
                                 style="cursor:pointer">
                             {{ $sc['icon'] }} {{ $statusLabel }}
-                            <i class="bi bi-chevron-down" style="font-size:0.5rem;opacity:.6;margin-left:3px"></i>
+                            <i class="bi bi-chevron-down"></i>
                         </button>
                         <template x-teleport="body">
                             <ul x-show="open" x-cloak
@@ -236,9 +236,9 @@
                         @endforeach
                     </select>
                 @elseif($sprintUrl)
-                    <a href="{{ $sprintUrl }}" class="text-decoration-none tg-dt-hit">
-                        <x-ui.badge variant="accent">{{ $task->sprint->name }}</x-ui.badge>
-                    </a>
+                    <x-tasks.col-chip variant="sprint" :href="$sprintUrl" class="tg-dt-hit" title="{{ $task->sprint->name }}">
+                        {{ $task->sprint->name }}
+                    </x-tasks.col-chip>
                 @elseif($this->rowWritable($task, 'sprint'))
                     <span wire:click.stop="startEdit({{ $task->id }}, 'sprint')" class="tg-hover-edit text-muted">—</span>
                 @else
@@ -264,12 +264,11 @@
                 @elseif($this->rowWritable($task, 'category') || $task->category)
                     <div class="tg-facet tg-dt-hit">
                         @if($task->category)
-                            <button type="button"
-                                    class="tg-facet__value"
-                                    wire:click.stop="filterByCategory({{ \Illuminate\Support\Js::from($task->category) }})"
-                                    title="Zawęź listę do tej kategorii">
-                                <x-ui.badge variant="info">{{ $task->category }}</x-ui.badge>
-                            </button>
+                            <x-tasks.col-chip
+                                variant="category"
+                                wire:click.stop="filterByCategory({{ \Illuminate\Support\Js::from($task->category) }})"
+                                title="Zawęź listę do tej kategorii"
+                            >{{ $task->category }}</x-tasks.col-chip>
                         @else
                             <span class="text-muted">—</span>
                         @endif
@@ -356,13 +355,12 @@
                 @elseif($this->rowWritable($task, 'priority') || $pc)
                     <div class="tg-facet tg-dt-hit">
                         @if($pc)
-                            <button type="button"
-                                    class="tg-facet__value tg-mono"
-                                    wire:click.stop="filterByPriority('{{ $task->priority }}')"
-                                    title="Zawęź listę do tego priorytetu"
-                                    style="font-weight:600; color:{{ $pc['color'] }}">
-                                {{ $pc['label'] }}
-                            </button>
+                            <x-tasks.col-chip
+                                variant="priority"
+                                :tone="$pc['tone']"
+                                wire:click.stop="filterByPriority('{{ $task->priority }}')"
+                                title="Zawęź listę do tego priorytetu"
+                            >{{ $pc['label'] }}</x-tasks.col-chip>
                         @else
                             <span class="tg-mono" style="color:rgba(255,255,255,0.35)">—</span>
                         @endif

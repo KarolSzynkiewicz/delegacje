@@ -7,6 +7,7 @@
                 </x-ui.button>
             </x-slot>
             <x-slot name="right">
+                <livewire:sprint-lifecycle-bar :sprint="$sprint" :key="'sprint-bar-'.$sprint->id" />
                 <a href="{{ route('tasks.grid', ['groupBy' => 'sprint']) }}" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-kanban me-1"></i>Siatka
                 </a>
@@ -24,11 +25,6 @@
     @endif
 
     <livewire:sprint-board :sprint="$sprint" />
-
-    <div class="mt-4">
-        <div class="fw-semibold mb-2">Backlog sprintu</div>
-        <livewire:tasks-grid :locked-sprint-id="$sprint->id" :key="'sprint-grid-'.$sprint->id" />
-    </div>
 
     <div class="mt-4">
         <x-comments :commentable="$sprint" />
