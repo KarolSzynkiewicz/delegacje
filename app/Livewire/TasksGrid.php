@@ -1221,6 +1221,45 @@ class TasksGrid extends Component
         $this->detachActiveView();
     }
 
+    public function filterByStatus(string $status): void
+    {
+        if ($this->isPlanQueue()) {
+            $this->enforcePlanLocks();
+
+            return;
+        }
+
+        if (! in_array($status, $this->allStatusValues(), true)) {
+            return;
+        }
+
+        $this->selectedStatuses = [$status];
+        $this->status = $this->statusBucketFromSelection($this->selectedStatuses);
+        $this->filterOps['status'] = 'eq';
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
+    public function filterByAssignee(string $key): void
+    {
+        if ($this->isPlanQueue()) {
+            $this->enforcePlanLocks();
+
+            return;
+        }
+
+        $key = (string) $key;
+        if ($key !== 'unassigned' && $key !== 'me' && ! ctype_digit($key)) {
+            return;
+        }
+
+        $this->assignedFilters = [$key];
+        $this->assignedFilter = $key;
+        $this->filterOps['assignedFilter'] = 'eq';
+        $this->resetPage();
+        $this->detachActiveView();
+    }
+
     public function filterByPriority(string $priority): void
     {
         if (! in_array($priority, ['1', '2', '3', '4', '5'], true)) {
@@ -1810,6 +1849,35 @@ class TasksGrid extends Component
         $task->update(['priority' => $priority === '' ? null : (int) $priority]);
         $this->invalidateViewCounts();
         $this->flash = 'Priorytet zaktualizowany.';
+    }
+
+    public function quickAssigneeChange(int $taskId, string $userId): void
+    {
+        if (! $this->rowWritable($taskId, 'assigned_to')) {
+            return;
+        }
+
+        if ($userId !== '' && ! ctype_digit($userId)) {
+            return;
+        }
+
+        $item = $this->resolveWorkItem($taskId);
+        if ($item) {
+            $item->handler()->write($item, GridField::AssignedTo, $userId);
+            $this->invalidateViewCounts();
+            $this->flash = 'Przypisanie zaktualizowane.';
+
+            return;
+        }
+
+        $task = $this->resolveProjectTask($taskId);
+        if (! $task || ! $this->canEditTask($task)) {
+            return;
+        }
+
+        $this->applyAssigneeChange($task, $userId);
+        $this->invalidateViewCounts();
+        $this->flash = 'Przypisanie zaktualizowane.';
     }
 
     public function addTask(): void
@@ -3746,6 +3814,8 @@ class TasksGrid extends Component
         foreach ($keys as $key) {
             if ($key === 'me') {
                 $labels[] = 'Ja';
+            } elseif ($key === 'unassigned') {
+                $labels[] = 'Nieprzypisane';
             } elseif (ctype_digit((string) $key)) {
                 $labels[] = $names[(int) $key] ?? '#'.$key;
             }
@@ -3763,7 +3833,7 @@ class TasksGrid extends Component
         $out = [];
         foreach ($keys as $key) {
             $key = (string) $key;
-            if (($key === 'me' || ctype_digit($key)) && ! in_array($key, $out, true)) {
+            if (($key === 'me' || $key === 'unassigned' || ctype_digit($key)) && ! in_array($key, $out, true)) {
                 $out[] = $key;
             }
         }
@@ -3778,9 +3848,14 @@ class TasksGrid extends Component
     protected function toggleUserFilterKey(array $keys, string $key): array
     {
         $keys = $this->normalizeUserFilterKeys($keys);
+        if ($key === 'unassigned') {
+            return in_array('unassigned', $keys, true) ? [] : ['unassigned'];
+        }
         if ($key !== 'me' && ! ctype_digit($key)) {
             return $keys;
         }
+
+        $keys = array_values(array_filter($keys, fn (string $existing) => $existing !== 'unassigned'));
 
         if (in_array($key, $keys, true)) {
             return array_values(array_diff($keys, [$key]));
@@ -4681,16 +4756,28 @@ class TasksGrid extends Component
         }
 
         $assigneeCol = $workItems ? 'work_items.assignee_id' : 'project_tasks.assigned_to';
-        $assignedIds = $this->resolveUserFilterIds($this->assignedFilterKeys());
-        if ($assignedIds !== []) {
+        $assignedKeys = $this->assignedFilterKeys();
+        if (in_array('unassigned', $assignedKeys, true)) {
             $neq = $this->filterOp('assignedFilter') === 'neq';
-            $clauses[] = function (Builder $q) use ($assigneeCol, $assignedIds, $neq) {
+            $clauses[] = function (Builder $q) use ($assigneeCol, $neq) {
                 if ($neq) {
-                    $q->where(fn (Builder $inner) => $inner->whereNull($assigneeCol)->orWhereNotIn($assigneeCol, $assignedIds));
+                    $q->whereNotNull($assigneeCol);
                 } else {
-                    $q->whereIn($assigneeCol, $assignedIds);
+                    $q->whereNull($assigneeCol);
                 }
             };
+        } else {
+            $assignedIds = $this->resolveUserFilterIds($assignedKeys);
+            if ($assignedIds !== []) {
+                $neq = $this->filterOp('assignedFilter') === 'neq';
+                $clauses[] = function (Builder $q) use ($assigneeCol, $assignedIds, $neq) {
+                    if ($neq) {
+                        $q->where(fn (Builder $inner) => $inner->whereNull($assigneeCol)->orWhereNotIn($assigneeCol, $assignedIds));
+                    } else {
+                        $q->whereIn($assigneeCol, $assignedIds);
+                    }
+                };
+            }
         }
 
         $createdCol = $workItems ? 'work_items.created_by_id' : 'project_tasks.created_by';

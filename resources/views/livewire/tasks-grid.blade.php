@@ -462,7 +462,8 @@
 
     .xuiv2-tasks td:has(.tg-col-chip--sprint),
     .xuiv2-tasks td:has(.tg-col-chip--category),
-    .xuiv2-tasks td:has(.tg-col-chip--priority) {
+    .xuiv2-tasks td:has(.tg-col-chip--priority),
+    .xuiv2-tasks td:has(.tg-col-chip--assignee) {
         overflow: hidden;
         min-width: 0;
         position: relative;
@@ -612,10 +613,22 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
         }
+        .xuiv2-tasks a.tg-col-chip--assignee:hover,
+        .xuiv2-tasks button.tg-col-chip--assignee:hover,
+        .xuiv2-tasks .tg-col-chip--assignee.tg-col-chip--split:hover {
+            background: rgba(59, 130, 246, 0.22);
+            border-color: rgba(59, 130, 246, 0.48);
+            color: #bfdbfe;
+            filter: brightness(1.12);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.32);
+        }
         .xuiv2-tasks a.tg-col-chip--p1:hover,
         .xuiv2-tasks button.tg-col-chip--p1:hover,
+        .xuiv2-tasks .tg-col-chip--p1.tg-col-chip--split:hover,
         .xuiv2-tasks a.tg-col-chip--p2:hover,
-        .xuiv2-tasks button.tg-col-chip--p2:hover {
+        .xuiv2-tasks button.tg-col-chip--p2:hover,
+        .xuiv2-tasks .tg-col-chip--p2.tg-col-chip--split:hover {
             background: rgba(148, 163, 184, 0.22);
             border-color: rgba(148, 163, 184, 0.5);
             filter: brightness(1.15);
@@ -623,7 +636,8 @@
             box-shadow: 0 4px 15px rgba(148, 163, 184, 0.28);
         }
         .xuiv2-tasks a.tg-col-chip--p3:hover,
-        .xuiv2-tasks button.tg-col-chip--p3:hover {
+        .xuiv2-tasks button.tg-col-chip--p3:hover,
+        .xuiv2-tasks .tg-col-chip--p3.tg-col-chip--split:hover {
             background: rgba(245, 158, 11, 0.26);
             border-color: rgba(245, 158, 11, 0.55);
             color: #fdba74;
@@ -633,8 +647,10 @@
         }
         .xuiv2-tasks a.tg-col-chip--p4:hover,
         .xuiv2-tasks button.tg-col-chip--p4:hover,
+        .xuiv2-tasks .tg-col-chip--p4.tg-col-chip--split:hover,
         .xuiv2-tasks a.tg-col-chip--p5:hover,
-        .xuiv2-tasks button.tg-col-chip--p5:hover {
+        .xuiv2-tasks button.tg-col-chip--p5:hover,
+        .xuiv2-tasks .tg-col-chip--p5.tg-col-chip--split:hover {
             background: rgba(239, 68, 68, 0.28);
             border-color: rgba(239, 68, 68, 0.55);
             color: #fca5a5;
@@ -642,18 +658,22 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
         }
-        .xuiv2-tasks button.tg-status-badge:hover {
+        .xuiv2-tasks button.tg-status-badge:hover,
+        .xuiv2-tasks .tg-status-badge.tg-col-chip--split:hover {
             filter: brightness(1.18);
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(245, 158, 11, 0.28);
         }
-        .xuiv2-tasks button.tg-status-badge.s-in_progress:hover {
+        .xuiv2-tasks button.tg-status-badge.s-in_progress:hover,
+        .xuiv2-tasks .tg-status-badge.s-in_progress.tg-col-chip--split:hover {
             box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
         }
-        .xuiv2-tasks button.tg-status-badge.s-completed:hover {
+        .xuiv2-tasks button.tg-status-badge.s-completed:hover,
+        .xuiv2-tasks .tg-status-badge.s-completed.tg-col-chip--split:hover {
             box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
         }
-        .xuiv2-tasks button.tg-status-badge.s-cancelled:hover {
+        .xuiv2-tasks button.tg-status-badge.s-cancelled:hover,
+        .xuiv2-tasks .tg-status-badge.s-cancelled.tg-col-chip--split:hover {
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);
         }
         .xuiv2-tasks a.tg-time-chip--cal.tg-time-chip--scheduled:hover,
@@ -702,6 +722,11 @@
         color: #60a5fa;
         border: 1px solid rgba(59, 130, 246, 0.4);
     }
+    .xuiv2-tasks .tg-col-chip--assignee {
+        background: rgba(59, 130, 246, 0.1);
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.32);
+    }
     .xuiv2-tasks .tg-col-chip--p1 {
         background: rgba(148, 163, 184, 0.1);
         color: #94a3b8;
@@ -731,6 +756,9 @@
         overflow: hidden;
         min-width: 0;
         max-width: var(--tg-w-priority, 10rem);
+    }
+    .xuiv2-tasks td:has(.tg-col-chip--assignee) {
+        max-width: var(--tg-w-assigned_to, 12rem);
     }
     .xuiv2-tasks .tg-facet:has(.tg-col-chip) {
         position: relative;

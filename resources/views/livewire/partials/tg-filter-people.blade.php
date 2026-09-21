@@ -22,6 +22,13 @@
         <span class="rp-filter-check {{ in_array('me', $selected, true) ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
         <span class="rp-filter-option__label">Ja ({{ auth()->user()->name }})</span>
     </button>
+    @if($field === 'assignedFilter')
+        <button type="button" wire:click="{{ $toggle }}('unassigned')"
+                class="rp-filter-option {{ in_array('unassigned', $selected, true) ? 'is-active' : '' }}">
+            <span class="rp-filter-check {{ in_array('unassigned', $selected, true) ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
+            <span class="rp-filter-option__label">Nieprzypisane</span>
+        </button>
+    @endif
     @foreach($allUsers as $u)
         @if($u->id !== $authId)
             <button type="button" wire:click="{{ $toggle }}('{{ $u->id }}')"

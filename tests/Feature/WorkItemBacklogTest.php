@@ -572,7 +572,7 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml("filterByCategory('Wyjazdy')")
+            ->assertSeeHtml('filterByCategory('.json_encode('Wyjazdy').')')
             ->assertSeeHtml("startEdit({$item->id}, 'category'")
             ->call('filterByCategory', 'Wyjazdy')
             ->assertSet('searchCategory', 'Wyjazdy')
@@ -597,12 +597,73 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
+            ->assertSeeHtml("filterByPriority('5')")
             ->assertSeeHtml("quickPriorityChange({$item->id}, '5')")
             ->assertSeeHtml("quickPriorityChange({$item->id}, '')")
             ->call('quickPriorityChange', $item->id, '3');
 
         $this->assertSame(3, $task->fresh()->priority);
         $this->assertSame(3, $item->fresh()->priority);
+    }
+
+    public function test_status_chip_filters_from_body_and_picks_from_chevron(): void
+    {
+        $task = ProjectTask::query()->create([
+            'name' => 'DR do Berlina',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $task->getMorphClass())
+            ->where('source_id', $task->id)
+            ->first();
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml("filterByStatus('pending')")
+            ->assertSeeHtml("quickStatusChange({$item->id}, 'pending')")
+            ->call('filterByStatus', 'pending')
+            ->assertSet('selectedStatuses', ['pending'])
+            ->call('quickStatusChange', $item->id, 'in_progress');
+
+        $this->assertSame(TaskStatus::IN_PROGRESS, $task->fresh()->status);
+    }
+
+    public function test_assignee_chip_filters_unassigned_and_picks_from_chevron(): void
+    {
+        $other = User::factory()->create(['name' => 'Ola Kowalska']);
+
+        $open = ProjectTask::query()->create([
+            'name' => 'Bez osoby',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => null,
+            'created_by' => $this->user->id,
+        ]);
+        ProjectTask::query()->create([
+            'name' => 'Moje zadanie',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $open->getMorphClass())
+            ->where('source_id', $open->id)
+            ->first();
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml("filterByAssignee('unassigned')")
+            ->assertSeeHtml("quickAssigneeChange({$item->id}, '')")
+            ->assertSeeHtml("quickAssigneeChange({$item->id}, '{$other->id}')")
+            ->call('filterByAssignee', 'unassigned')
+            ->assertSet('assignedFilters', ['unassigned'])
+            ->assertSee('Bez osoby')
+            ->assertDontSee('Moje zadanie')
+            ->call('quickAssigneeChange', $item->id, (string) $other->id);
+
+        $this->assertSame($other->id, $open->fresh()->assigned_to);
+        $this->assertSame($other->id, $item->fresh()->assignee_id);
     }
 
     public function test_subtask_row_uses_binary_status_without_in_progress(): void

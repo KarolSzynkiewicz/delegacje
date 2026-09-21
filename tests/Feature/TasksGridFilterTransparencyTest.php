@@ -68,8 +68,7 @@ class TasksGridFilterTransparencyTest extends TestCase
             ->assertSee('Status: Aktywne')
             ->assertSee('Aktywne zadanie')
             ->assertDontSee('Dawno zakończone zadanie')
-            ->assertSee('dt-card__row', false)
-            ->assertSee('dt-card__label', false);
+            ->assertSee('tg-status-badge', false);
 
         // "Wyczyść" ma realnie pokazać wszystko — nie wrócić do tego samego
         // domyślnego zawężenia, które user właśnie próbował zdjąć.
@@ -149,6 +148,54 @@ class TasksGridFilterTransparencyTest extends TestCase
             ->assertSet('assignedFilter', '')
             ->assertSee('Moje zadanie')
             ->assertSee('Zadanie kolegi');
+    }
+
+    public function test_unassigned_chip_filter_hides_assigned_tasks(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Bez osoby',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => null,
+            'created_by' => $this->user->id,
+        ]);
+        ProjectTask::query()->create([
+            'name' => 'Moje zadanie',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('filterByAssignee', 'unassigned')
+            ->assertSee('Przypisany: Nieprzypisane')
+            ->assertSee('Bez osoby')
+            ->assertDontSee('Moje zadanie');
+    }
+
+    public function test_status_chip_filter_narrows_to_one_status(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Czeka',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        ProjectTask::query()->create([
+            'name' => 'Idzie',
+            'status' => TaskStatus::IN_PROGRESS,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSee('Czeka')
+            ->assertSee('Idzie')
+            ->call('filterByStatus', 'pending')
+            ->assertSee('Status: Oczekujące')
+            ->assertSee('Czeka')
+            ->assertDontSee('Idzie');
     }
 
     public function test_created_by_filter_narrows_to_items_i_initiated(): void
@@ -302,7 +349,6 @@ class TasksGridFilterTransparencyTest extends TestCase
         $component = Livewire::actingAs($this->user)->test(TasksGrid::class);
 
         $component->assertSee('tg-facet', false)
-            ->assertSee('tg-facet tg-dt-hit', false)
             ->assertSee('tg-active-filters__chips', false)
             ->call('filterByCategory', 'Transport')
             ->assertSee('Kategoria: Transport')

@@ -51,9 +51,6 @@
 
     $sourceCard = $task->sourceCard();
     $ediName = $this->ediCell($task, 'name');
-    $canPickStatus = in_array($statusWidget, [\App\WorkItems\StatusWidget::TaskSelect, \App\WorkItems\StatusWidget::BinarySelect], true)
-        && $this->rowWritable($task, 'status');
-    $binaryStatus = $statusWidget === \App\WorkItems\StatusWidget::BinarySelect;
 @endphp
 
 <x-ui.card
@@ -144,64 +141,7 @@
         <div class="dt-card__row">
             <span class="dt-card__label">Status</span>
             <span class="dt-card__value">
-                @if($canPickStatus)
-                    <div x-data="{ open: false, top: 0, left: 0 }" class="tg-dt-hit">
-                        <button type="button"
-                                @click.stop="if(open){open=false;return} const r=$el.getBoundingClientRect(); top=r.bottom+4; left=Math.min(r.left, window.innerWidth-165); open=true"
-                                class="tg-status-badge tg-col-chip--split {{ $sc['cls'] }}"
-                                style="cursor:pointer">
-                            <span class="tg-col-chip__main">{{ $sc['icon'] }} {{ $statusLabel }}</span>
-                            <span class="tg-col-chip__side" aria-hidden="true">
-                                <i class="bi bi-chevron-down"></i>
-                            </span>
-                        </button>
-                        <template x-teleport="body">
-                            <ul x-show="open" x-cloak
-                                @click.outside="open = false"
-                                :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;min-width:155px;font-size:0.84rem`"
-                                class="dropdown-menu show py-1 shadow-lg tg-teleport-menu">
-                                <li>
-                                    <button type="button"
-                                            class="dropdown-item py-2 {{ $task->status->value === 'pending' ? 'active' : '' }}"
-                                            wire:click="quickStatusChange({{ $task->id }}, 'pending')"
-                                            @click="open=false">
-                                        ⏳ Oczekujące
-                                    </button>
-                                </li>
-                                @unless($binaryStatus)
-                                <li>
-                                    <button type="button"
-                                            class="dropdown-item py-2 {{ $task->status->value === 'in_progress' ? 'active' : '' }}"
-                                            wire:click="quickStatusChange({{ $task->id }}, 'in_progress')"
-                                            @click="open=false">
-                                        ▶ W trakcie
-                                    </button>
-                                </li>
-                                @endunless
-                                <li>
-                                    <button type="button"
-                                            class="dropdown-item py-2 {{ $task->status->value === 'completed' ? 'active' : '' }}"
-                                            wire:click="quickStatusChange({{ $task->id }}, 'completed')"
-                                            @click="open=false">
-                                        ✓ Ukończone
-                                    </button>
-                                </li>
-                                @unless($binaryStatus)
-                                <li>
-                                    <button type="button"
-                                            class="dropdown-item py-2 {{ $task->status->value === 'cancelled' ? 'active' : '' }}"
-                                            wire:click="quickStatusChange({{ $task->id }}, 'cancelled')"
-                                            @click="open=false">
-                                        ✗ Anulowane
-                                    </button>
-                                </li>
-                                @endunless
-                            </ul>
-                        </template>
-                    </div>
-                @else
-                    <span class="tg-status-badge {{ $sc['cls'] }}">{{ $sc['icon'] }} {{ $statusLabel }}</span>
-                @endif
+                @include('livewire.partials.tg-status-chip', ['chipClass' => 'tg-dt-hit'])
             </span>
         </div>
     @endif
@@ -210,31 +150,7 @@
         <div class="dt-card__row">
             <span class="dt-card__label">Sprint</span>
             <span class="dt-card__value">
-                @php $canPickSprint = $this->rowWritable($task, 'sprint') && ! $this->isLockedToSprint(); @endphp
-                @if($canPickSprint)
-                    <x-tasks.quick-menu
-                        class="tg-col-chip tg-col-chip--sprint tg-dt-hit"
-                        :min-width="220"
-                        :href="$task->sprint ? route('sprints.show', $task->sprint) : null"
-                        open-label="Otwórz sprint"
-                        change-label="Zmień sprint"
-                    >
-                        <x-slot:trigger>
-                            <i class="bi bi-flag" aria-hidden="true"></i>
-                            <span class="tg-col-chip__label">{{ $task->sprint?->name ?: '—' }}</span>
-                        </x-slot:trigger>
-                        <x-slot:menu>
-                            @include('livewire.partials.tasks-grid-sprint-menu')
-                        </x-slot:menu>
-                    </x-tasks.quick-menu>
-                @elseif($task->sprint)
-                    <a href="{{ route('sprints.show', $task->sprint) }}" class="tg-col-chip tg-col-chip--sprint" data-tip="Otwórz sprint">
-                        <i class="bi bi-flag" aria-hidden="true"></i>
-                        <span class="tg-col-chip__label">{{ $task->sprint->name }}</span>
-                    </a>
-                @else
-                    <span class="text-muted">—</span>
-                @endif
+                @include('livewire.partials.tg-sprint-chip', ['chipClass' => 'tg-dt-hit'])
             </span>
         </div>
     @endif
@@ -243,44 +159,8 @@
         @php $ediCategory = $this->ediCell($task, 'category'); @endphp
         <div class="dt-card__row">
             <span class="dt-card__label">Kategoria</span>
-            <span class="dt-card__value">
-                @if($ediCategory)
-                    <span class="tg-edi tg-edi--{{ $ediCategory['kind'] }}">
-                        @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediCategory, 'rowId' => $task->id, 'field' => 'category'])
-                    </span>
-                @elseif($isEditing && $editingField === 'category')
-                    <input type="text" wire:model="editingValue" class="form-control form-control-sm"
-                           wire:keydown.enter="saveEdit" wire:keydown.escape="cancelEdit" wire:blur="saveEdit"
-                           x-data x-init="$el.focus(); $el.select()">
-                @elseif($this->rowWritable($task, 'category') && $task->category)
-                    <x-tasks.col-chip
-                        variant="category"
-                        side="edit"
-                        class="tg-dt-hit"
-                        :side-task-id="$task->id"
-                        :filter-category="$task->category"
-                        side-tip="Edytuj kategorię"
-                        side-label="Edytuj kategorię"
-                    >{{ $task->category }}</x-tasks.col-chip>
-                @elseif($this->rowWritable($task, 'category'))
-                    <x-tasks.col-chip
-                        variant="category"
-                        side="edit"
-                        class="tg-dt-hit"
-                        :side-task-id="$task->id"
-                        :edit-category="true"
-                        side-tip="Wpisz kategorię"
-                        side-label="Wpisz kategorię"
-                    >—</x-tasks.col-chip>
-                @elseif($task->category)
-                    <x-tasks.col-chip
-                        variant="category"
-                        class="tg-dt-hit"
-                        :filter-category="$task->category"
-                    >{{ $task->category }}</x-tasks.col-chip>
-                @else
-                    <span class="text-muted">—</span>
-                @endif
+            <span class="dt-card__value {{ $ediCategory ? 'tg-edi tg-edi--'.$ediCategory['kind'] : '' }}">
+                @include('livewire.partials.tg-category-chip', ['chipClass' => 'tg-dt-hit'])
             </span>
         </div>
     @endif
@@ -289,28 +169,7 @@
         <div class="dt-card__row">
             <span class="dt-card__label">Przypisany</span>
             <span class="dt-card__value">
-                @if($isEditing && $editingField === 'assigned_to')
-                    <select wire:model="editingValue" class="form-select form-select-sm"
-                            wire:change="saveEdit" wire:keydown.escape="cancelEdit"
-                            x-data x-init="$el.focus()">
-                        <option value="">Nieprzypisane</option>
-                        @foreach($allUsers as $u)
-                            <option value="{{ $u->id }}">{{ $u->name }}</option>
-                        @endforeach
-                    </select>
-                @elseif($this->rowWritable($task, 'assigned_to'))
-                    <span wire:click.stop="startEdit({{ $task->id }}, 'assigned_to')" class="tg-hover-edit">
-                        @if($task->assignedTo)
-                            <x-ui.person :user="$task->assignedTo" avatar-size="22px" :show-email="false" name-class="small" />
-                        @else
-                            <span class="text-muted">—</span>
-                        @endif
-                    </span>
-                @elseif($task->assignedTo)
-                    <x-ui.person :user="$task->assignedTo" avatar-size="22px" :show-email="false" name-class="small" />
-                @else
-                    <span class="text-muted">—</span>
-                @endif
+                @include('livewire.partials.tg-assignee-chip', ['chipClass' => 'tg-dt-hit'])
             </span>
         </div>
     @endif
@@ -332,29 +191,8 @@
         @php $ediPriority = $this->ediCell($task, 'priority'); @endphp
         <div class="dt-card__row">
             <span class="dt-card__label">Priorytet</span>
-            <span class="dt-card__value">
-                @if($ediPriority)
-                    <span class="tg-edi tg-edi--{{ $ediPriority['kind'] }}">
-                        @include('livewire.partials.tasks-grid-edi-value', ['diff' => $ediPriority, 'rowId' => $task->id, 'field' => 'priority'])
-                    </span>
-                @elseif($this->rowWritable($task, 'priority'))
-                    <x-tasks.quick-menu class="tg-col-chip tg-col-chip--priority {{ $pc ? 'tg-col-chip--'.$pc['tone'] : 'tg-col-chip--p1' }} tg-dt-hit" :min-width="160">
-                        <x-slot:trigger>
-                            <i class="bi bi-fire" aria-hidden="true"></i>
-                            <span class="tg-col-chip__label">{{ $pc['label'] ?? '—' }}</span>
-                        </x-slot:trigger>
-                        <x-slot:menu>
-                            @include('livewire.partials.tasks-grid-priority-menu')
-                        </x-slot:menu>
-                    </x-tasks.quick-menu>
-                @elseif($pc)
-                    <span class="tg-col-chip tg-col-chip--priority tg-col-chip--{{ $pc['tone'] }}">
-                        <i class="bi bi-fire" aria-hidden="true"></i>
-                        <span class="tg-col-chip__label">{{ $pc['label'] }}</span>
-                    </span>
-                @else
-                    <span class="tg-mono" style="color:rgba(255,255,255,0.35)">—</span>
-                @endif
+            <span class="dt-card__value {{ $ediPriority ? 'tg-edi tg-edi--'.$ediPriority['kind'] : '' }}">
+                @include('livewire.partials.tg-priority-chip', ['chipClass' => 'tg-dt-hit'])
             </span>
         </div>
     @endif

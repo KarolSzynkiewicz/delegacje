@@ -2,6 +2,7 @@
     'disabled' => false,
     'minWidth' => 200,
     'href' => null,
+    'mainClick' => null,
     'openLabel' => 'Otwórz',
     'changeLabel' => 'Zmień',
 ])
@@ -9,6 +10,7 @@
 @php
     $minWidth = (int) $minWidth;
     $href = is_string($href) && $href !== '' ? $href : null;
+    $mainClick = is_string($mainClick) && $mainClick !== '' ? $mainClick : null;
     $openJs = 'if (open) { open = false; return } const r = $el.getBoundingClientRect(); const w = Math.min('.$minWidth.', window.innerWidth - 16); top = r.bottom + 4; left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)); open = true';
 @endphp
 
@@ -18,21 +20,18 @@
     </span>
 @else
     <div class="tg-quick-menu" x-data="{ open: false, top: 0, left: 0 }">
-        @if($href)
-            <div {{ $attributes->class('tg-col-chip--split') }}>
-                <a href="{{ $href }}" class="tg-col-chip__main" data-tip="{{ $openLabel }}" aria-label="{{ $openLabel }}">
-                    {{ $trigger }}
-                </a>
-                <button
-                    type="button"
-                    class="tg-col-chip__side"
-                    @click.stop="{{ $openJs }}"
-                    data-tip="{{ $changeLabel }}"
-                    aria-label="{{ $changeLabel }}"
-                >
-                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
-                </button>
-            </div>
+        @if($href || $mainClick)
+            <x-tasks.chip
+                {{ $attributes->class('tg-col-chip--split') }}
+                :href="$href"
+                :main-click="$mainClick"
+                :main-tip="$openLabel"
+                side="down"
+                :side-tip="$changeLabel"
+                :open-menu="$openJs"
+            >
+                {{ $trigger }}
+            </x-tasks.chip>
         @else
             <button
                 type="button"
