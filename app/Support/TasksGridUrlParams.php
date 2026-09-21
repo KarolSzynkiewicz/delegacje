@@ -12,6 +12,7 @@ class TasksGridUrlParams
         'searchAssignedTo',
         'priority',
         'due',
+        'sprint',
         'status',
         'assignedFilter',
         'createdByFilter',

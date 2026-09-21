@@ -59,11 +59,14 @@ class TasksGrid extends Component
 
     public string $searchAssignedTo = '';
 
-    /** Priorytet 1–5 z kliknięcia w komórkę. Pusty = bez tego wymiaru. */
+    /** Priorytet 1–5 z kliknięcia w komórkę, albo `none` = bez priorytetu. Pusty = bez tego wymiaru. */
     public string $filterPriority = '';
 
     /** Termin Y-m-d z kliknięcia w komórkę. Pusty = bez tego wymiaru. */
     public string $filterDueDate = '';
+
+    /** `none` = poza sprintem. Pusty = bez tego wymiaru. */
+    public string $filterSprint = '';
 
     public string $status = ''; // '' = active (pending+in_progress), 'closed', 'all' — skrót z selectedStatuses
 
@@ -300,6 +303,7 @@ class TasksGrid extends Component
             'searchAssignedTo' => ['except' => '', 'history' => true],
             'filterPriority' => ['except' => '', 'as' => 'priority', 'history' => true],
             'filterDueDate' => ['except' => '', 'as' => 'due', 'history' => true],
+            'filterSprint' => ['except' => '', 'as' => 'sprint', 'history' => true],
             'status' => ['except' => '', 'history' => true],
             'selectedStatuses' => ['except' => $this->defaultStatuses(), 'as' => 'statuses', 'history' => true],
             'assignedFilter' => ['except' => '', 'history' => true],
@@ -323,6 +327,7 @@ class TasksGrid extends Component
         'searchAssignedTo',
         'filterPriority',
         'filterDueDate',
+        'filterSprint',
         'status',
         'selectedStatuses',
         'assignedFilter',
@@ -970,7 +975,7 @@ class TasksGrid extends Component
 
     public function updating(string $name, mixed $value): void
     {
-        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'filterPriority', 'filterDueDate', 'status', 'selectedStatuses', 'assignedFilter', 'assignedFilters', 'createdByFilter', 'createdByFilters', 'selectedTypes', 'filterJoin', 'filterOps'], true)) {
+        if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'filterPriority', 'filterDueDate', 'filterSprint', 'status', 'selectedStatuses', 'assignedFilter', 'assignedFilters', 'createdByFilter', 'createdByFilters', 'selectedTypes', 'filterJoin', 'filterOps'], true)) {
             $this->resetPage();
         }
     }
@@ -998,6 +1003,7 @@ class TasksGrid extends Component
         $this->searchAssignedTo = '';
         $this->filterPriority = '';
         $this->filterDueDate = '';
+        $this->filterSprint = '';
         $this->status = 'all';
         $this->selectedStatuses = $this->allStatusValues();
         $this->assignedFilter = '';
@@ -1053,7 +1059,10 @@ class TasksGrid extends Component
 
         if ($this->searchCategory !== '') {
             $neg = $this->filterOp('searchCategory') === 'neq';
-            $chips[] = ['key' => 'searchCategory', 'label' => ($neg ? 'Kategoria ≠ ' : 'Kategoria: ').$this->searchCategory];
+            $chips[] = [
+                'key' => 'searchCategory',
+                'label' => ($neg ? 'Kategoria ≠ ' : 'Kategoria: ').$this->categoryChipLabel($this->searchCategory),
+            ];
         }
 
         if ($this->searchAssignedTo !== '') {
@@ -1067,6 +1076,10 @@ class TasksGrid extends Component
 
         if ($this->filterDueDate !== '') {
             $chips[] = ['key' => 'filterDueDate', 'label' => 'Do kiedy: '.$this->dueDateChipLabel($this->filterDueDate)];
+        }
+
+        if ($this->filterSprint !== '') {
+            $chips[] = ['key' => 'filterSprint', 'label' => 'Sprint: '.$this->sprintChipLabel($this->filterSprint)];
         }
 
         // "all" to jedyna wartość statusu, która niczego nie odfiltrowuje —
@@ -1198,7 +1211,7 @@ class TasksGrid extends Component
             return;
         }
 
-        if (in_array($key, ['searchTask', 'searchCategory', 'searchAssignedTo', 'filterPriority', 'filterDueDate'], true)) {
+        if (in_array($key, ['searchTask', 'searchCategory', 'searchAssignedTo', 'filterPriority', 'filterDueDate', 'filterSprint'], true)) {
             $this->{$key} = '';
             if (isset($this->filterOps[$key])) {
                 $this->filterOps[$key] = 'eq';
@@ -1215,10 +1228,11 @@ class TasksGrid extends Component
             return;
         }
 
-        $this->searchCategory = mb_substr($category, 0, 255);
+        $this->searchCategory = $category === '__none__' ? '__none__' : mb_substr($category, 0, 255);
         $this->filterOps['searchCategory'] = 'eq';
         $this->resetPage();
         $this->detachActiveView();
+        $this->flashFilterChip('searchCategory');
     }
 
     public function filterByStatus(string $status): void
@@ -1238,6 +1252,7 @@ class TasksGrid extends Component
         $this->filterOps['status'] = 'eq';
         $this->resetPage();
         $this->detachActiveView();
+        $this->flashFilterChip('status');
     }
 
     public function filterByAssignee(string $key): void
@@ -1258,17 +1273,35 @@ class TasksGrid extends Component
         $this->filterOps['assignedFilter'] = 'eq';
         $this->resetPage();
         $this->detachActiveView();
+        $this->flashFilterChip('assignedFilter');
     }
 
     public function filterByPriority(string $priority): void
     {
-        if (! in_array($priority, ['1', '2', '3', '4', '5'], true)) {
+        if (! in_array($priority, ['1', '2', '3', '4', '5', 'none'], true)) {
             return;
         }
 
         $this->filterPriority = $priority;
         $this->resetPage();
         $this->detachActiveView();
+        $this->flashFilterChip('filterPriority');
+    }
+
+    public function filterBySprint(string $sprint): void
+    {
+        if ($this->isLockedToSprint() || $this->isPlanQueue()) {
+            return;
+        }
+
+        if ($sprint !== 'none' && ! ctype_digit($sprint)) {
+            return;
+        }
+
+        $this->filterSprint = $sprint;
+        $this->resetPage();
+        $this->detachActiveView();
+        $this->flashFilterChip('filterSprint');
     }
 
     public function filterByDueDate(string $date): void
@@ -1280,6 +1313,22 @@ class TasksGrid extends Component
         $this->filterDueDate = $date;
         $this->resetPage();
         $this->detachActiveView();
+        $this->flashFilterChip('filterDueDate');
+    }
+
+    protected function flashFilterChip(string $key): void
+    {
+        $this->dispatch('tg-filter-flash', key: $key);
+    }
+
+    protected function categoryChipLabel(string $category): string
+    {
+        return $category === '__none__' ? 'Brak' : $category;
+    }
+
+    protected function sprintChipLabel(string $sprint): string
+    {
+        return $sprint === 'none' ? 'Poza sprintem' : $sprint;
     }
 
     protected function priorityChipLabel(string $priority): string
@@ -1290,6 +1339,7 @@ class TasksGrid extends Component
             '3' => 'Średni',
             '4' => 'Wysoki',
             '5' => 'Krytyczny',
+            'none' => 'Brak',
             default => $priority,
         };
     }
@@ -3147,7 +3197,10 @@ class TasksGrid extends Component
             }
         }
 
-        $category = trim($this->searchCategory) !== '' ? trim($this->searchCategory) : null;
+        $category = trim($this->searchCategory);
+        if ($category === '' || $category === '__none__') {
+            $category = null;
+        }
 
         return [
             'category' => $category,
@@ -3383,6 +3436,7 @@ class TasksGrid extends Component
             'searchAssignedTo' => $this->searchAssignedTo,
             'priority' => $this->filterPriority,
             'due' => $this->filterDueDate,
+            'sprint' => $this->filterSprint,
             'status' => $this->status,
             'assignedFilter' => count($this->assignedFilterKeys()) === 1 ? $this->assignedFilterKeys()[0] : '',
             'createdByFilter' => count($this->createdByFilterKeys()) === 1 ? $this->createdByFilterKeys()[0] : '',
@@ -3625,6 +3679,7 @@ class TasksGrid extends Component
             'searchAssignedTo' => $this->searchAssignedTo,
             'filterPriority' => $this->filterPriority,
             'filterDueDate' => $this->filterDueDate,
+            'filterSprint' => $this->filterSprint,
             'status' => $this->status,
             'selectedStatuses' => $this->selectedStatuses,
             'assignedFilter' => $this->assignedFilter,
@@ -3654,6 +3709,7 @@ class TasksGrid extends Component
         $this->searchAssignedTo = $view->search_assigned_to ?? '';
         $this->filterPriority = '';
         $this->filterDueDate = '';
+        $this->filterSprint = '';
         $this->status = $view->status ?? '';
         $this->selectedTypes = $view->type_filter ?: $this->defaultSelectedTypes();
         $this->filterJoin = ($view->filter_join ?? 'and') === 'or' ? 'or' : 'and';
@@ -4828,15 +4884,25 @@ class TasksGrid extends Component
 
         if ($this->searchCategory !== '') {
             $col = $workItems ? 'work_items.category' : 'project_tasks.category';
-            $term = '%'.$this->searchCategory.'%';
             $neq = $this->filterOp('searchCategory') === 'neq';
-            $clauses[] = function (Builder $q) use ($col, $term, $neq) {
-                if ($neq) {
-                    $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, 'not like', $term));
-                } else {
-                    $q->where($col, 'like', $term);
-                }
-            };
+            if ($this->searchCategory === '__none__') {
+                $clauses[] = function (Builder $q) use ($col, $neq) {
+                    if ($neq) {
+                        $q->whereNotNull($col)->where($col, '!=', '');
+                    } else {
+                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, ''));
+                    }
+                };
+            } else {
+                $term = '%'.$this->searchCategory.'%';
+                $clauses[] = function (Builder $q) use ($col, $term, $neq) {
+                    if ($neq) {
+                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, 'not like', $term));
+                    } else {
+                        $q->where($col, 'like', $term);
+                    }
+                };
+            }
         }
 
         if ($this->searchAssignedTo !== '') {
@@ -4855,11 +4921,31 @@ class TasksGrid extends Component
         }
 
         if ($this->filterPriority !== '') {
-            $priority = (int) $this->filterPriority;
             $col = $workItems ? 'work_items.priority' : 'project_tasks.priority';
-            $clauses[] = function (Builder $q) use ($col, $priority) {
-                $q->where($col, $priority);
-            };
+            if ($this->filterPriority === 'none') {
+                $clauses[] = function (Builder $q) use ($col) {
+                    $q->whereNull($col);
+                };
+            } else {
+                $priority = (int) $this->filterPriority;
+                $clauses[] = function (Builder $q) use ($col, $priority) {
+                    $q->where($col, $priority);
+                };
+            }
+        }
+
+        if ($this->filterSprint !== '') {
+            $col = $workItems ? 'work_items.sprint_id' : 'project_tasks.sprint_id';
+            if ($this->filterSprint === 'none') {
+                $clauses[] = function (Builder $q) use ($col) {
+                    $q->whereNull($col);
+                };
+            } elseif (ctype_digit($this->filterSprint)) {
+                $sprintId = (int) $this->filterSprint;
+                $clauses[] = function (Builder $q) use ($col, $sprintId) {
+                    $q->where($col, $sprintId);
+                };
+            }
         }
 
         if ($this->filterDueDate !== '') {

@@ -37,10 +37,23 @@
              this.filterWidth = pw;
              this.filterMode = detail.key;
              this.filterOpen = true;
+         },
+         flashFilterChip(key) {
+             this.$nextTick(() => {
+                 const root = this.$root;
+                 if (!root || !key) return;
+                 const el = root.querySelector('[data-tg-filter-key=' + key + ']');
+                 if (!el) return;
+                 el.classList.remove('is-fresh');
+                 void el.offsetWidth;
+                 el.classList.add('is-fresh');
+                 setTimeout(() => el.classList.remove('is-fresh'), 1100);
+             });
          }
      }"
      @tg-open-col-filter.window="openColumnFilter($event.detail)"
      @tg-close-filters.window="closeFilters()"
+     @tg-filter-flash.window="flashFilterChip($event.detail.key)"
      @keydown.escape.window="closeFilters()">
 <style>
     /* ══════════════════════════════════════════════════════════
@@ -114,6 +127,29 @@
     .xuiv2-tasks .rp-active-filters__chip { padding: .3rem .65rem; font-size: .78rem; }
     .xuiv2-tasks .rp-active-filters__clear { padding: .3rem .5rem; font-size: .78rem; }
     .tg-active-filters__chips { display: contents; }
+    @keyframes tg-filter-fresh {
+        0% {
+            background: rgba(59, 130, 246, 0.3);
+            border-color: rgba(168, 85, 247, 0.7);
+            box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.5);
+            color: #e9d5ff;
+        }
+        100% {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 8px rgba(168, 85, 247, 0);
+            color: #cbd5e1;
+        }
+    }
+    .xuiv2-tasks .rp-active-filters__chip.is-fresh {
+        animation: tg-filter-fresh .95s ease-out;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .xuiv2-tasks .rp-active-filters__chip.is-fresh {
+            animation: none;
+            border-color: rgba(168, 85, 247, 0.55);
+        }
+    }
 
     .tg-facet {
         display: inline-flex;
@@ -1670,7 +1706,9 @@
         <span class="rp-active-filters__label">Filtry:</span>
         <div class="tg-active-filters__chips">
             @foreach($filterChips as $chip)
-                <span class="rp-active-filters__chip{{ ! empty($chip['locked']) ? ' is-locked' : '' }}">
+                <span class="rp-active-filters__chip{{ ! empty($chip['locked']) ? ' is-locked' : '' }}"
+                      data-tg-filter-key="{{ $chip['key'] }}"
+                      wire:key="tg-filter-chip-{{ $chip['key'] }}">
                     <span class="rp-active-filters__chip-text">{{ $chip['label'] }}</span>
                     @if(empty($chip['locked']))
                     <button type="button"

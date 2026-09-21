@@ -520,6 +520,7 @@ class WorkItemBacklogTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
             ->assertSeeHtml("quickSprintChange({$item->id}, '')")
+            ->assertSeeHtml("filterBySprint('none')")
             ->assertSee('Poza sprintem')
             ->call('quickSprintChange', $item->id, '')
             ->assertSet('editingField', '');
@@ -572,13 +573,60 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml('filterByCategory('.json_encode('Wyjazdy').')')
+            ->assertSeeHtml("filterByCategory('Wyjazdy')")
             ->assertSeeHtml("startEdit({$item->id}, 'category'")
             ->call('filterByCategory', 'Wyjazdy')
             ->assertSet('searchCategory', 'Wyjazdy')
             ->call('startEdit', $item->id, 'category')
             ->assertSet('editingField', 'category')
             ->assertSet('editingValue', 'Wyjazdy');
+    }
+
+    public function test_empty_category_sprint_and_priority_chips_filter_none(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Z kategorią',
+            'category' => 'Wyjazdy',
+            'priority' => 3,
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $open = ProjectTask::query()->create([
+            'name' => 'Bez nic',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $open->getMorphClass())
+            ->where('source_id', $open->id)
+            ->first();
+
+        $component = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml("filterByCategory('__none__')")
+            ->assertSeeHtml("filterBySprint('none')")
+            ->assertSeeHtml("filterByPriority('none')")
+            ->assertSeeHtml("startEdit({$item->id}, 'category'")
+            ->call('filterByCategory', '__none__')
+            ->assertSet('searchCategory', '__none__')
+            ->assertSee('Kategoria: Brak')
+            ->assertSee('Bez nic')
+            ->assertDontSee('Z kategorią')
+            ->assertDispatched('tg-filter-flash');
+
+        $component->call('clearFilters')
+            ->call('filterByPriority', 'none')
+            ->assertSet('filterPriority', 'none')
+            ->assertSee('Priorytet: Brak')
+            ->assertSee('Bez nic')
+            ->assertDontSee('Z kategorią');
+
+        $component->call('clearFilters')
+            ->call('filterBySprint', 'none')
+            ->assertSet('filterSprint', 'none')
+            ->assertSee('Sprint: Poza sprintem');
     }
 
     public function test_priority_chip_opens_status_like_picker(): void

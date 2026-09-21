@@ -9,4 +9,9 @@
             <span class="rp-filter-option__label">{{ $value }} – {{ $label }}</span>
         </button>
     @endforeach
+    <button type="button" wire:click="filterByPriority('none')"
+            class="rp-filter-option {{ $filterPriority === 'none' ? 'is-active' : '' }}">
+        <span class="rp-filter-check {{ $filterPriority === 'none' ? 'is-checked' : '' }}"><i class="bi bi-check"></i></span>
+        <span class="rp-filter-option__label">Brak</span>
+    </button>
 </div>

@@ -1,9 +1,8 @@
 @php
     $chipClass = $chipClass ?? '';
     $ediCategory = $this->ediCell($task, 'category');
-    $categoryClick = $task->category
-        ? 'filterByCategory('.\Illuminate\Support\Js::from($task->category).')'
-        : 'startEdit('.$task->id.', \'category\')';
+    $categoryValue = $task->category ?: '__none__';
+    $categoryClick = 'filterByCategory(\''.str_replace(['\\', "'"], ['\\\\', "\\'"], $categoryValue).'\')';
     $categoryEdit = 'startEdit('.$task->id.', \'category\')';
 @endphp
 @if($ediCategory)
@@ -17,18 +16,16 @@
         variant="category"
         :class="$chipClass"
         :main-click="$categoryClick"
-        :main-tip="$task->category ? 'Pokaż tę kategorię' : 'Wpisz kategorię'"
+        :main-tip="$task->category ? 'Pokaż tę kategorię' : 'Pokaż bez kategorii'"
         side="edit"
         :side-click="$categoryEdit"
         :side-tip="$task->category ? 'Edytuj kategorię' : 'Wpisz kategorię'"
-    >{{ $task->category ?: '—' }}</x-tasks.col-chip>
-@elseif($task->category)
+    >{{ $task->category ?: 'Brak' }}</x-tasks.col-chip>
+@else
     <x-tasks.col-chip
         variant="category"
         :class="$chipClass"
         :main-click="$categoryClick"
-        main-tip="Pokaż tę kategorię"
-    >{{ $task->category }}</x-tasks.col-chip>
-@else
-    <span class="text-muted" style="font-size:0.82rem">—</span>
+        :main-tip="$task->category ? 'Pokaż tę kategorię' : 'Pokaż bez kategorii'"
+    >{{ $task->category ?: 'Brak' }}</x-tasks.col-chip>
 @endif
