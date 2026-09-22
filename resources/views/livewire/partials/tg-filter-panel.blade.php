@@ -34,7 +34,6 @@
 
     {{-- Każdy widget raz. Filtry (mode=all) i Filtruj na kolumnie (mode=klucz) pokazują ten sam węzeł. --}}
 
-    @unless($this->isPlanQueue())
     <div class="rp-filter-section" x-show="filterMode === 'all' || filterMode === 'status'" data-tg-col-filter="status">
         <button type="button" x-show="filterMode === 'all'" @click="openStatus = !openStatus" class="rp-filter-section__head">
             <span><i class="bi bi-flag me-1 opacity-75"></i>Status zadań</span>
@@ -44,7 +43,6 @@
             @include('livewire.partials.tg-filter-status')
         </div>
     </div>
-    @endunless
 
     <div class="rp-filter-section" x-show="filterMode === 'all' || filterMode === 'assigned_to' || filterMode === 'created_by'">
         <button type="button" x-show="filterMode === 'all'" @click="openVisibility = !openVisibility" class="rp-filter-section__head">

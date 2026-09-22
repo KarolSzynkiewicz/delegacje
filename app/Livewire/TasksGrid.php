@@ -354,6 +354,7 @@ class TasksGrid extends Component
             $this->visibleColumns = ['name'];
             $this->groupBy = '';
             $this->enforcePlanLocks();
+            $this->resetPlanStatusSlice();
             $this->restoreGridChromeFromCookies();
             $this->hideGroupedColumn();
             $this->persistGridChrome();
@@ -674,6 +675,10 @@ class TasksGrid extends Component
         $this->assignedFilter = $userId;
         $this->assignedFilters = [$userId];
         $this->filterOps['assignedFilter'] = 'eq';
+    }
+
+    protected function resetPlanStatusSlice(): void
+    {
         $this->status = '';
         $this->selectedStatuses = $this->defaultStatuses();
         $this->filterOps['status'] = 'eq';
@@ -1035,6 +1040,7 @@ class TasksGrid extends Component
             $this->sortField = 'due_date';
             $this->sortDirection = 'asc';
             $this->enforcePlanLocks();
+            $this->resetPlanStatusSlice();
         }
         $this->batchingViewPersist = false;
         $this->resetPage();
@@ -1068,9 +1074,13 @@ class TasksGrid extends Component
 
         if ($this->searchCategory !== '') {
             $neg = $this->filterOp('searchCategory') === 'neq';
+            $terms = $neg ? $this->splitPinnedValues($this->searchCategory) : [$this->searchCategory];
+            $labels = array_map(fn (string $term) => $this->categoryChipLabel($term), $terms);
             $chips[] = [
                 'key' => 'searchCategory',
-                'label' => ($neg ? 'Kategoria ≠ ' : 'Kategoria: ').$this->categoryChipLabel($this->searchCategory),
+                'label' => $neg
+                    ? 'Kategoria '.$this->neqChipLabel($labels)
+                    : 'Kategoria: '.$labels[0],
             ];
         }
 
@@ -1081,7 +1091,14 @@ class TasksGrid extends Component
 
         if ($this->filterPriority !== '') {
             $neg = $this->filterOp('filterPriority') === 'neq';
-            $chips[] = ['key' => 'filterPriority', 'label' => ($neg ? 'Priorytet ≠ ' : 'Priorytet: ').$this->priorityChipLabel($this->filterPriority)];
+            $terms = $neg ? $this->splitPinnedValues($this->filterPriority) : [$this->filterPriority];
+            $labels = array_map(fn (string $term) => $this->priorityChipLabel($term), $terms);
+            $chips[] = [
+                'key' => 'filterPriority',
+                'label' => $neg
+                    ? 'Priorytet '.$this->neqChipLabel($labels)
+                    : 'Priorytet: '.$labels[0],
+            ];
         }
 
         if ($this->filterDueDate !== '') {
@@ -1090,7 +1107,14 @@ class TasksGrid extends Component
 
         if ($this->filterSprint !== '') {
             $neg = $this->filterOp('filterSprint') === 'neq';
-            $chips[] = ['key' => 'filterSprint', 'label' => ($neg ? 'Sprint ≠ ' : 'Sprint: ').$this->sprintChipLabel($this->filterSprint)];
+            $terms = $neg ? $this->splitPinnedValues($this->filterSprint) : [$this->filterSprint];
+            $labels = array_map(fn (string $term) => $this->sprintChipLabel($term), $terms);
+            $chips[] = [
+                'key' => 'filterSprint',
+                'label' => $neg
+                    ? 'Sprint '.$this->neqChipLabel($labels)
+                    : 'Sprint: '.$labels[0],
+            ];
         }
 
         // "all" to jedyna wartość statusu, która niczego nie odfiltrowuje —
@@ -1100,28 +1124,50 @@ class TasksGrid extends Component
         // nie pokazywał — stąd user widział np. 15 z 129 zadań bez żadnej
         // wskazówki, że coś jest odfiltrowane.
         if (! $this->selectsAllStatuses() || $this->filterOp('status') === 'neq') {
-            $statusLabel = $this->statusChipLabel();
+            $neq = $this->filterOp('status') === 'neq';
+            if ($neq) {
+                $statusLabel = match ($this->statusBucketFromSelection($this->selectedStatuses)) {
+                    '' => $this->neqChipLabel(['Aktywne']),
+                    'closed' => $this->neqChipLabel(['Zamknięte']),
+                    'all' => $this->neqChipLabel(['Wszystkie']),
+                    'none' => '≠ żaden (0 wyników)',
+                    default => $this->neqChipLabel(array_map(
+                        fn (string $value) => TaskStatus::from($value)->label(),
+                        $this->normalizeStatusSelection($this->selectedStatuses)
+                    )),
+                };
+            } else {
+                $statusLabel = $this->statusChipLabel();
+            }
             $chips[] = [
                 'key' => 'status',
-                'label' => 'Status: '.($this->filterOp('status') === 'neq' ? '≠ ' : '').$statusLabel,
-                'locked' => $this->isPlanQueue(),
+                'label' => 'Status: '.$statusLabel,
             ];
         }
 
         $assignedKeys = $this->assignedFilterKeys();
         if ($assignedKeys !== []) {
-            $neg = $this->filterOp('assignedFilter') === 'neq' ? '≠ ' : '';
+            $labels = $this->userFilterChipLabels($assignedKeys);
+            $neq = $this->filterOp('assignedFilter') === 'neq';
             $chips[] = [
                 'key' => 'assignedFilter',
-                'label' => 'Przypisany: '.$neg.$this->userFilterChipLabel($assignedKeys),
+                'label' => $neq
+                    ? 'Przypisany: '.$this->neqChipLabel($labels)
+                    : 'Przypisany: '.$this->userFilterChipLabel($assignedKeys),
                 'locked' => $this->isPlanQueue(),
             ];
         }
 
         $createdKeys = $this->createdByFilterKeys();
         if ($createdKeys !== []) {
-            $neg = $this->filterOp('createdByFilter') === 'neq' ? '≠ ' : '';
-            $chips[] = ['key' => 'createdByFilter', 'label' => 'Utworzono przez: '.$neg.$this->userFilterChipLabel($createdKeys)];
+            $labels = $this->userFilterChipLabels($createdKeys);
+            $neq = $this->filterOp('createdByFilter') === 'neq';
+            $chips[] = [
+                'key' => 'createdByFilter',
+                'label' => $neq
+                    ? 'Utworzono przez: '.$this->neqChipLabel($labels)
+                    : 'Utworzono przez: '.$this->userFilterChipLabel($createdKeys),
+            ];
         }
 
         if ($this->usesWorkItems()) {
@@ -1162,8 +1208,15 @@ class TasksGrid extends Component
 
     public function clearFilter(string $key): void
     {
-        if ($this->isPlanQueue() && in_array($key, ['planQueue', 'assignedFilter', 'status'], true)) {
+        if ($this->isPlanQueue() && in_array($key, ['planQueue', 'assignedFilter'], true)) {
             $this->enforcePlanLocks();
+
+            return;
+        }
+
+        if ($this->isPlanQueue() && $key === 'status') {
+            $this->resetPlanStatusSlice();
+            $this->resetPage();
 
             return;
         }
@@ -1250,7 +1303,7 @@ class TasksGrid extends Component
     public function pinFilter(string $key, string $value, string $op = 'eq'): void
     {
         if (! $this->canPinFilter($key)) {
-            if ($this->isPlanQueue() && in_array($key, ['status', 'assignedFilter', 'filterSprint'], true)) {
+            if ($this->isPlanQueue() && $key === 'assignedFilter') {
                 $this->enforcePlanLocks();
             }
 
@@ -1258,7 +1311,7 @@ class TasksGrid extends Component
         }
 
         $op = $op === 'neq' ? 'neq' : 'eq';
-        if (! $this->applyPinValue($key, $value)) {
+        if (! $this->applyPinValue($key, $value, $op)) {
             return;
         }
 
@@ -1308,7 +1361,7 @@ class TasksGrid extends Component
 
     protected function canPinFilter(string $key): bool
     {
-        if ($this->isPlanQueue() && in_array($key, ['status', 'assignedFilter', 'filterSprint'], true)) {
+        if ($this->isPlanQueue() && $key === 'assignedFilter') {
             return false;
         }
 
@@ -1319,36 +1372,52 @@ class TasksGrid extends Component
         return true;
     }
 
-    protected function applyPinValue(string $key, string $value): bool
+    protected function applyPinValue(string $key, string $value, string $op = 'eq'): bool
     {
         return match ($key) {
-            'searchCategory' => $this->applyCategoryPin($value),
-            'status' => $this->applyStatusPin($value),
-            'assignedFilter' => $this->applyAssigneePin($value),
-            'filterPriority' => $this->applyPriorityPin($value),
-            'filterSprint' => $this->applySprintPin($value),
+            'searchCategory' => $this->applyCategoryPin($value, $op),
+            'status' => $this->applyStatusPin($value, $op),
+            'assignedFilter' => $this->applyAssigneePin($value, $op),
+            'filterPriority' => $this->applyPriorityPin($value, $op),
+            'filterSprint' => $this->applySprintPin($value, $op),
             'filterDueDate' => $this->applyDueDatePin($value),
             default => false,
         };
     }
 
-    protected function applyCategoryPin(string $category): bool
+    protected function applyCategoryPin(string $category, string $op = 'eq'): bool
     {
         $category = trim($category);
         if ($category === '') {
             return false;
         }
 
-        $this->searchCategory = $category === '__none__' ? '__none__' : mb_substr($category, 0, 255);
-        $this->filterOps['searchCategory'] = 'eq';
+        $category = $category === '__none__' ? '__none__' : mb_substr($category, 0, 255);
+        if ($this->shouldAppendPin('searchCategory', $op)) {
+            $this->searchCategory = $this->appendPinnedValue($this->searchCategory, $category);
+
+            return true;
+        }
+
+        $this->searchCategory = $category;
 
         return true;
     }
 
-    protected function applyStatusPin(string $status): bool
+    protected function applyStatusPin(string $status, string $op = 'eq'): bool
     {
         if (! in_array($status, $this->allStatusValues(), true)) {
             return false;
+        }
+
+        if ($this->shouldAppendPin('status', $op)) {
+            if (! in_array($status, $this->selectedStatuses, true)) {
+                $this->selectedStatuses[] = $status;
+                $this->selectedStatuses = $this->normalizeStatusSelection($this->selectedStatuses);
+            }
+            $this->status = $this->statusBucketFromSelection($this->selectedStatuses);
+
+            return true;
         }
 
         $this->selectedStatuses = [$status];
@@ -1357,11 +1426,24 @@ class TasksGrid extends Component
         return true;
     }
 
-    protected function applyAssigneePin(string $key): bool
+    protected function applyAssigneePin(string $key, string $op = 'eq'): bool
     {
         $key = (string) $key;
         if ($key !== 'unassigned' && $key !== 'me' && ! ctype_digit($key)) {
             return false;
+        }
+
+        if ($this->shouldAppendPin('assignedFilter', $op)) {
+            $keys = $this->assignedFilterKeys();
+            if (! in_array($key, $keys, true)) {
+                $keys[] = $key;
+            }
+            $this->assignedFilters = $this->normalizeUserFilterKeys($keys);
+            $this->assignedFilter = count($this->assignedFilters) === 1
+                ? $this->assignedFilters[0]
+                : '';
+
+            return true;
         }
 
         $this->assignedFilters = [$key];
@@ -1370,10 +1452,16 @@ class TasksGrid extends Component
         return true;
     }
 
-    protected function applyPriorityPin(string $priority): bool
+    protected function applyPriorityPin(string $priority, string $op = 'eq'): bool
     {
         if (! in_array($priority, ['1', '2', '3', '4', '5', 'none'], true)) {
             return false;
+        }
+
+        if ($this->shouldAppendPin('filterPriority', $op)) {
+            $this->filterPriority = $this->appendPinnedValue($this->filterPriority, $priority);
+
+            return true;
         }
 
         $this->filterPriority = $priority;
@@ -1381,10 +1469,16 @@ class TasksGrid extends Component
         return true;
     }
 
-    protected function applySprintPin(string $sprint): bool
+    protected function applySprintPin(string $sprint, string $op = 'eq'): bool
     {
         if ($sprint !== 'none' && ! ctype_digit($sprint)) {
             return false;
+        }
+
+        if ($this->shouldAppendPin('filterSprint', $op)) {
+            $this->filterSprint = $this->appendPinnedValue($this->filterSprint, $sprint);
+
+            return true;
         }
 
         $this->filterSprint = $sprint;
@@ -1406,6 +1500,61 @@ class TasksGrid extends Component
     protected function jsStr(string $value): string
     {
         return "'".str_replace(['\\', "'"], ['\\\\', "\\'"], $value)."'";
+    }
+
+    protected function shouldAppendPin(string $key, string $op): bool
+    {
+        return $op === 'neq' && $this->filterOp($key) === 'neq';
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function splitPinnedValues(string $raw): array
+    {
+        if ($raw === '') {
+            return [];
+        }
+
+        $parts = [];
+        foreach (explode('|', $raw) as $part) {
+            $part = trim($part);
+            if ($part !== '' && ! in_array($part, $parts, true)) {
+                $parts[] = $part;
+            }
+        }
+
+        return $parts;
+    }
+
+    /**
+     * @param  list<string>  $values
+     */
+    protected function joinPinnedValues(array $values): string
+    {
+        return implode('|', $values);
+    }
+
+    protected function appendPinnedValue(string $current, string $value): string
+    {
+        $parts = $this->splitPinnedValues($current);
+        if (! in_array($value, $parts, true)) {
+            $parts[] = $value;
+        }
+
+        return $this->joinPinnedValues($parts);
+    }
+
+    /**
+     * @param  list<string>  $labels
+     */
+    protected function neqChipLabel(array $labels): string
+    {
+        if ($labels === []) {
+            return '≠';
+        }
+
+        return '≠ '.implode(', ≠ ', $labels);
     }
 
     protected function categoryChipLabel(string $category): string
@@ -3310,7 +3459,7 @@ class TasksGrid extends Component
         }
 
         $category = trim($this->searchCategory);
-        if ($category === '' || $category === '__none__') {
+        if ($this->filterOp('searchCategory') === 'neq' || str_contains($category, '|') || $category === '' || $category === '__none__') {
             $category = null;
         }
 
@@ -3968,6 +4117,15 @@ class TasksGrid extends Component
      */
     protected function userFilterChipLabel(array $keys): string
     {
+        return implode(' lub ', $this->userFilterChipLabels($keys));
+    }
+
+    /**
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    protected function userFilterChipLabels(array $keys): array
+    {
         $ids = [];
         foreach ($keys as $key) {
             if ($key !== 'me' && ctype_digit((string) $key)) {
@@ -3989,7 +4147,7 @@ class TasksGrid extends Component
             }
         }
 
-        return implode(' lub ', $labels);
+        return $labels;
     }
 
     /**
@@ -4997,24 +5155,30 @@ class TasksGrid extends Component
         if ($this->searchCategory !== '') {
             $col = $workItems ? 'work_items.category' : 'project_tasks.category';
             $neq = $this->filterOp('searchCategory') === 'neq';
-            if ($this->searchCategory === '__none__') {
-                $clauses[] = function (Builder $q) use ($col, $neq) {
-                    if ($neq) {
-                        $q->whereNotNull($col)->where($col, '!=', '');
-                    } else {
-                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, ''));
+            $terms = $neq ? $this->splitPinnedValues($this->searchCategory) : [trim($this->searchCategory)];
+            $clauses[] = function (Builder $q) use ($col, $terms, $neq) {
+                foreach ($terms as $term) {
+                    if ($term === '') {
+                        continue;
                     }
-                };
-            } else {
-                $term = '%'.$this->searchCategory.'%';
-                $clauses[] = function (Builder $q) use ($col, $term, $neq) {
-                    if ($neq) {
-                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, 'not like', $term));
-                    } else {
-                        $q->where($col, 'like', $term);
+                    if ($term === '__none__') {
+                        if ($neq) {
+                            $q->whereNotNull($col)->where($col, '!=', '');
+                        } else {
+                            $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, ''));
+                        }
+
+                        continue;
                     }
-                };
-            }
+
+                    $like = '%'.$term.'%';
+                    if ($neq) {
+                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, 'not like', $like));
+                    } else {
+                        $q->where($col, 'like', $like);
+                    }
+                }
+            };
         }
 
         if ($this->searchAssignedTo !== '') {
@@ -5035,47 +5199,63 @@ class TasksGrid extends Component
         if ($this->filterPriority !== '') {
             $col = $workItems ? 'work_items.priority' : 'project_tasks.priority';
             $neq = $this->filterOp('filterPriority') === 'neq';
-            if ($this->filterPriority === 'none') {
-                $clauses[] = function (Builder $q) use ($col, $neq) {
-                    if ($neq) {
-                        $q->whereNotNull($col);
-                    } else {
-                        $q->whereNull($col);
+            $values = $neq ? $this->splitPinnedValues($this->filterPriority) : [$this->filterPriority];
+            $clauses[] = function (Builder $q) use ($col, $values, $neq) {
+                if ($neq) {
+                    foreach ($values as $value) {
+                        if ($value === 'none') {
+                            $q->whereNotNull($col);
+                        } else {
+                            $priority = (int) $value;
+                            $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, '!=', $priority));
+                        }
                     }
-                };
-            } else {
-                $priority = (int) $this->filterPriority;
-                $clauses[] = function (Builder $q) use ($col, $priority, $neq) {
-                    if ($neq) {
-                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, '!=', $priority));
-                    } else {
-                        $q->where($col, $priority);
+
+                    return;
+                }
+
+                $includeNone = in_array('none', $values, true);
+                $nums = array_map('intval', array_values(array_filter($values, fn (string $value) => $value !== 'none')));
+                $q->where(function (Builder $inner) use ($col, $includeNone, $nums) {
+                    if ($nums !== []) {
+                        $inner->whereIn($col, $nums);
                     }
-                };
-            }
+                    if ($includeNone) {
+                        $nums === [] ? $inner->whereNull($col) : $inner->orWhereNull($col);
+                    }
+                });
+            };
         }
 
         if ($this->filterSprint !== '') {
             $col = $workItems ? 'work_items.sprint_id' : 'project_tasks.sprint_id';
             $neq = $this->filterOp('filterSprint') === 'neq';
-            if ($this->filterSprint === 'none') {
-                $clauses[] = function (Builder $q) use ($col, $neq) {
-                    if ($neq) {
-                        $q->whereNotNull($col);
-                    } else {
-                        $q->whereNull($col);
+            $values = $neq ? $this->splitPinnedValues($this->filterSprint) : [$this->filterSprint];
+            $clauses[] = function (Builder $q) use ($col, $values, $neq) {
+                if ($neq) {
+                    foreach ($values as $value) {
+                        if ($value === 'none') {
+                            $q->whereNotNull($col);
+                        } elseif (ctype_digit($value)) {
+                            $sprintId = (int) $value;
+                            $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, '!=', $sprintId));
+                        }
                     }
-                };
-            } elseif (ctype_digit($this->filterSprint)) {
-                $sprintId = (int) $this->filterSprint;
-                $clauses[] = function (Builder $q) use ($col, $sprintId, $neq) {
-                    if ($neq) {
-                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, '!=', $sprintId));
-                    } else {
-                        $q->where($col, $sprintId);
+
+                    return;
+                }
+
+                $includeNone = in_array('none', $values, true);
+                $ids = array_map('intval', array_values(array_filter($values, fn (string $value) => ctype_digit($value))));
+                $q->where(function (Builder $inner) use ($col, $includeNone, $ids) {
+                    if ($ids !== []) {
+                        $inner->whereIn($col, $ids);
                     }
-                };
-            }
+                    if ($includeNone) {
+                        $ids === [] ? $inner->whereNull($col) : $inner->orWhereNull($col);
+                    }
+                });
+            };
         }
 
         if ($this->filterDueDate !== '') {

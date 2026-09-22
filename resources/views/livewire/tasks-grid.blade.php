@@ -1241,7 +1241,7 @@
         }
     }
 
-    /* Plan queue: one compact row — Filtry + Kolumny. No views, Chrono, search, or chip strip. */
+    /* Plan queue: compact Filtry + Kolumny. No views, Chrono, or search. */
     .xuiv2-tasks.is-plan-queue .tg-toolbar__row {
         flex-wrap: nowrap;
         align-items: stretch;
@@ -1251,9 +1251,13 @@
     .xuiv2-tasks.is-plan-queue .tg-toolbar__views,
     .xuiv2-tasks.is-plan-queue .tg-toolbar__home,
     .xuiv2-tasks.is-plan-queue .tg-toolbar__meta,
-    .xuiv2-tasks.is-plan-queue .tg-toolbar__chrono,
-    .xuiv2-tasks.is-plan-queue .tg-active-filters {
+    .xuiv2-tasks.is-plan-queue .tg-toolbar__chrono {
         display: none !important;
+    }
+    .xuiv2-tasks.is-plan-queue .tg-active-filters {
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
+        margin-bottom: 0.35rem !important;
     }
     .xuiv2-tasks.is-plan-queue .tg-toolbar__controls {
         flex: 1 1 auto;
@@ -1778,7 +1782,7 @@
     </div>
 </div>
 
-@if(count($filterChips) > 0 && ! $this->isPlanQueue())
+@if(count($filterChips) > 0)
     <div class="rp-active-filters tg-active-filters mb-2 px-1">
         <span class="rp-active-filters__label">Filtry:</span>
         <div class="tg-active-filters__chips">

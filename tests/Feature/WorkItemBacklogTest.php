@@ -676,6 +676,74 @@ class WorkItemBacklogTest extends TestCase
             ->assertSet('editingField', 'due_date');
     }
 
+    public function test_chip_exclude_appends_additional_not_filters(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Karta System',
+            'category' => 'System',
+            'status' => TaskStatus::PENDING,
+            'priority' => 5,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        ProjectTask::query()->create([
+            'name' => 'Karta Szkolenia',
+            'category' => 'Szkolenia',
+            'status' => TaskStatus::IN_PROGRESS,
+            'priority' => 4,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        ProjectTask::query()->create([
+            'name' => 'Karta Inne',
+            'category' => 'Inne',
+            'status' => TaskStatus::PENDING,
+            'priority' => 3,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $component = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->call('pinFilter', 'searchCategory', 'System', 'neq')
+            ->assertSet('searchCategory', 'System')
+            ->assertSet('filterOps.searchCategory', 'neq')
+            ->assertSee('Kategoria ≠ System')
+            ->assertDontSee('Karta System')
+            ->assertSee('Karta Szkolenia')
+            ->assertSee('Karta Inne')
+            ->call('pinFilter', 'searchCategory', 'Szkolenia', 'neq')
+            ->assertSet('searchCategory', 'System|Szkolenia')
+            ->assertSee('Kategoria ≠ System, ≠ Szkolenia')
+            ->assertDontSee('Karta System')
+            ->assertDontSee('Karta Szkolenia')
+            ->assertSee('Karta Inne');
+
+        $component->call('clearFilters')
+            ->call('pinFilter', 'status', TaskStatus::PENDING->value, 'neq')
+            ->assertSet('selectedStatuses', [TaskStatus::PENDING->value])
+            ->assertSee('Karta Szkolenia')
+            ->assertDontSee('Karta System')
+            ->call('pinFilter', 'status', TaskStatus::IN_PROGRESS->value, 'neq')
+            ->assertSet('selectedStatuses', [
+                TaskStatus::PENDING->value,
+                TaskStatus::IN_PROGRESS->value,
+            ])
+            ->assertSee('Status: ≠ Aktywne')
+            ->assertDontSee('Karta System')
+            ->assertDontSee('Karta Szkolenia')
+            ->assertDontSee('Karta Inne');
+
+        $component->call('clearFilters')
+            ->call('pinFilter', 'filterPriority', '5', 'neq')
+            ->call('pinFilter', 'filterPriority', '4', 'neq')
+            ->assertSet('filterPriority', '5|4')
+            ->assertSee('Priorytet ≠ Krytyczny, ≠ Wysoki')
+            ->assertSee('Karta Inne')
+            ->assertDontSee('Karta System')
+            ->assertDontSee('Karta Szkolenia');
+    }
+
     public function test_priority_chip_opens_status_like_picker(): void
     {
         $task = ProjectTask::query()->create([

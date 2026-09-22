@@ -341,6 +341,55 @@ class WorkItemPlanTest extends TestCase
             ->assertDontSee('Kartka z kolejki Planu');
     }
 
+    public function test_plan_queue_chip_filters_slice_without_unlocking_assignee(): void
+    {
+        $this->actingAs($this->user);
+        $pending = $this->workItem('Oczekujące z kolejki');
+        ProjectTask::query()->create([
+            'name' => 'W trakcie z kolejki',
+            'status' => TaskStatus::IN_PROGRESS,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        $grid = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class, [
+                'planQueue' => true,
+                'planUserId' => $this->user->id,
+            ])
+            ->set('visibleColumns', ['name', 'status', 'assigned_to'])
+            ->assertSee('Filtry:')
+            ->assertSee('Do przypięcia')
+            ->assertSee('Status: Aktywne')
+            ->assertSee('Przypisany:')
+            ->assertSeeHtml('data-tg-filter-key="planQueue"')
+            ->assertSeeHtml('data-tg-filter-key="assignedFilter"')
+            ->assertSeeHtml("pinFilter('status', '{$pending->status->value}')")
+            ->assertDontSeeHtml("pinFilter('assignedFilter'")
+            ->assertSee('Oczekujące z kolejki')
+            ->assertSee('W trakcie z kolejki')
+            ->call('pinFilter', 'status', TaskStatus::PENDING->value)
+            ->assertSet('selectedStatuses', [TaskStatus::PENDING->value])
+            ->assertSee('Status: Oczekujące')
+            ->assertSee('Oczekujące z kolejki')
+            ->assertDontSee('W trakcie z kolejki')
+            ->call('pinFilter', 'assignedFilter', 'unassigned')
+            ->assertSet('assignedFilter', (string) $this->user->id)
+            ->assertSee('Oczekujące z kolejki')
+            ->call('clearFilter', 'status')
+            ->assertSet('selectedStatuses', [
+                TaskStatus::PENDING->value,
+                TaskStatus::IN_PROGRESS->value,
+            ])
+            ->assertSee('Status: Aktywne')
+            ->assertSee('Oczekujące z kolejki')
+            ->assertSee('W trakcie z kolejki');
+
+        $grid->call('pinFilter', 'status', TaskStatus::COMPLETED->value)
+            ->assertDontSee('Oczekujące z kolejki')
+            ->assertDontSee('W trakcie z kolejki');
+    }
+
     public function test_plan_queue_meetings_have_no_selection_checkbox(): void
     {
         $this->actingAs($this->user);
