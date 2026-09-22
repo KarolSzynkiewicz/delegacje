@@ -693,6 +693,7 @@
         font-size: 0.68rem;
         line-height: 1;
         cursor: pointer;
+        text-decoration: none !important;
     }
     .xuiv2-tasks .tg-col-chip__side i {
         font-size: 0.68rem;
@@ -801,7 +802,8 @@
         .xuiv2-tasks .tg-status-badge.s-cancelled.tg-col-chip--split:hover {
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);
         }
-        .xuiv2-tasks a.tg-time-chip--cal.tg-time-chip--scheduled:hover,
+        .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--scheduled:hover,
+        .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--scheduled.tg-col-chip--split:hover,
         .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--ok:hover,
         .xuiv2-tasks .tg-time-chip--due.tg-time-chip--ok.tg-col-chip--split:hover {
             background: rgba(59, 130, 246, 0.28);
@@ -811,7 +813,8 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(168, 85, 247, 0.38);
         }
-        .xuiv2-tasks a.tg-time-chip--cal.tg-time-chip--stale:hover,
+        .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--stale:hover,
+        .xuiv2-tasks .tg-time-chip--cal.tg-time-chip--stale.tg-col-chip--split:hover,
         .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--soon:hover,
         .xuiv2-tasks .tg-time-chip--due.tg-time-chip--soon.tg-col-chip--split:hover {
             background: rgba(245, 158, 11, 0.26);

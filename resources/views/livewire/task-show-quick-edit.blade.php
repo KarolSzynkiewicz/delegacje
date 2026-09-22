@@ -82,6 +82,41 @@
             color: inherit;
             background: rgba(255, 255, 255, 0.04);
         }
+        .task-show-meta .tg-time-chip.tg-col-chip--split {
+            gap: 0;
+            padding: 2px;
+        }
+        .task-show-meta .tg-col-chip__main {
+            appearance: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex: 1 1 auto;
+            min-width: 0;
+            padding: 2px 8px 2px 4px;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            text-align: left;
+            text-decoration: none !important;
+        }
+        .task-show-meta .tg-col-chip__side {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.55rem;
+            min-height: 1.45rem;
+            margin-left: auto;
+            padding: 0;
+            border: 0;
+            border-left: 1px solid color-mix(in srgb, currentColor 38%, transparent);
+            border-radius: 9px;
+            background: rgba(255, 255, 255, 0.05);
+            color: inherit;
+            text-decoration: none !important;
+        }
         .task-show-meta .tg-time-chip__icon {
             flex-shrink: 0;
             width: 1.45rem;

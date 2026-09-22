@@ -1529,7 +1529,7 @@ class WorkItemPlanTest extends TestCase
 
         $this->assertSame('stale', $item->scheduleState());
         $this->assertSame('skisło', $item->scheduleLabel());
-        $this->assertSame('Zaległy · 16.09 08:00–08:30', $item->scheduleChipLabel());
+        $this->assertSame('16.09 08:00–08:30', $item->scheduleChipLabel());
         $this->assertStringContainsString('pin='.$item->id, $item->planPinUrl());
         $this->assertStringContainsString('w=2026-09-14', $item->planPinUrl());
     }
@@ -1547,7 +1547,7 @@ class WorkItemPlanTest extends TestCase
         ]);
 
         Livewire::test(TasksGrid::class)
-            ->assertSee('Zaległy · 16.09 08:00–08:30')
+            ->assertSee('16.09 08:00–08:30')
             ->assertSeeHtml('pin='.$item->id)
             ->assertSeeHtml('tg-schedule--stale')
             ->assertSeeHtml('tg-time-chip--stale')
@@ -1570,10 +1570,10 @@ class WorkItemPlanTest extends TestCase
         $this->workItem('Bez terminu');
         $item->load('timeBlocks');
 
-        $this->assertSame('Zaplanowane · 2 sloty', $item->scheduleChipLabel());
+        $this->assertSame('2 sloty', $item->scheduleChipLabel());
 
         Livewire::test(TasksGrid::class)
-            ->assertSee('Zaplanowane · 2 sloty')
+            ->assertSee('2 sloty')
             ->assertSee('17.09 08:00–08:30')
             ->assertSee('17.09 10:00–10:30')
             ->assertSee('24.09.2026')
@@ -1581,6 +1581,40 @@ class WorkItemPlanTest extends TestCase
             ->assertSeeHtml('bi-bullseye')
             ->assertSeeHtml('tg-time-chip--due')
             ->assertSeeHtml('tg-time-chip--scheduled');
+    }
+
+    public function test_schedule_chip_filters_none_and_opens_plan_from_the_side(): void
+    {
+        $this->actingAs($this->user);
+        $this->workItem('Bez slotu kalendarza');
+        $planned = $this->workItem('Ze slotem kalendarza');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $planned->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 15:00:00',
+            'ends_at' => '2026-09-17 15:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        $component = Livewire::test(TasksGrid::class)
+            ->assertSeeHtml("pinFilter('filterSchedule', 'none')")
+            ->assertSeeHtml("pinFilter('filterSchedule', 'scheduled')")
+            ->assertSeeHtml("pinFilter('filterSchedule', 'none', 'neq')")
+            ->assertSeeHtml('pin='.$planned->id)
+            ->assertSee('17.09 15:00–15:30')
+            ->assertDontSee('Zaplanowane ·')
+            ->call('pinFilter', 'filterSchedule', 'none')
+            ->assertSet('filterSchedule', 'none')
+            ->assertSee('W kalendarzu: Brak')
+            ->assertSee('Bez slotu kalendarza')
+            ->assertDontSee('Ze slotem kalendarza');
+
+        $component->call('clearFilters')
+            ->call('pinFilter', 'filterSchedule', 'scheduled')
+            ->assertSet('filterSchedule', 'scheduled')
+            ->assertSee('W kalendarzu: Zaplanowane')
+            ->assertSee('Ze slotem kalendarza')
+            ->assertDontSee('Bez slotu kalendarza');
     }
 
     public function test_task_show_links_blocks_facet_to_the_plan(): void
@@ -1616,7 +1650,7 @@ class WorkItemPlanTest extends TestCase
         }
 
         Livewire::test(\App\Livewire\TaskShowQuickEdit::class, ['task' => $item->source])
-            ->assertSee('Zaplanowane · 2 sloty')
+            ->assertSee('2 sloty')
             ->assertSee('17.09 08:00–08:30')
             ->assertSee('17.09 14:00–14:30');
     }

@@ -104,18 +104,23 @@
         </div>
     </div>
 
-    <div class="rp-filter-section" x-show="filterMode === 'all' || filterMode === 'priority' || filterMode === 'due_date'">
+    <div class="rp-filter-section" x-show="filterMode === 'all' || filterMode === 'priority' || filterMode === 'due_date' || filterMode === 'blocks'">
         <button type="button" x-show="filterMode === 'all'" @click="openMore = !openMore" class="rp-filter-section__head">
             <span><i class="bi bi-sliders me-1 opacity-75"></i>Priorytet i termin</span>
             <i class="bi" :class="openMore ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
         </button>
-        <div class="rp-filter-section__body" x-show="filterMode === 'priority' || filterMode === 'due_date' || (filterMode === 'all' && openMore)">
+        <div class="rp-filter-section__body" x-show="filterMode === 'priority' || filterMode === 'due_date' || filterMode === 'blocks' || (filterMode === 'all' && openMore)">
             <div class="mb-2" x-show="filterMode === 'all' || filterMode === 'priority'" data-tg-col-filter="priority">
                 @include('livewire.partials.tg-filter-priority')
             </div>
-            <div x-show="filterMode === 'all' || filterMode === 'due_date'" data-tg-col-filter="due_date">
+            <div class="mb-2" x-show="filterMode === 'all' || filterMode === 'due_date'" data-tg-col-filter="due_date">
                 @include('livewire.partials.tg-filter-due')
             </div>
+            @if($this->usesWorkItems())
+            <div x-show="filterMode === 'all' || filterMode === 'blocks'" data-tg-col-filter="blocks">
+                @include('livewire.partials.tg-filter-schedule')
+            </div>
+            @endif
         </div>
     </div>
 

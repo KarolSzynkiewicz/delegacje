@@ -12,6 +12,7 @@ use App\WorkItems\GridField;
 use App\WorkItems\HandlesWorkItem;
 use App\WorkItems\StatusWidget;
 use App\WorkItems\WorkItemCatalog;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -159,14 +160,11 @@ class WorkItem extends Model
 
     public function scheduleChipLabel(): string
     {
-        $state = $this->scheduleState();
-        if ($state === 'none') {
+        if ($this->scheduleState() === 'none') {
             return 'Brak';
         }
 
-        $prefix = $state === 'stale' ? 'Zaległy' : 'Zaplanowane';
-
-        return $prefix.' · '.$this->scheduleChipDetail();
+        return $this->scheduleChipDetail();
     }
 
     public function scheduleHoverTip(): string
@@ -206,6 +204,113 @@ class WorkItem extends Model
         }
 
         return $count.' slotów';
+    }
+
+    public function scopeWhereScheduleState(Builder $query, string $state): Builder
+    {
+        return match ($state) {
+            'none' => $query->where(fn (Builder $q) => static::constrainUnscheduled($q)),
+            'stale' => $query->where(fn (Builder $q) => static::constrainStale($q)),
+            'scheduled' => $query->where(fn (Builder $q) => static::constrainScheduled($q)),
+            default => $query->whereRaw('0 = 1'),
+        };
+    }
+
+    public function scopeWhereNotScheduleState(Builder $query, string $state): Builder
+    {
+        $others = array_values(array_diff(['none', 'scheduled', 'stale'], [$state]));
+        if ($others === [] || ! in_array($state, ['none', 'scheduled', 'stale'], true)) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($others) {
+            foreach ($others as $index => $other) {
+                $index === 0
+                    ? $q->where(fn (Builder $inner) => $inner->whereScheduleState($other))
+                    : $q->orWhere(fn (Builder $inner) => $inner->whereScheduleState($other));
+            }
+        });
+    }
+
+    /** @return list<string> */
+    protected static function openScheduleStatusValues(): array
+    {
+        return [
+            WorkItemStatus::Pending->value,
+            WorkItemStatus::InProgress->value,
+        ];
+    }
+
+    protected static function constrainUnscheduled(Builder $q): void
+    {
+        $q->where(function (Builder $inner) {
+            $inner->where(function (Builder $meeting) {
+                $meeting->where('type', WorkItemType::Meeting)
+                    ->whereDoesntHaveMorph('source', [ProjectTask::class], function (Builder $source) {
+                        $source->whereNotNull('starts_at');
+                    });
+            })->orWhere(function (Builder $other) {
+                $other->where('type', '!=', WorkItemType::Meeting)
+                    ->whereDoesntHave('timeBlocks', function (Builder $blocks) {
+                        $blocks->where('kind', WorkItemTimeBlockKind::Item);
+                    });
+            });
+        });
+    }
+
+    protected static function constrainStale(Builder $q): void
+    {
+        $today = now()->startOfDay();
+        $q->whereIn('status', static::openScheduleStatusValues())
+            ->where(function (Builder $inner) use ($today) {
+                $inner->where(function (Builder $meeting) use ($today) {
+                    $meeting->where('type', WorkItemType::Meeting)
+                        ->whereHasMorph('source', [ProjectTask::class], function (Builder $source) use ($today) {
+                            $source->whereNotNull('starts_at')->where('starts_at', '<', $today);
+                        });
+                })->orWhere(function (Builder $other) use ($today) {
+                    $other->where('type', '!=', WorkItemType::Meeting)
+                        ->whereHas('timeBlocks', function (Builder $blocks) {
+                            $blocks->where('kind', WorkItemTimeBlockKind::Item);
+                        })
+                        ->whereDoesntHave('timeBlocks', function (Builder $blocks) use ($today) {
+                            $blocks->where('kind', WorkItemTimeBlockKind::Item)
+                                ->where('starts_at', '>=', $today);
+                        });
+                });
+            });
+    }
+
+    protected static function constrainScheduled(Builder $q): void
+    {
+        $today = now()->startOfDay();
+        $open = static::openScheduleStatusValues();
+        $q->where(function (Builder $inner) use ($today, $open) {
+            $inner->where(function (Builder $meeting) use ($today) {
+                $meeting->where('type', WorkItemType::Meeting)
+                    ->whereHasMorph('source', [ProjectTask::class], function (Builder $source) use ($today) {
+                        $source->whereNotNull('starts_at')->where('starts_at', '>=', $today);
+                    });
+            })->orWhere(function (Builder $closedMeeting) use ($open) {
+                $closedMeeting->where('type', WorkItemType::Meeting)
+                    ->whereNotIn('status', $open)
+                    ->whereHasMorph('source', [ProjectTask::class], function (Builder $source) {
+                        $source->whereNotNull('starts_at');
+                    });
+            })->orWhere(function (Builder $upcoming) use ($today) {
+                $upcoming->where('type', '!=', WorkItemType::Meeting)
+                    ->whereHas('timeBlocks', function (Builder $blocks) use ($today) {
+                        $blocks->where('kind', WorkItemTimeBlockKind::Item)
+                            ->where('starts_at', '>=', $today);
+                    });
+            })->orWhere(function (Builder $closedPast) use ($open) {
+                $closedPast->where('type', '!=', WorkItemType::Meeting)
+                    ->whereNotIn('status', $open)
+                    ->whereHas('timeBlocks', function (Builder $blocks) {
+                        $blocks->where('kind', WorkItemTimeBlockKind::Item);
+                    });
+            });
+        });
     }
 
     public function planPinUrl(): string
