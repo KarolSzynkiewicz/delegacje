@@ -36,6 +36,12 @@ class WorkItemSync
             ->first();
         $previousAssigneeId = $existing?->assignee_id;
 
+        if ($model instanceof ProjectTask && array_key_exists('type', $payload)) {
+            $payload['type'] = $existing?->type
+                ?? $model->intendedWorkItemType
+                ?? WorkItemType::Task;
+        }
+
         $item = WorkItem::query()->updateOrCreate(
             [
                 'source_type' => $payload['source_type'],
@@ -227,6 +233,69 @@ class WorkItemSync
     }
 
     /**
+     * Stara heurystyka nazwy / slotu. Tylko przycisk backfillu w akcjach
+     * systemowych — nowe karty dostają typ z przycisku (Umów spotkanie,
+     * Prosi o oddzwonienie), nie z nazwy.
+     */
+    public function guessTaskType(ProjectTask $task): WorkItemType
+    {
+        if ($task->isProcedure() || $task->isMention()) {
+            return WorkItemType::Task;
+        }
+
+        $name = (string) $task->name;
+        if ($task->starts_at !== null
+            || str_starts_with($name, 'Spotkanie rekrutacyjne')
+            || str_starts_with($name, 'Spotkanie:')) {
+            return WorkItemType::Meeting;
+        }
+
+        if ($task->category === 'Rekrutacja' && str_starts_with(mb_strtolower($name), 'oddzwonić')) {
+            return WorkItemType::Callback;
+        }
+
+        if (str_starts_with($name, 'Oddzwonić do ')) {
+            return WorkItemType::Callback;
+        }
+
+        return WorkItemType::Task;
+    }
+
+    /**
+     * @return array{meetings: int, callbacks: int}
+     */
+    public function backfillMeetingTypes(): array
+    {
+        $meetings = 0;
+        $callbacks = 0;
+        $taskMorph = (new ProjectTask)->getMorphClass();
+
+        WorkItem::query()
+            ->where('source_type', $taskMorph)
+            ->where('type', WorkItemType::Task)
+            ->orderBy('id')
+            ->chunkById(200, function ($items) use (&$meetings, &$callbacks): void {
+                $items->load('source');
+                foreach ($items as $item) {
+                    $task = $item->source;
+                    if (! $task instanceof ProjectTask) {
+                        continue;
+                    }
+                    $guessed = $this->guessTaskType($task);
+                    if ($guessed === WorkItemType::Meeting) {
+                        $item->update(['type' => WorkItemType::Meeting]);
+                        $meetings++;
+                    } elseif ($guessed === WorkItemType::Callback) {
+                        $item->update(['type' => WorkItemType::Callback]);
+                        $callbacks++;
+                    }
+                }
+            });
+
+        return ['meetings' => $meetings, 'callbacks' => $callbacks];
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function fromTask(ProjectTask $task): ?array
@@ -270,15 +339,8 @@ class WorkItemSync
             return null;
         }
 
-        $type = WorkItemType::Task;
-        if ($task->isMeeting()) {
-            $type = WorkItemType::Meeting;
-        } elseif ($task->isCallback()) {
-            $type = WorkItemType::Callback;
-        }
-
         return [
-            'type' => $type,
+            'type' => WorkItemType::Task,
             'source_type' => $task->getMorphClass(),
             'source_id' => $task->id,
             'title' => $task->name,

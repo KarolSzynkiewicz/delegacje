@@ -2474,7 +2474,7 @@ class TasksGrid extends Component
             ? $this->lockedSprintId
             : ($this->newTaskSprint ?: null);
 
-        ProjectTask::create([
+        ProjectTask::createIntended(WorkItemType::Meeting, [
             'name' => $this->newTaskName,
             'category' => $this->newTaskCategory ?: 'Spotkanie',
             'status' => TaskStatus::PENDING,

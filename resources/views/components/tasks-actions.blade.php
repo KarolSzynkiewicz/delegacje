@@ -46,7 +46,7 @@
         </form>
     @endif
 
-    @if($task->status === \App\Enums\TaskStatus::IN_PROGRESS)
+    @if($task->status === \App\Enums\TaskStatus::PENDING || $task->status === \App\Enums\TaskStatus::IN_PROGRESS)
         <form action="{{ route('tasks.mark-completed', $task) }}" method="POST" class="d-inline">
             @csrf
             <x-ui.button variant="success" type="submit" class="{{ $sizeClass }} task-actions__btn" title="Zakończ">

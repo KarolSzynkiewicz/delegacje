@@ -518,6 +518,7 @@ class WorkItemPlanService
             'participant_ids' => $participants,
             'location' => $location !== '' ? $location : null,
             'due_date' => null,
+            'work_item_type' => WorkItemType::Meeting,
         ], $actor);
     }
 
@@ -634,6 +635,7 @@ class WorkItemPlanService
                 'participant_ids' => $participants,
                 'location' => $location !== '' ? $location : null,
                 'due_date' => $start->toDateString(),
+                'work_item_type' => WorkItemType::Meeting,
             ], $actor);
 
             return ['meeting' => $task];

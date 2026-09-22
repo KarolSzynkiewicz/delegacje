@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Enums\ApprovalDecision;
 use App\Enums\ProcedureSubjectType;
 use App\Enums\WorkItemTimeBlockKind;
+use App\Enums\WorkItemType;
 use App\Models\ApprovalRequest;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectTask;
@@ -234,6 +235,50 @@ class WorkItemPlan extends Component
         app(WorkItemPlanService::class)->deleteBlock($block);
         $this->closeEvent();
         $this->offerUndo('Odplanowano', 'recreate_block', $snapshot);
+        $this->refreshPlanQueue();
+    }
+
+    public function unscheduleMeeting(int $workItemId): void
+    {
+        $item = $this->workItem($workItemId);
+        $source = $item?->source;
+        if (! $item || ! $item->isMeetingItem() || ! $source instanceof ProjectTask || ! $source->starts_at) {
+            $this->closeEvent();
+
+            return;
+        }
+
+        $snapshot = $this->meetingSnapshot($item, $source);
+        app(WorkItemPlanService::class)->clearMeetingSlot($item);
+        $this->closeEvent();
+        $this->offerUndo('Odplanowano', 'restore_meeting', $snapshot);
+        $this->refreshPlanQueue();
+    }
+
+    public function completeOpenMeeting(): void
+    {
+        if (! in_array($this->openKind, ['meeting', 'item'], true) || ! $this->openId) {
+            return;
+        }
+
+        $item = $this->workItem($this->openId);
+        $source = $item?->source;
+        if (! $item || ! $source instanceof ProjectTask || ! $item->status->isOpen()) {
+            $this->closeEvent();
+
+            return;
+        }
+        if (! $item->isMeetingItem() && $item->type !== WorkItemType::Callback) {
+            return;
+        }
+
+        $user = auth()->user();
+        if (! $user || $user->cannot('markCompleted', $source)) {
+            return;
+        }
+
+        $source->markCompleted();
+        $this->closeEvent();
         $this->refreshPlanQueue();
     }
 
@@ -1010,7 +1055,7 @@ class WorkItemPlan extends Component
             ? $this->planSlotLabel($starts, $ends ?? $starts->addMinutes(WorkItemPlanService::DEFAULT_MINUTES), false)
             : 'Bez godziny';
 
-        return $this->cardFromWorkItem($item, $timeLabel, false, false, false, [], null);
+        return $this->cardFromWorkItem($item, $timeLabel, (bool) $source->starts_at, false, false, [], null);
     }
 
     /**
@@ -1122,6 +1167,8 @@ class WorkItemPlan extends Component
             'title' => $item->title,
             'url' => $item->openUrl(),
             'canUnschedule' => $canUnschedule,
+            'canComplete' => $this->canCompletePlanCard($item, $task),
+            'workItemId' => $item->id,
             'isSession' => $isSession,
             'viewingMember' => $viewingMember,
             'members' => $members,
@@ -1132,6 +1179,20 @@ class WorkItemPlan extends Component
             'description' => $item->plainDescription(),
             'blockId' => $blockId,
         ], $this->memberNav($members, $viewingMember ? $item->id : null));
+    }
+
+    protected function canCompletePlanCard(WorkItem $item, ?ProjectTask $task): bool
+    {
+        if (! $task || ! $item->status->isOpen()) {
+            return false;
+        }
+        if (! $item->isMeetingItem() && $item->type !== WorkItemType::Callback) {
+            return false;
+        }
+
+        $user = auth()->user();
+
+        return (bool) $user?->can('markCompleted', $task);
     }
 
     /**

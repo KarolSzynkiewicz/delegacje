@@ -199,6 +199,29 @@ class SystemActionsController extends Controller
     }
 
     /**
+     * Jednorazowy backfill typów Spotkanie / Oddzwonienie na work_items.
+     * Stare karty zgadywane z nazwy albo starts_at zostają Zadaniem, dopóki
+     * ktoś nie odpali tej akcji — sync przy edycji już nie nadpisuje typu.
+     */
+    public function backfillMeetingTypes(WorkItemSync $sync): RedirectResponse
+    {
+        try {
+            set_time_limit(0);
+
+            $stats = $sync->backfillMeetingTypes();
+
+            return redirect()->route('system-actions.index')
+                ->with(
+                    'success',
+                    "Backfill typów zakończony. Spotkania: {$stats['meetings']}, oddzwonienia: {$stats['callbacks']}."
+                );
+        } catch (\Exception $e) {
+            return redirect()->route('system-actions.index')
+                ->with('error', 'Błąd backfillu typów: '.$e->getMessage());
+        }
+    }
+
+    /**
      * Fix location names: where location.name == location.address, replace with the linked accommodation name.
      */
     public function fixLocationNames(): RedirectResponse

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\TaskSubject;
 use App\Enums\TaskStatus;
+use App\Enums\WorkItemType;
 use App\Traits\HasComments;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Validation\ValidationException;
 
@@ -57,6 +59,12 @@ class ProjectTask extends Model
         'completed_at' => 'datetime',
     ];
 
+    /**
+     * Typ WI przy pierwszym zapisie. Nie kolumna — observer czyta to zanim
+     * powstanie wiersz backlogu. Kolejny sync nie zgaduje z nazwy.
+     */
+    public ?WorkItemType $intendedWorkItemType = null;
+
     public function sprint(): BelongsTo
     {
         return $this->belongsTo(Sprint::class);
@@ -68,6 +76,23 @@ class ProjectTask extends Model
     public function procedureRun(): BelongsTo
     {
         return $this->belongsTo(ProcedureRun::class, 'procedure_run_id');
+    }
+
+    public function workItem(): MorphOne
+    {
+        return $this->morphOne(WorkItem::class, 'source');
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function createIntended(WorkItemType $type, array $attributes): static
+    {
+        $task = new static($attributes);
+        $task->intendedWorkItemType = $type;
+        $task->save();
+
+        return $task;
     }
 
     public function isProcedure(): bool
@@ -82,16 +107,11 @@ class ProjectTask extends Model
 
     public function isCallback(): bool
     {
-        if ($this->isProcedure() || $this->isMention() || $this->isMeeting()) {
+        if ($this->isProcedure() || $this->isMention()) {
             return false;
         }
 
-        $name = (string) $this->name;
-        if ($this->category === 'Rekrutacja' && str_starts_with(mb_strtolower($name), 'oddzwonić')) {
-            return true;
-        }
-
-        return str_starts_with($name, 'Oddzwonić do ');
+        return $this->workItem?->type === WorkItemType::Callback;
     }
 
     public function isMeeting(): bool
@@ -100,14 +120,7 @@ class ProjectTask extends Model
             return false;
         }
 
-        if ($this->starts_at !== null) {
-            return true;
-        }
-
-        $name = (string) $this->name;
-
-        return str_starts_with($name, 'Spotkanie rekrutacyjne')
-            || str_starts_with($name, 'Spotkanie:');
+        return $this->workItem?->type === WorkItemType::Meeting;
     }
 
     public function isOpenMeeting(): bool

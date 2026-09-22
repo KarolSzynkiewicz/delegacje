@@ -48,7 +48,8 @@ class WorkItemPlanTest extends TestCase
             ->assertSee('Do przypięcia')
             ->assertSee('Plan')
             ->assertSee('07:00')
-            ->assertSee('20:00');
+            ->assertSee('20:00')
+            ->assertSee('id="wi-plan-filters"', false);
     }
 
     public function test_open_item_without_block_is_in_the_queue(): void
@@ -184,8 +185,8 @@ class WorkItemPlanTest extends TestCase
     public function test_dropping_a_meeting_writes_the_source_slot(): void
     {
         $this->actingAs($this->user);
-        $task = $this->task('Spotkanie: sync');
-        $item = WorkItem::query()->where('source_id', $task->id)->firstOrFail();
+        $item = $this->hangingMeeting('Spotkanie: sync');
+        $task = $item->source;
 
         Livewire::actingAs($this->user)
             ->test(WorkItemPlan::class)
@@ -201,8 +202,7 @@ class WorkItemPlanTest extends TestCase
     public function test_dropping_a_meeting_from_the_queue_removes_it_from_the_left_list(): void
     {
         $this->actingAs($this->user);
-        $task = $this->task('Spotkanie: znika z kolejki');
-        $item = WorkItem::query()->where('source_id', $task->id)->firstOrFail();
+        $item = $this->hangingMeeting('Spotkanie: znika z kolejki');
 
         Livewire::actingAs($this->user)
             ->test(WorkItemPlan::class)
@@ -394,16 +394,8 @@ class WorkItemPlanTest extends TestCase
     {
         $this->actingAs($this->user);
         $item = $this->workItem('Wymienic rolety w sypialni');
-        $meeting = ProjectTask::query()->create([
-            'name' => 'Spotkanie: urodziny Szymona i Aldony',
-            'status' => TaskStatus::PENDING,
-            'assigned_to' => $this->user->id,
-            'created_by' => $this->user->id,
-        ]);
-        $meetingItem = WorkItem::query()
-            ->where('source_type', 'project_task')
-            ->where('source_id', $meeting->id)
-            ->firstOrFail();
+        $meeting = $this->hangingMeeting('Spotkanie: urodziny Szymona i Aldony');
+        $meetingItem = $meeting;
         $this->assertTrue($meetingItem->isMeetingItem());
 
         Livewire::actingAs($this->user)
@@ -1025,7 +1017,7 @@ class WorkItemPlanTest extends TestCase
         $this->actingAs($this->user);
         $first = $this->workItem('Oddzwonić do Ani');
         $second = $this->workItem('Oddzwonić do Bartka');
-        $meeting = $this->workItem('Spotkanie: sync');
+        $meeting = $this->hangingMeeting('Spotkanie: sync');
 
         Livewire::actingAs($this->user)
             ->test(WorkItemPlan::class)
@@ -1094,8 +1086,8 @@ class WorkItemPlanTest extends TestCase
     {
         $this->actingAs($this->user);
         $session = $this->planSession('Dzwonienie', '2026-09-17 14:00:00', '2026-09-17 16:00:00');
-        $task = $this->task('Spotkanie: sync');
-        $item = WorkItem::query()->where('source_id', $task->id)->firstOrFail();
+        $item = $this->hangingMeeting('Spotkanie: sync');
+        $task = $item->source;
 
         Livewire::actingAs($this->user)
             ->test(WorkItemPlan::class)
@@ -1199,7 +1191,7 @@ class WorkItemPlanTest extends TestCase
             ->assertDontSee('Zadzwonić do Celiny');
     }
 
-    public function test_opening_a_meeting_embeds_the_task_card_without_unschedule(): void
+    public function test_opening_a_meeting_embeds_the_task_card_with_unschedule_and_complete(): void
     {
         $this->actingAs($this->user);
         $task = $this->meeting('Spotkanie rekrutacyjne', '2026-09-17 08:00:00', '2026-09-17 09:00:00');
@@ -1212,7 +1204,50 @@ class WorkItemPlanTest extends TestCase
             ->assertSeeLivewire(\App\Livewire\TaskShowQuickEdit::class)
             ->assertDontSeeLivewire(\App\Livewire\TaskSubtasks::class)
             ->assertSee('Spotkanie')
-            ->assertDontSeeHtml('wire:click="unschedule');
+            ->assertSee('Odplanuj')
+            ->assertSee('Oznacz jako odbyte')
+            ->assertSeeHtml('wire:click="unscheduleMeeting('.$item->id.')');
+    }
+
+    public function test_unschedule_meeting_returns_it_to_the_queue_and_keeps_the_type(): void
+    {
+        $this->actingAs($this->user);
+        $task = $this->meeting('Balet z Sylwią', '2026-09-17 13:45:00', '2026-09-17 14:15:00');
+        $item = WorkItem::query()->where('source_id', $task->id)->firstOrFail();
+        $service = app(WorkItemPlanService::class);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('unscheduleMeeting', $item->id)
+            ->assertHasNoErrors()
+            ->assertDontSee('data-plan-drag="meeting:'.$item->id.'"', false);
+
+        $task->refresh();
+        $item->refresh();
+        $this->assertNull($task->starts_at);
+        $this->assertNull($task->ends_at);
+        $this->assertSame(WorkItemType::Meeting, $item->type);
+        $this->assertTrue($task->fresh()->isMeeting());
+        $this->assertTrue(
+            $service->queue($this->user, now())->contains(fn (WorkItem $row) => $row->id === $item->id)
+        );
+    }
+
+    public function test_completing_a_meeting_from_the_plan_hides_it_from_the_grid(): void
+    {
+        $this->actingAs($this->user);
+        $task = $this->meeting('Zęby', '2026-09-17 10:00:00', '2026-09-17 11:00:00');
+        $item = WorkItem::query()->where('source_id', $task->id)->firstOrFail();
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openEvent', 'meeting', $item->id)
+            ->call('completeOpenMeeting')
+            ->assertHasNoErrors()
+            ->assertDontSee('data-plan-drag="meeting:'.$item->id.'"', false);
+
+        $this->assertSame(TaskStatus::COMPLETED, $task->fresh()->status);
+        $this->assertSame(\App\Enums\WorkItemStatus::Completed, $item->fresh()->status);
     }
 
     public function test_opening_a_session_lists_members_then_opens_their_card(): void
@@ -1557,9 +1592,21 @@ class WorkItemPlanTest extends TestCase
         return WorkItem::query()->where('source_type', 'project_task')->where('source_id', $task->id)->firstOrFail();
     }
 
+    private function hangingMeeting(string $name): WorkItem
+    {
+        $task = ProjectTask::createIntended(WorkItemType::Meeting, [
+            'name' => $name,
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        return WorkItem::query()->where('source_type', 'project_task')->where('source_id', $task->id)->firstOrFail();
+    }
+
     private function meeting(string $name, string $starts, string $ends): ProjectTask
     {
-        return ProjectTask::query()->create([
+        return ProjectTask::createIntended(WorkItemType::Meeting, [
             'name' => $name,
             'status' => TaskStatus::PENDING,
             'assigned_to' => $this->user->id,

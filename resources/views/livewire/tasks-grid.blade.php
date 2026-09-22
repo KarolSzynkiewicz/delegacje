@@ -40,9 +40,10 @@
          },
          flashFilterChip(key) {
              this.$nextTick(() => {
-                 const root = this.$root;
-                 if (!root || !key) return;
-                 const el = root.querySelector('[data-tg-filter-key=' + key + ']');
+                 if (!key) return;
+                 const scope = document.getElementById('wi-plan-filters') || this.$root;
+                 if (!scope) return;
+                 const el = scope.querySelector('[data-tg-filter-key=' + key + ']');
                  if (!el) return;
                  el.classList.remove('is-fresh');
                  void el.offsetWidth;
@@ -1254,11 +1255,6 @@
     .xuiv2-tasks.is-plan-queue .tg-toolbar__chrono {
         display: none !important;
     }
-    .xuiv2-tasks.is-plan-queue .tg-active-filters {
-        flex-wrap: wrap;
-        row-gap: 0.3rem;
-        margin-bottom: 0.35rem !important;
-    }
     .xuiv2-tasks.is-plan-queue .tg-toolbar__controls {
         flex: 1 1 auto;
         width: 100%;
@@ -1783,27 +1779,13 @@
 </div>
 
 @if(count($filterChips) > 0)
-    <div class="rp-active-filters tg-active-filters mb-2 px-1">
-        <span class="rp-active-filters__label">Filtry:</span>
-        <div class="tg-active-filters__chips">
-            @foreach($filterChips as $chip)
-                <span class="rp-active-filters__chip{{ ! empty($chip['locked']) ? ' is-locked' : '' }}"
-                      data-tg-filter-key="{{ $chip['key'] }}"
-                      wire:key="tg-filter-chip-{{ $chip['key'] }}">
-                    <span class="rp-active-filters__chip-text">{{ $chip['label'] }}</span>
-                    @if(empty($chip['locked']))
-                    <button type="button"
-                            wire:click="clearFilter('{{ $chip['key'] }}')"
-                            class="rp-active-filters__chip-remove"
-                            title="Usuń filtr">
-                        <i class="bi bi-x"></i>
-                    </button>
-                    @endif
-                </span>
-            @endforeach
-        </div>
-        <button type="button" wire:click="clearFilters" class="rp-active-filters__clear">Wyczyść</button>
-    </div>
+    @if($this->isPlanQueue())
+        @teleport('#wi-plan-filters')
+            @include('livewire.partials.tg-active-filters')
+        @endteleport
+    @else
+        @include('livewire.partials.tg-active-filters')
+    @endif
 @endif
 @endunless
 

@@ -365,7 +365,7 @@
                 return;
             }
             if (hit.type === 'queue') {
-                this.ghost = this.payload.kind === 'block' ? { unschedule: true } : null;
+                this.ghost = (this.payload.kind === 'block' || this.payload.kind === 'meeting') ? { unschedule: true } : null;
                 this.paintRubber();
                 this.paintDropTargets();
                 return;
@@ -441,6 +441,7 @@
             if (!hit) return;
             if (hit.type === 'queue') {
                 if (payload.kind === 'block') $wire.unschedule(payload.id);
+                if (payload.kind === 'meeting') $wire.unscheduleMeeting(payload.id);
                 return;
             }
             if (hit.type === 'session') {
@@ -674,6 +675,7 @@
                 @endforeach
             </select>
         </label>
+        <div id="wi-plan-filters" class="wi-plan__filters" wire:ignore></div>
         <div class="wi-plan__week">
             <button type="button" class="wi-plan__nav" wire:click="previousWeek" title="Poprzedni tydzień">
                 <i class="bi bi-chevron-left"></i>
@@ -901,6 +903,13 @@
                                     @unless($slot->hidesTime())
                                         <span class="wi-plan__event-time font-mono">{{ $slot->timeLabel() }}</span>
                                     @endunless
+                                    @if($slot->workItemId)
+                                        <button type="button"
+                                                class="wi-plan__chip-off"
+                                                title="Odplanuj"
+                                                @pointerdown.stop
+                                                @click.stop="$wire.unscheduleMeeting({{ $slot->workItemId }})">×</button>
+                                    @endif
                                 @else
                                     <span class="wi-plan__event-title">{{ $slot->title }}</span>
                                     @unless($slot->hidesTime())
@@ -982,6 +991,11 @@
                     @endif
                     @if($openCard['canUnschedule'] && $openCard['blockId'])
                         <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unschedule({{ $openCard['blockId'] }})">Odplanuj</button>
+                    @elseif($openCard['canUnschedule'] && ($openCard['workItemId'] ?? null))
+                        <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unscheduleMeeting({{ $openCard['workItemId'] }})">Odplanuj</button>
+                    @endif
+                    @if(! empty($openCard['canComplete']))
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="completeOpenMeeting">Oznacz jako odbyte</button>
                     @endif
                     <button type="button" class="wi-plan__nav wi-plan__pop-close" title="Zamknij" wire:click="closeEvent">×</button>
                 </div>
@@ -1169,10 +1183,27 @@
 
 <style>
     .wi-plan { display: flex; flex-direction: column; gap: .75rem; min-height: calc(100vh - 8.5rem); position: relative; }
-    .wi-plan__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
-    .wi-plan__user { display: inline-flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: .8rem; }
+    .wi-plan__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .85rem; }
+    .wi-plan__user { display: inline-flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: .8rem; flex: 0 0 auto; }
     .wi-plan__user .form-select { min-width: 160px; background: rgba(255,255,255,.04); border-color: var(--glass-border); color: var(--text-main); }
-    .wi-plan__week { display: inline-flex; align-items: center; gap: .35rem; margin-left: auto; }
+    .wi-plan__filters { flex: 1 1 14rem; min-width: 0; }
+    .wi-plan__filters .rp-active-filters {
+        gap: .3rem .4rem;
+        padding: 0;
+        margin: 0;
+    }
+    .wi-plan__filters .tg-active-filters__chips { display: contents; }
+    .wi-plan__filters .rp-active-filters__chip.is-locked { padding-right: .55rem; }
+    .wi-plan__filters .rp-active-filters__chip.is-fresh {
+        animation: tg-filter-fresh .95s ease-out;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .wi-plan__filters .rp-active-filters__chip.is-fresh {
+            animation: none;
+            border-color: rgba(168, 85, 247, 0.55);
+        }
+    }
+    .wi-plan__week { display: inline-flex; align-items: center; gap: .35rem; margin-left: auto; flex: 0 0 auto; }
     .wi-plan__week-label { min-width: 9.5rem; text-align: center; font-size: .8rem; color: var(--text-main); }
     .wi-plan__nav, .wi-plan__today {
         background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
@@ -1264,8 +1295,6 @@
         border-color: rgba(168, 85, 247, .55);
         box-shadow: 0 0 0 1px rgba(59, 130, 246, .45), 0 8px 22px rgba(59, 130, 246, .18);
     }
-    .wi-plan__queue .rp-active-filters { margin-bottom: .45rem !important; }
-    .wi-plan__queue .rp-active-filters__chip.is-locked { padding-right: .55rem; }
     .wi-plan__board {
         background: var(--bg-card); border: 1px solid var(--glass-border); border-radius: 14px;
         overflow: auto; min-width: 0; max-height: calc(100vh - 11rem);

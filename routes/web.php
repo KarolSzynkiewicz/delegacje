@@ -99,6 +99,10 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('system-actions.sync-work-items')
             ->defaults('resource', 'system-actions');
 
+        Route::post('/system-actions/backfill-meeting-types', [SystemActionsController::class, 'backfillMeetingTypes'])
+            ->name('system-actions.backfill-meeting-types')
+            ->defaults('resource', 'system-actions');
+
         Route::get('/system-actions/backup-database', [SystemActionsController::class, 'backupDatabase'])
             ->name('system-actions.backup-database')
             ->defaults('resource', 'system-actions');

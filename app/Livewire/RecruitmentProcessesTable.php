@@ -8,6 +8,7 @@ use App\Enums\RecruitmentRejectionReason;
 use App\Enums\RecruitmentShipyardExperience;
 use App\Enums\RecruitmentStatus;
 use App\Enums\TaskStatus;
+use App\Enums\WorkItemType;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentConsent;
@@ -257,6 +258,8 @@ class RecruitmentProcessesTable extends Component
     public ?int $taskAssignedTo = null;
 
     public string $taskDescription = '';
+
+    public bool $taskIsCallback = false;
 
     public bool $showMeetingModal = false;
 
@@ -1780,6 +1783,7 @@ class RecruitmentProcessesTable extends Component
         $this->taskDueDate = now()->addDay()->format('Y-m-d');
         $this->taskAssignedTo = $process->assigned_recruiter_id ?: auth()->id();
         $this->taskDescription = '';
+        $this->taskIsCallback = true;
     }
 
     public function openTaskModalManual(): void
@@ -1794,6 +1798,7 @@ class RecruitmentProcessesTable extends Component
         $this->taskDueDate = now()->addDay()->format('Y-m-d');
         $this->taskAssignedTo = $process->assigned_recruiter_id ?: auth()->id();
         $this->taskDescription = '';
+        $this->taskIsCallback = false;
     }
 
     public function saveFollowUpTask(): void
@@ -1814,7 +1819,7 @@ class RecruitmentProcessesTable extends Component
             'taskDueDate.required' => 'Wybierz termin (due date).',
         ]);
 
-        ProjectTask::create([
+        $attributes = [
             'name' => $this->taskTitle,
             'description' => $this->taskDescription ?: null,
             'category' => 'Rekrutacja',
@@ -1823,7 +1828,12 @@ class RecruitmentProcessesTable extends Component
             'assigned_to' => $this->taskAssignedTo ?: auth()->id(),
             'created_by' => auth()->id(),
             'recruitment_process_id' => $process->id,
-        ]);
+        ];
+        if ($this->taskIsCallback) {
+            ProjectTask::createIntended(WorkItemType::Callback, $attributes);
+        } else {
+            ProjectTask::create($attributes);
+        }
 
         session()->flash('success', 'Zadanie z przypomnieniem zostało dodane.');
 
@@ -1837,6 +1847,7 @@ class RecruitmentProcessesTable extends Component
         $this->taskDueDate = '';
         $this->taskAssignedTo = null;
         $this->taskDescription = '';
+        $this->taskIsCallback = false;
     }
 
     public function openMeetingModal(): void
@@ -1890,7 +1901,7 @@ class RecruitmentProcessesTable extends Component
             ->values()
             ->all();
 
-        $task = ProjectTask::create([
+        $task = ProjectTask::createIntended(WorkItemType::Meeting, [
             'name' => 'Spotkanie: '.$process->full_name,
             'description' => ProjectTask::meetingDescriptionFor($process, $this->meetingNote),
             'category' => 'Rekrutacja',

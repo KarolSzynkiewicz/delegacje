@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\WorkItemType;
 use App\Mcp\Concerns\ActsAsConfiguredUser;
 use App\Services\TaskCreationService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -88,6 +89,7 @@ class CreateTaskTool extends Tool
             'ends_at' => $validated['ends_at'] ?? null,
             'location' => isset($validated['location']) ? trim($validated['location']) : null,
             'participant_ids' => $validated['participant_ids'] ?? null,
+            'work_item_type' => isset($validated['starts_at']) ? WorkItemType::Meeting : null,
             'subtasks' => $subtasks,
         ], $user);
 

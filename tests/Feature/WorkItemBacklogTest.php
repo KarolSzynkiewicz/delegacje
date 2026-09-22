@@ -217,7 +217,7 @@ class WorkItemBacklogTest extends TestCase
     {
         $this->actingAs($this->user);
 
-        ProjectTask::query()->create([
+        ProjectTask::createIntended(WorkItemType::Callback, [
             'name' => 'Oddzwonić do Jan Kowalski #12',
             'category' => 'Rekrutacja',
             'status' => TaskStatus::PENDING,
@@ -252,7 +252,7 @@ class WorkItemBacklogTest extends TestCase
         $this->actingAs($this->user);
 
         $starts = now()->addDay()->setTime(10, 0);
-        ProjectTask::query()->create([
+        ProjectTask::createIntended(WorkItemType::Meeting, [
             'name' => 'Spotkanie rekrutacyjne: Jan Kowalski #12',
             'category' => 'Rekrutacja',
             'status' => TaskStatus::PENDING,
@@ -294,7 +294,7 @@ class WorkItemBacklogTest extends TestCase
             'assigned_recruiter_id' => $this->user->id,
         ]);
 
-        $task = ProjectTask::query()->create([
+        $task = ProjectTask::createIntended(WorkItemType::Callback, [
             'name' => 'Oddzwonić do Jan Kowalski #'.$process->id,
             'description' => 'Po 17:00',
             'category' => 'Rekrutacja',

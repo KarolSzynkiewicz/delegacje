@@ -49,6 +49,29 @@ class TaskActivityTest extends TestCase
         $response->assertDontSee('form-check-input', false);
         $response->assertDontSee('>Utworzył<', false);
         $response->assertDontSee('>Zakończono<', false);
+        $response->assertSee('title="Rozpocznij"', false);
+        $response->assertSee('title="Zakończ"', false);
+        $response->assertSee('title="Anuluj zadanie"', false);
+        $response->assertSee(route('tasks.mark-completed', $task), false);
+    }
+
+    public function test_pending_task_can_be_completed_without_starting_progress(): void
+    {
+        $user = $this->admin();
+        $task = ProjectTask::query()->create([
+            'name' => 'Od razu do zamknięcia',
+            'status' => TaskStatus::PENDING,
+            'assigned_to' => $user->id,
+            'created_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('tasks.show', $task))
+            ->post(route('tasks.mark-completed', $task))
+            ->assertRedirect();
+
+        $this->assertSame(TaskStatus::COMPLETED, $task->fresh()->status);
+        $this->assertNotNull($task->fresh()->completed_at);
     }
 
     public function test_activity_feed_includes_task_and_subtask_creation(): void

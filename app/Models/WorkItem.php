@@ -247,11 +247,7 @@ class WorkItem extends Model
 
     public function isMeetingItem(): bool
     {
-        if ($this->type === WorkItemType::Meeting) {
-            return true;
-        }
-
-        return $this->source instanceof ProjectTask && $this->source->isMeeting();
+        return $this->type === WorkItemType::Meeting;
     }
 
     public function handler(): HandlesWorkItem

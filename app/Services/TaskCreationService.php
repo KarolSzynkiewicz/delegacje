@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\TaskStatus;
+use App\Enums\WorkItemType;
 use App\Models\ProjectTask;
 use App\Models\TaskSubtask;
 use App\Models\TaskSubtaskEvent;
@@ -24,6 +25,7 @@ class TaskCreationService
      *     ends_at?: string|null,
      *     location?: string|null,
      *     participant_ids?: array<int, int>|null,
+     *     work_item_type?: WorkItemType|null,
      *     subtasks?: array<int, string>
      * }  $data
      */
@@ -37,7 +39,7 @@ class TaskCreationService
                 $dueDate = \Illuminate\Support\Carbon::parse($startsAt)->toDateString();
             }
 
-            $task = ProjectTask::create([
+            $task = new ProjectTask([
                 'name' => $data['name'],
                 'description' => $data['description'] ?? null,
                 'status' => TaskStatus::PENDING,
@@ -55,6 +57,11 @@ class TaskCreationService
                     : null,
                 'created_by' => $creator->id,
             ]);
+            $intended = $data['work_item_type'] ?? null;
+            if ($intended instanceof WorkItemType) {
+                $task->intendedWorkItemType = $intended;
+            }
+            $task->save();
 
             $subtasks = $data['subtasks'] ?? [];
 

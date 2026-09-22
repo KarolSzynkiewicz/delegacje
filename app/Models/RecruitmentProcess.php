@@ -79,7 +79,7 @@ class RecruitmentProcess extends Model
      */
     public function openMeetings(): \Illuminate\Support\Collection
     {
-        $this->loadMissing('tasks');
+        $this->loadMissing('tasks.workItem');
 
         return $this->recruitmentMeetings()
             ->filter(fn (ProjectTask $task) => $task->isOpenMeeting())
@@ -91,7 +91,7 @@ class RecruitmentProcess extends Model
      */
     public function recruitmentMeetings(): \Illuminate\Support\Collection
     {
-        $this->loadMissing('tasks');
+        $this->loadMissing('tasks.workItem');
 
         return $this->tasks
             ->filter(fn (ProjectTask $task) => $task->isMeeting() && $task->status !== TaskStatus::CANCELLED)

@@ -42,6 +42,34 @@
             </div>
         </x-ui.card>
 
+        <x-ui.card class="mb-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+                <div>
+                    <h5 class="mb-2">
+                        <i class="bi bi-calendar-event text-warning"></i>
+                        Backfill typów spotkań i oddzwonień
+                    </h5>
+                    <p class="text-muted mb-0 small">
+                        Ustawia typ backlogu na <strong>Spotkanie</strong> / <strong>Oddzwonienie</strong>
+                        tam, gdzie karta nadal jest Zadaniem, ale stara heurystyka (godzina na karcie
+                        albo nazwa <code>Spotkanie:</code> / <code>Oddzwonić do</code>) mówi inaczej.
+                        Nie cofa już ustawionych typów — po odpięciu spotkanie zostaje spotkaniem.
+                        Idempotentna — można odpalać ponownie.
+                    </p>
+                </div>
+                <form method="POST" action="{{ route('system-actions.backfill-meeting-types') }}" class="flex-shrink-0">
+                    @csrf
+                    <x-ui.button
+                        variant="warning"
+                        type="submit"
+                        onclick="return confirm('Ustawić typy Spotkanie / Oddzwonienie na kartach zgadywanych ze slotu albo nazwy?')"
+                    >
+                        <i class="bi bi-arrow-repeat"></i> Uzupełnij typy spotkań
+                    </x-ui.button>
+                </form>
+            </div>
+        </x-ui.card>
+
         <div class="row">
             <div class="col-lg-8">
                 <x-ui.card label="Cache i Optymalizacja">
