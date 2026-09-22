@@ -3,6 +3,7 @@
 /public/storage
 /public/build
 /storage/*.key
+/storage/framework/lsp-*.php
 /bootstrap/cache
 .env
 .env.testing
