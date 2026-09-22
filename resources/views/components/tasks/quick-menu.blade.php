@@ -3,6 +3,8 @@
     'minWidth' => 200,
     'href' => null,
     'mainClick' => null,
+    'excludeClick' => null,
+    'excludeTip' => null,
     'openLabel' => 'Otwórz',
     'changeLabel' => 'Zmień',
 ])
@@ -11,6 +13,7 @@
     $minWidth = (int) $minWidth;
     $href = is_string($href) && $href !== '' ? $href : null;
     $mainClick = is_string($mainClick) && $mainClick !== '' ? $mainClick : null;
+    $excludeClick = is_string($excludeClick) && $excludeClick !== '' ? $excludeClick : null;
     $openJs = 'if (open) { open = false; shown = false; return } shown = true; const r = $el.getBoundingClientRect(); const w = Math.min('.$minWidth.', window.innerWidth - 16); top = r.bottom + 4; left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)); $nextTick(function () { open = true })';
 @endphp
 
@@ -26,6 +29,8 @@
                 :href="$href"
                 :main-click="$mainClick"
                 :main-tip="$openLabel"
+                :exclude-click="$excludeClick"
+                :exclude-tip="$excludeTip"
                 side="down"
                 :side-tip="$changeLabel"
                 :open-menu="$openJs"

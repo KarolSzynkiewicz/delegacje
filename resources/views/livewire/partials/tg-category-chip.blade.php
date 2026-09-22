@@ -2,7 +2,10 @@
     $chipClass = $chipClass ?? '';
     $ediCategory = $this->ediCell($task, 'category');
     $categoryValue = $task->category ?: '__none__';
-    $categoryClick = 'filterByCategory(\''.str_replace(['\\', "'"], ['\\\\', "\\'"], $categoryValue).'\')';
+    $categoryLabel = $task->category ?: 'Brak';
+    $categoryClick = $this->pinClick('searchCategory', $categoryValue);
+    $categoryExclude = $this->pinClick('searchCategory', $categoryValue, 'neq');
+    $categoryExcludeTip = 'Odfiltruj · bez '.$categoryLabel;
     $categoryEdit = 'startEdit('.$task->id.', \'category\')';
 @endphp
 @if($ediCategory)
@@ -17,15 +20,19 @@
         :class="$chipClass"
         :main-click="$categoryClick"
         :main-tip="$task->category ? 'Pokaż tę kategorię' : 'Pokaż bez kategorii'"
+        :exclude-click="$categoryExclude"
+        :exclude-tip="$categoryExcludeTip"
         side="edit"
         :side-click="$categoryEdit"
         :side-tip="$task->category ? 'Edytuj kategorię' : 'Wpisz kategorię'"
-    >{{ $task->category ?: 'Brak' }}</x-tasks.col-chip>
+    >{{ $categoryLabel }}</x-tasks.col-chip>
 @else
     <x-tasks.col-chip
         variant="category"
         :class="$chipClass"
         :main-click="$categoryClick"
         :main-tip="$task->category ? 'Pokaż tę kategorię' : 'Pokaż bez kategorii'"
-    >{{ $task->category ?: 'Brak' }}</x-tasks.col-chip>
+        :exclude-click="$categoryExclude"
+        :exclude-tip="$categoryExcludeTip"
+    >{{ $categoryLabel }}</x-tasks.col-chip>
 @endif

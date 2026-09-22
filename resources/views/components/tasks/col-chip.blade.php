@@ -8,6 +8,8 @@
     'sideTip' => null,
     'mainClick' => null,
     'mainTip' => null,
+    'excludeClick' => null,
+    'excludeTip' => null,
     'static' => false,
 ])
 
@@ -32,6 +34,8 @@
     :side="$side"
     :side-click="$sideClick"
     :side-tip="$sideTip"
+    :exclude-click="$excludeClick"
+    :exclude-tip="$excludeTip"
     :static="$static"
 >
     <i class="bi bi-{{ $icon }}" aria-hidden="true"></i>

@@ -6,6 +6,8 @@
     'sideClick' => null,
     'sideTip' => null,
     'openMenu' => null,
+    'excludeClick' => null,
+    'excludeTip' => null,
     'static' => false,
 ])
 
@@ -14,27 +16,42 @@
     $mainClick = is_string($mainClick) && $mainClick !== '' ? $mainClick : null;
     $sideClick = is_string($sideClick) && $sideClick !== '' ? $sideClick : null;
     $openMenu = is_string($openMenu) && $openMenu !== '' ? $openMenu : null;
+    $excludeClick = is_string($excludeClick) && $excludeClick !== '' ? $excludeClick : null;
     $side = in_array($side, ['down', 'edit'], true) ? $side : 'none';
     if ($openMenu && $side === 'none') {
         $side = 'down';
     }
-    $split = $side !== 'none' && ($href || $mainClick || $sideClick || $openMenu);
+    $hasSide = $side !== 'none' && ($href || $mainClick || $sideClick || $openMenu);
+    $hasExclude = $excludeClick !== null;
+    $compound = $hasSide || $hasExclude;
     $sideIcon = $side === 'edit' ? 'pencil' : 'chevron-down';
-    $classes = $split ? 'tg-col-chip--split' : '';
+    $classes = trim(($compound ? 'tg-col-chip--split' : '').($hasExclude ? ' tg-col-chip--has-exclude' : ''));
     $mainTip = $mainTip ?: null;
     $sideTip = $sideTip ?: null;
+    $excludeTip = $excludeTip ?: 'Odfiltruj';
 @endphp
 
 @if($static)
     <span {{ $attributes->class($classes) }}>
-        @if($split)
+        @if($compound)
             <span class="tg-col-chip__main">{{ $slot }}</span>
         @else
             {{ $slot }}
         @endif
     </span>
-@elseif($split)
+@elseif($compound)
     <div {{ $attributes->except(['wire:click', 'wire:click.stop'])->class($classes) }}>
+        @if($hasExclude)
+            <button
+                type="button"
+                class="tg-col-chip__exclude"
+                wire:click.stop="{!! $excludeClick !!}"
+                data-tip="{{ $excludeTip }}"
+                aria-label="{{ $excludeTip }}"
+            >
+                <i class="bi bi-x" aria-hidden="true"></i>
+            </button>
+        @endif
         @if($href)
             <a href="{{ $href }}" class="tg-col-chip__main" @if($mainTip) data-tip="{{ $mainTip }}" aria-label="{{ $mainTip }}" @endif>
                 {{ $slot }}
@@ -46,15 +63,17 @@
         @else
             <span class="tg-col-chip__main">{{ $slot }}</span>
         @endif
-        <button
-            type="button"
-            class="tg-col-chip__side"
-            @if($openMenu) @click.stop="{{ $openMenu }}"
-            @elseif($sideClick) wire:click.stop="{!! $sideClick !!}" @endif
-            @if($sideTip) data-tip="{{ $sideTip }}" aria-label="{{ $sideTip }}" @endif
-        >
-            <i class="bi bi-{{ $sideIcon }}" aria-hidden="true"></i>
-        </button>
+        @if($hasSide)
+            <button
+                type="button"
+                class="tg-col-chip__side"
+                @if($openMenu) @click.stop="{{ $openMenu }}"
+                @elseif($sideClick) wire:click.stop="{!! $sideClick !!}" @endif
+                @if($sideTip) data-tip="{{ $sideTip }}" aria-label="{{ $sideTip }}" @endif
+            >
+                <i class="bi bi-{{ $sideIcon }}" aria-hidden="true"></i>
+            </button>
+        @endif
     </div>
 @elseif($href)
     <a href="{{ $href }}" {{ $attributes->except(['wire:click', 'wire:click.stop']) }} @if($mainTip) data-tip="{{ $mainTip }}" @endif>

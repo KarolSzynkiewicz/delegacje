@@ -498,6 +498,7 @@ class WorkItemBacklogTest extends TestCase
             ->test(TasksGrid::class)
             ->assertSeeHtml('href="'.e(route('sprints.show', $sprint)).'"')
             ->assertSeeHtml('Zmień sprint')
+            ->assertSeeHtml("pinFilter('filterSprint', '{$sprint->id}')")
             ->assertSee('Sprint HQ')
             ->assertSeeHtml("quickSprintChange({$item->id}, '{$sprint->id}')")
             ->assertSeeHtml("startEdit({$item->id}, 'name'")
@@ -520,7 +521,7 @@ class WorkItemBacklogTest extends TestCase
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
             ->assertSeeHtml("quickSprintChange({$item->id}, '')")
-            ->assertSeeHtml("filterBySprint('none')")
+            ->assertSeeHtml("pinFilter('filterSprint', 'none')")
             ->assertSee('Poza sprintem')
             ->call('quickSprintChange', $item->id, '')
             ->assertSet('editingField', '');
@@ -573,7 +574,7 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml("filterByCategory('Wyjazdy')")
+            ->assertSeeHtml("pinFilter('searchCategory', 'Wyjazdy')")
             ->assertSeeHtml("startEdit({$item->id}, 'category'")
             ->call('filterByCategory', 'Wyjazdy')
             ->assertSet('searchCategory', 'Wyjazdy')
@@ -605,9 +606,10 @@ class WorkItemBacklogTest extends TestCase
 
         $component = Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml("filterByCategory('__none__')")
-            ->assertSeeHtml("filterBySprint('none')")
-            ->assertSeeHtml("filterByPriority('none')")
+            ->assertSeeHtml("pinFilter('searchCategory', '__none__')")
+            ->assertSeeHtml("pinFilter('filterSprint', 'none')")
+            ->assertSeeHtml("pinFilter('filterPriority', 'none')")
+            ->assertSeeHtml("pinFilter('searchCategory', '__none__', 'neq')")
             ->assertSeeHtml("startEdit({$item->id}, 'category'")
             ->call('filterByCategory', '__none__')
             ->assertSet('searchCategory', '__none__')
@@ -629,6 +631,51 @@ class WorkItemBacklogTest extends TestCase
             ->assertSee('Sprint: Poza sprintem');
     }
 
+    public function test_chip_exclude_pins_neq_and_due_date_filters_on_or_before(): void
+    {
+        ProjectTask::query()->create([
+            'name' => 'Wcześniej',
+            'status' => TaskStatus::PENDING,
+            'priority' => 3,
+            'due_date' => '2026-09-03',
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $later = ProjectTask::query()->create([
+            'name' => 'Później',
+            'status' => TaskStatus::IN_PROGRESS,
+            'priority' => 5,
+            'due_date' => '2026-09-20',
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
+        $item = WorkItem::query()
+            ->where('source_type', $later->getMorphClass())
+            ->where('source_id', $later->id)
+            ->first();
+
+        $component = Livewire::actingAs($this->user)
+            ->test(TasksGrid::class)
+            ->assertSeeHtml("pinFilter('status', 'in_progress', 'neq')")
+            ->assertSeeHtml("pinFilter('filterDueDate', '2026-09-20')")
+            ->assertSeeHtml("startEdit({$item->id}, 'due_date'")
+            ->call('pinFilter', 'status', 'pending', 'neq')
+            ->assertSet('selectedStatuses', ['pending'])
+            ->assertSet('filterOps.status', 'neq')
+            ->assertSee('Status: ≠ Oczekujące')
+            ->assertSee('Później')
+            ->assertDontSee('Wcześniej');
+
+        $component->call('clearFilters')
+            ->call('pinFilter', 'filterDueDate', '2026-09-03', 'eq')
+            ->assertSet('filterDueDate', '2026-09-03')
+            ->assertSee('Do kiedy: do 03.09.2026')
+            ->assertSee('Wcześniej')
+            ->assertDontSee('Później')
+            ->call('startEdit', $item->id, 'due_date')
+            ->assertSet('editingField', 'due_date');
+    }
+
     public function test_priority_chip_opens_status_like_picker(): void
     {
         $task = ProjectTask::query()->create([
@@ -645,7 +692,7 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml("filterByPriority('5')")
+            ->assertSeeHtml("pinFilter('filterPriority', '5')")
             ->assertSeeHtml("quickPriorityChange({$item->id}, '5')")
             ->assertSeeHtml("quickPriorityChange({$item->id}, '')")
             ->call('quickPriorityChange', $item->id, '3');
@@ -669,7 +716,7 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml("filterByStatus('pending')")
+            ->assertSeeHtml("pinFilter('status', 'pending')")
             ->assertSeeHtml("quickStatusChange({$item->id}, 'pending')")
             ->call('filterByStatus', 'pending')
             ->assertSet('selectedStatuses', ['pending'])
@@ -701,7 +748,7 @@ class WorkItemBacklogTest extends TestCase
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
-            ->assertSeeHtml("filterByAssignee('unassigned')")
+            ->assertSeeHtml("pinFilter('assignedFilter', 'unassigned')")
             ->assertSeeHtml("quickAssigneeChange({$item->id}, '')")
             ->assertSeeHtml("quickAssigneeChange({$item->id}, '{$other->id}')")
             ->call('filterByAssignee', 'unassigned')

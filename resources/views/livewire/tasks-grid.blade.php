@@ -490,6 +490,10 @@
         gap: 0;
         padding: 2px 2px 2px 0;
     }
+    .xuiv2-tasks .tg-status-badge.tg-col-chip--has-exclude,
+    .xuiv2-tasks .tg-time-chip.tg-col-chip--has-exclude {
+        padding-left: 2px;
+    }
     .xuiv2-tasks button.tg-status-badge:hover { filter: brightness(1.18); cursor: pointer; }
     .xuiv2-tasks .tg-status-badge.s-pending    { background: rgba(245,158,11,.18); color: #f59e0b; border: 1px solid rgba(245,158,11,.35); }
     .xuiv2-tasks .tg-status-badge.s-in_progress{ background: rgba(168,85,247,.18); color: #c084fc; border: 1px solid rgba(168,85,247,.35); }
@@ -499,11 +503,21 @@
     .xuiv2-tasks td:has(.tg-col-chip--sprint),
     .xuiv2-tasks td:has(.tg-col-chip--category),
     .xuiv2-tasks td:has(.tg-col-chip--priority),
-    .xuiv2-tasks td:has(.tg-col-chip--assignee) {
+    .xuiv2-tasks td:has(.tg-col-chip--assignee),
+    .xuiv2-tasks td:has(.tg-time-chip) {
         overflow: hidden;
         min-width: 0;
         position: relative;
         z-index: 1;
+    }
+    .xuiv2-tasks td:has(.tg-col-chip:hover),
+    .xuiv2-tasks td:has(.tg-col-chip:focus-within),
+    .xuiv2-tasks td:has(.tg-status-badge:hover),
+    .xuiv2-tasks td:has(.tg-status-badge:focus-within),
+    .xuiv2-tasks td:has(.tg-time-chip:hover),
+    .xuiv2-tasks td:has(.tg-time-chip:focus-within) {
+        overflow: visible;
+        z-index: 12;
     }
     .xuiv2-tasks td:has(.tg-col-chip--sprint) {
         max-width: var(--tg-w-sprint, 16rem);
@@ -533,11 +547,14 @@
         appearance: none;
         cursor: pointer;
         transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
-        overflow: hidden;
+        overflow: visible;
     }
     .xuiv2-tasks .tg-col-chip--split {
         gap: 0;
         padding: 2px 2px 2px 0;
+    }
+    .xuiv2-tasks .tg-col-chip--has-exclude {
+        padding-left: 2px;
     }
     .xuiv2-tasks .tg-col-chip__main {
         appearance: none;
@@ -588,6 +605,50 @@
         font-size: 0.62rem;
         opacity: 0.65;
     }
+    .xuiv2-tasks .tg-col-chip__exclude {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        appearance: none;
+        width: 1.45rem;
+        min-height: 1.45rem;
+        padding: 0;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: inherit;
+        font-size: 0.72rem;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s ease, background-color 0.12s ease;
+    }
+    .xuiv2-tasks .tg-col-chip__exclude i {
+        font-size: 0.78rem;
+        opacity: 0.85;
+    }
+    @media (hover: hover) {
+        .xuiv2-tasks .tg-col-chip:hover > .tg-col-chip__exclude,
+        .xuiv2-tasks .tg-col-chip:focus-within > .tg-col-chip__exclude,
+        .xuiv2-tasks .tg-status-badge:hover > .tg-col-chip__exclude,
+        .xuiv2-tasks .tg-status-badge:focus-within > .tg-col-chip__exclude,
+        .xuiv2-tasks .tg-time-chip:hover > .tg-col-chip__exclude,
+        .xuiv2-tasks .tg-time-chip:focus-within > .tg-col-chip__exclude {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .xuiv2-tasks .tg-col-chip__exclude:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+    }
+    @media (hover: none) {
+        .xuiv2-tasks .tg-col-chip__exclude {
+            opacity: 0.75;
+            pointer-events: auto;
+        }
+    }
     .xuiv2-tasks .tg-col-chip__side {
         flex-shrink: 0;
         display: inline-flex;
@@ -615,14 +676,16 @@
         cursor: inherit;
     }
     .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__main,
-    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__side {
+    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__side,
+    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__exclude {
         transform: none;
         box-shadow: none;
         filter: none;
         position: relative;
         z-index: 1;
     }
-    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__side {
+    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__side,
+    .xuiv2-tasks .tg-col-chip--split > .tg-col-chip__exclude {
         z-index: 2;
     }
     @media (hover: hover) {
@@ -713,7 +776,8 @@
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);
         }
         .xuiv2-tasks a.tg-time-chip--cal.tg-time-chip--scheduled:hover,
-        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--ok:hover {
+        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--ok:hover,
+        .xuiv2-tasks .tg-time-chip--due.tg-time-chip--ok.tg-col-chip--split:hover {
             background: rgba(59, 130, 246, 0.28);
             border-color: rgba(168, 85, 247, 0.55);
             color: #ddd6fe;
@@ -722,7 +786,8 @@
             box-shadow: 0 4px 15px rgba(168, 85, 247, 0.38);
         }
         .xuiv2-tasks a.tg-time-chip--cal.tg-time-chip--stale:hover,
-        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--soon:hover {
+        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--soon:hover,
+        .xuiv2-tasks .tg-time-chip--due.tg-time-chip--soon.tg-col-chip--split:hover {
             background: rgba(245, 158, 11, 0.26);
             border-color: rgba(245, 158, 11, 0.55);
             color: #fdba74;
@@ -730,7 +795,8 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
         }
-        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--late:hover {
+        .xuiv2-tasks button.tg-time-chip--due.tg-time-chip--late:hover,
+        .xuiv2-tasks .tg-time-chip--due.tg-time-chip--late.tg-col-chip--split:hover {
             background: rgba(239, 68, 68, 0.28);
             border-color: rgba(239, 68, 68, 0.55);
             color: #fca5a5;
@@ -739,7 +805,8 @@
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
         }
         .xuiv2-tasks a.tg-time-chip--none:hover,
-        .xuiv2-tasks button.tg-time-chip--none:hover {
+        .xuiv2-tasks button.tg-time-chip--none:hover,
+        .xuiv2-tasks .tg-time-chip--none.tg-col-chip--split:hover {
             background: rgba(148, 163, 184, 0.18);
             border-color: rgba(148, 163, 184, 0.42);
             color: #cbd5e1;
@@ -1265,7 +1332,12 @@
     .xuiv2-tasks td:has(.tg-time-chip),
     .xuiv2-tasks .dt-card__value:has(.tg-time-chip) {
         min-width: 0;
-        overflow: hidden;
+    }
+    .xuiv2-tasks .dt-card__value:has(.tg-time-chip:hover),
+    .xuiv2-tasks .dt-card__value:has(.tg-time-chip:focus-within) {
+        overflow: visible;
+        z-index: 12;
+        position: relative;
     }
     .xuiv2-tasks .tg-time-chip {
         display: inline-flex;
@@ -1288,6 +1360,11 @@
         color: inherit;
         background: rgba(255, 255, 255, 0.04);
         transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+        overflow: visible;
+    }
+    .xuiv2-tasks .tg-time-chip.tg-col-chip--split {
+        gap: 0;
+        padding: 2px 2px 2px 2px;
     }
     .xuiv2-tasks .tg-time-chip--static {
         cursor: default;

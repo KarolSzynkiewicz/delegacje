@@ -3,7 +3,9 @@
     $assignee = $task->assignedTo;
     $assigneeKey = $assignee ? (string) $assignee->id : 'unassigned';
     $assigneeLabel = $assignee?->name ?: 'Brak';
-    $assigneeFilter = $this->isPlanQueue() ? null : 'filterByAssignee(\''.$assigneeKey.'\')';
+    $assigneeFilter = $this->pinClick('assignedFilter', $assigneeKey);
+    $assigneeExclude = $this->pinClick('assignedFilter', $assigneeKey, 'neq');
+    $assigneeExcludeTip = 'Odfiltruj · bez '.$assigneeLabel;
     $canPickAssignee = $this->rowWritable($task, 'assigned_to');
 @endphp
 @if($isEditing && $editingField === 'assigned_to')
@@ -20,6 +22,8 @@
         :class="$chipClass"
         :min-width="220"
         :main-click="$assigneeFilter"
+        :exclude-click="$assigneeExclude"
+        :exclude-tip="$assigneeExcludeTip"
         open-label="{{ $assignee ? 'Pokaż zadania tej osoby' : 'Pokaż nieprzypisane' }}"
         change-label="Zmień osobę"
     >
@@ -37,6 +41,8 @@
         :class="$chipClass"
         :main-click="$assigneeFilter"
         :main-tip="$assignee ? 'Pokaż zadania tej osoby' : 'Pokaż nieprzypisane'"
+        :exclude-click="$assigneeExclude"
+        :exclude-tip="$assigneeExcludeTip"
     >{{ $assigneeLabel }}</x-tasks.col-chip>
 @else
     <span class="{{ $chipClass }}" style="cursor:default">

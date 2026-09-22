@@ -1,3 +1,11 @@
+@if($task->sprint)
+<li>
+    <a href="{{ route('sprints.show', $task->sprint) }}" class="dropdown-item py-2" @click="open=false">
+        Otwórz sprint
+    </a>
+</li>
+<li><hr class="dropdown-divider my-1"></li>
+@endif
 <li>
     <button type="button"
             class="dropdown-item py-2 {{ $task->sprint_id ? '' : 'active' }}"

@@ -62,7 +62,7 @@ class TasksGrid extends Component
     /** Priorytet 1–5 z kliknięcia w komórkę, albo `none` = bez priorytetu. Pusty = bez tego wymiaru. */
     public string $filterPriority = '';
 
-    /** Termin Y-m-d z kliknięcia w komórkę. Pusty = bez tego wymiaru. */
+    /** Termin Y-m-d (do tego dnia włącznie) albo `none`. Pusty = bez tego wymiaru. */
     public string $filterDueDate = '';
 
     /** `none` = poza sprintem. Pusty = bez tego wymiaru. */
@@ -927,6 +927,9 @@ class TasksGrid extends Component
             'searchTask' => 'eq',
             'searchCategory' => 'eq',
             'searchAssignedTo' => 'eq',
+            'filterPriority' => 'eq',
+            'filterSprint' => 'eq',
+            'filterDueDate' => 'eq',
         ];
     }
 
@@ -978,6 +981,12 @@ class TasksGrid extends Component
         if (in_array($name, ['searchTask', 'searchCategory', 'searchAssignedTo', 'filterPriority', 'filterDueDate', 'filterSprint', 'status', 'selectedStatuses', 'assignedFilter', 'assignedFilters', 'createdByFilter', 'createdByFilters', 'selectedTypes', 'filterJoin', 'filterOps'], true)) {
             $this->resetPage();
         }
+    }
+
+    public function updatedFilterDueDate(): void
+    {
+        $this->filterOps['filterDueDate'] = 'eq';
+        $this->detachActiveView();
     }
 
     public function updated(string $property): void
@@ -1071,15 +1080,17 @@ class TasksGrid extends Component
         }
 
         if ($this->filterPriority !== '') {
-            $chips[] = ['key' => 'filterPriority', 'label' => 'Priorytet: '.$this->priorityChipLabel($this->filterPriority)];
+            $neg = $this->filterOp('filterPriority') === 'neq';
+            $chips[] = ['key' => 'filterPriority', 'label' => ($neg ? 'Priorytet ≠ ' : 'Priorytet: ').$this->priorityChipLabel($this->filterPriority)];
         }
 
         if ($this->filterDueDate !== '') {
-            $chips[] = ['key' => 'filterDueDate', 'label' => 'Do kiedy: '.$this->dueDateChipLabel($this->filterDueDate)];
+            $chips[] = ['key' => 'filterDueDate', 'label' => $this->dueDateFilterChipLabel()];
         }
 
         if ($this->filterSprint !== '') {
-            $chips[] = ['key' => 'filterSprint', 'label' => 'Sprint: '.$this->sprintChipLabel($this->filterSprint)];
+            $neg = $this->filterOp('filterSprint') === 'neq';
+            $chips[] = ['key' => 'filterSprint', 'label' => ($neg ? 'Sprint ≠ ' : 'Sprint: ').$this->sprintChipLabel($this->filterSprint)];
         }
 
         // "all" to jedyna wartość statusu, która niczego nie odfiltrowuje —
@@ -1221,104 +1232,180 @@ class TasksGrid extends Component
         }
     }
 
-    public function filterByCategory(string $category): void
+    public function pinClick(string $key, string $value, string $op = 'eq'): ?string
     {
-        $category = trim($category);
-        if ($category === '') {
+        if (! $this->canPinFilter($key)) {
+            return null;
+        }
+
+        $encodedKey = $this->jsStr($key);
+        $encodedValue = $this->jsStr($value);
+        if ($op === 'neq') {
+            return 'pinFilter('.$encodedKey.', '.$encodedValue.', \'neq\')';
+        }
+
+        return 'pinFilter('.$encodedKey.', '.$encodedValue.')';
+    }
+
+    public function pinFilter(string $key, string $value, string $op = 'eq'): void
+    {
+        if (! $this->canPinFilter($key)) {
+            if ($this->isPlanQueue() && in_array($key, ['status', 'assignedFilter', 'filterSprint'], true)) {
+                $this->enforcePlanLocks();
+            }
+
             return;
         }
 
-        $this->searchCategory = $category === '__none__' ? '__none__' : mb_substr($category, 0, 255);
-        $this->filterOps['searchCategory'] = 'eq';
+        $op = $op === 'neq' ? 'neq' : 'eq';
+        if (! $this->applyPinValue($key, $value)) {
+            return;
+        }
+
+        if (array_key_exists($key, $this->defaultFilterOps())) {
+            $this->filterOps[$key] = $op;
+        }
+
         $this->resetPage();
         $this->detachActiveView();
-        $this->flashFilterChip('searchCategory');
+        $this->flashFilterChip($key);
+    }
+
+    public function filterByCategory(string $category): void
+    {
+        $this->pinFilter('searchCategory', $category, 'eq');
     }
 
     public function filterByStatus(string $status): void
     {
-        if ($this->isPlanQueue()) {
-            $this->enforcePlanLocks();
-
-            return;
-        }
-
-        if (! in_array($status, $this->allStatusValues(), true)) {
-            return;
-        }
-
-        $this->selectedStatuses = [$status];
-        $this->status = $this->statusBucketFromSelection($this->selectedStatuses);
-        $this->filterOps['status'] = 'eq';
-        $this->resetPage();
-        $this->detachActiveView();
-        $this->flashFilterChip('status');
+        $this->pinFilter('status', $status, 'eq');
     }
 
     public function filterByAssignee(string $key): void
     {
-        if ($this->isPlanQueue()) {
-            $this->enforcePlanLocks();
-
-            return;
-        }
-
-        $key = (string) $key;
-        if ($key !== 'unassigned' && $key !== 'me' && ! ctype_digit($key)) {
-            return;
-        }
-
-        $this->assignedFilters = [$key];
-        $this->assignedFilter = $key;
-        $this->filterOps['assignedFilter'] = 'eq';
-        $this->resetPage();
-        $this->detachActiveView();
-        $this->flashFilterChip('assignedFilter');
+        $this->pinFilter('assignedFilter', $key, 'eq');
     }
 
     public function filterByPriority(string $priority): void
     {
-        if (! in_array($priority, ['1', '2', '3', '4', '5', 'none'], true)) {
-            return;
-        }
-
-        $this->filterPriority = $priority;
-        $this->resetPage();
-        $this->detachActiveView();
-        $this->flashFilterChip('filterPriority');
+        $this->pinFilter('filterPriority', $priority, 'eq');
     }
 
     public function filterBySprint(string $sprint): void
     {
-        if ($this->isLockedToSprint() || $this->isPlanQueue()) {
-            return;
-        }
-
-        if ($sprint !== 'none' && ! ctype_digit($sprint)) {
-            return;
-        }
-
-        $this->filterSprint = $sprint;
-        $this->resetPage();
-        $this->detachActiveView();
-        $this->flashFilterChip('filterSprint');
+        $this->pinFilter('filterSprint', $sprint, 'eq');
     }
 
     public function filterByDueDate(string $date): void
     {
-        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-            return;
-        }
-
-        $this->filterDueDate = $date;
-        $this->resetPage();
-        $this->detachActiveView();
-        $this->flashFilterChip('filterDueDate');
+        $this->pinFilter('filterDueDate', $date, 'eq');
     }
 
     protected function flashFilterChip(string $key): void
     {
         $this->dispatch('tg-filter-flash', key: $key);
+    }
+
+    protected function canPinFilter(string $key): bool
+    {
+        if ($this->isPlanQueue() && in_array($key, ['status', 'assignedFilter', 'filterSprint'], true)) {
+            return false;
+        }
+
+        if ($this->isLockedToSprint() && $key === 'filterSprint') {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function applyPinValue(string $key, string $value): bool
+    {
+        return match ($key) {
+            'searchCategory' => $this->applyCategoryPin($value),
+            'status' => $this->applyStatusPin($value),
+            'assignedFilter' => $this->applyAssigneePin($value),
+            'filterPriority' => $this->applyPriorityPin($value),
+            'filterSprint' => $this->applySprintPin($value),
+            'filterDueDate' => $this->applyDueDatePin($value),
+            default => false,
+        };
+    }
+
+    protected function applyCategoryPin(string $category): bool
+    {
+        $category = trim($category);
+        if ($category === '') {
+            return false;
+        }
+
+        $this->searchCategory = $category === '__none__' ? '__none__' : mb_substr($category, 0, 255);
+        $this->filterOps['searchCategory'] = 'eq';
+
+        return true;
+    }
+
+    protected function applyStatusPin(string $status): bool
+    {
+        if (! in_array($status, $this->allStatusValues(), true)) {
+            return false;
+        }
+
+        $this->selectedStatuses = [$status];
+        $this->status = $this->statusBucketFromSelection($this->selectedStatuses);
+
+        return true;
+    }
+
+    protected function applyAssigneePin(string $key): bool
+    {
+        $key = (string) $key;
+        if ($key !== 'unassigned' && $key !== 'me' && ! ctype_digit($key)) {
+            return false;
+        }
+
+        $this->assignedFilters = [$key];
+        $this->assignedFilter = $key;
+
+        return true;
+    }
+
+    protected function applyPriorityPin(string $priority): bool
+    {
+        if (! in_array($priority, ['1', '2', '3', '4', '5', 'none'], true)) {
+            return false;
+        }
+
+        $this->filterPriority = $priority;
+
+        return true;
+    }
+
+    protected function applySprintPin(string $sprint): bool
+    {
+        if ($sprint !== 'none' && ! ctype_digit($sprint)) {
+            return false;
+        }
+
+        $this->filterSprint = $sprint;
+
+        return true;
+    }
+
+    protected function applyDueDatePin(string $date): bool
+    {
+        if ($date !== 'none' && ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return false;
+        }
+
+        $this->filterDueDate = $date;
+
+        return true;
+    }
+
+    protected function jsStr(string $value): string
+    {
+        return "'".str_replace(['\\', "'"], ['\\\\', "\\'"], $value)."'";
     }
 
     protected function categoryChipLabel(string $category): string
@@ -1328,7 +1415,15 @@ class TasksGrid extends Component
 
     protected function sprintChipLabel(string $sprint): string
     {
-        return $sprint === 'none' ? 'Poza sprintem' : $sprint;
+        if ($sprint === 'none') {
+            return 'Poza sprintem';
+        }
+
+        if (! ctype_digit($sprint)) {
+            return $sprint;
+        }
+
+        return Sprint::query()->whereKey((int) $sprint)->value('name') ?: $sprint;
     }
 
     protected function priorityChipLabel(string $priority): string
@@ -1346,11 +1441,27 @@ class TasksGrid extends Component
 
     protected function dueDateChipLabel(string $date): string
     {
+        if ($date === 'none') {
+            return 'Brak';
+        }
+
         try {
             return \Carbon\Carbon::createFromFormat('Y-m-d', $date)->format('d.m.Y');
         } catch (\Throwable) {
             return $date;
         }
+    }
+
+    protected function dueDateFilterChipLabel(): string
+    {
+        $label = $this->dueDateChipLabel($this->filterDueDate);
+        $neq = $this->filterOp('filterDueDate') === 'neq';
+
+        if ($this->filterDueDate === 'none') {
+            return ($neq ? 'Do kiedy ≠ ' : 'Do kiedy: ').$label;
+        }
+
+        return $neq ? 'Do kiedy: po '.$label : 'Do kiedy: do '.$label;
     }
 
     public function sortBy(string $field): void
@@ -1410,6 +1521,7 @@ class TasksGrid extends Component
             'created_by' => ['createdByFilter'],
             'priority' => ['filterPriority'],
             'due_date' => ['filterDueDate'],
+            'sprint' => ['filterSprint'],
             default => [],
         };
     }
@@ -4922,38 +5034,71 @@ class TasksGrid extends Component
 
         if ($this->filterPriority !== '') {
             $col = $workItems ? 'work_items.priority' : 'project_tasks.priority';
+            $neq = $this->filterOp('filterPriority') === 'neq';
             if ($this->filterPriority === 'none') {
-                $clauses[] = function (Builder $q) use ($col) {
-                    $q->whereNull($col);
+                $clauses[] = function (Builder $q) use ($col, $neq) {
+                    if ($neq) {
+                        $q->whereNotNull($col);
+                    } else {
+                        $q->whereNull($col);
+                    }
                 };
             } else {
                 $priority = (int) $this->filterPriority;
-                $clauses[] = function (Builder $q) use ($col, $priority) {
-                    $q->where($col, $priority);
+                $clauses[] = function (Builder $q) use ($col, $priority, $neq) {
+                    if ($neq) {
+                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, '!=', $priority));
+                    } else {
+                        $q->where($col, $priority);
+                    }
                 };
             }
         }
 
         if ($this->filterSprint !== '') {
             $col = $workItems ? 'work_items.sprint_id' : 'project_tasks.sprint_id';
+            $neq = $this->filterOp('filterSprint') === 'neq';
             if ($this->filterSprint === 'none') {
-                $clauses[] = function (Builder $q) use ($col) {
-                    $q->whereNull($col);
+                $clauses[] = function (Builder $q) use ($col, $neq) {
+                    if ($neq) {
+                        $q->whereNotNull($col);
+                    } else {
+                        $q->whereNull($col);
+                    }
                 };
             } elseif (ctype_digit($this->filterSprint)) {
                 $sprintId = (int) $this->filterSprint;
-                $clauses[] = function (Builder $q) use ($col, $sprintId) {
-                    $q->where($col, $sprintId);
+                $clauses[] = function (Builder $q) use ($col, $sprintId, $neq) {
+                    if ($neq) {
+                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhere($col, '!=', $sprintId));
+                    } else {
+                        $q->where($col, $sprintId);
+                    }
                 };
             }
         }
 
         if ($this->filterDueDate !== '') {
             $col = $workItems ? 'work_items.due_at' : 'project_tasks.due_date';
-            $day = $this->filterDueDate;
-            $clauses[] = function (Builder $q) use ($col, $day) {
-                $q->whereDate($col, $day);
-            };
+            $neq = $this->filterOp('filterDueDate') === 'neq';
+            if ($this->filterDueDate === 'none') {
+                $clauses[] = function (Builder $q) use ($col, $neq) {
+                    if ($neq) {
+                        $q->whereNotNull($col);
+                    } else {
+                        $q->whereNull($col);
+                    }
+                };
+            } else {
+                $day = $this->filterDueDate;
+                $clauses[] = function (Builder $q) use ($col, $day, $neq) {
+                    if ($neq) {
+                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhereDate($col, '>', $day));
+                    } else {
+                        $q->whereDate($col, '<=', $day);
+                    }
+                };
+            }
         }
 
         return $clauses;
