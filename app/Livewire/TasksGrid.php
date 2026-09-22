@@ -5273,7 +5273,7 @@ class TasksGrid extends Component
                 $day = $this->filterDueDate;
                 $clauses[] = function (Builder $q) use ($col, $day, $neq) {
                     if ($neq) {
-                        $q->where(fn (Builder $inner) => $inner->whereNull($col)->orWhereDate($col, '>', $day));
+                        $q->whereDate($col, '>', $day);
                     } else {
                         $q->whereDate($col, '<=', $day);
                     }

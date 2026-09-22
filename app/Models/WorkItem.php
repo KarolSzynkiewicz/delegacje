@@ -93,13 +93,11 @@ class WorkItem extends Model
 
                 return [$label];
             }
-        }
 
-        if (! $this->relationLoaded('timeBlocks')) {
             return [];
         }
 
-        return $this->timeBlocks
+        return $this->itemScheduleBlocks()
             ->sortBy('starts_at')
             ->values()
             ->map(fn (WorkItemTimeBlock $block) => $block->label())
@@ -161,13 +159,39 @@ class WorkItem extends Model
 
     public function scheduleChipLabel(): string
     {
-        $count = $this->scheduleSlotCount();
+        $state = $this->scheduleState();
+        if ($state === 'none') {
+            return 'Brak';
+        }
+
+        $prefix = $state === 'stale' ? 'Zaległy' : 'Zaplanowane';
+
+        return $prefix.' · '.$this->scheduleChipDetail();
+    }
+
+    public function scheduleHoverTip(): string
+    {
+        $pills = $this->schedulePills();
 
         return match ($this->scheduleState()) {
-            'stale' => 'Zaległy · '.$count,
-            'scheduled' => 'Zaplanowane · '.$this->polishSlotWord($count),
-            default => 'Brak',
+            'stale' => $pills === []
+                ? 'Slot przed dniem dzisiejszym — otwórz plan'
+                : 'Zaległe: '.implode(' · ', $pills),
+            'scheduled' => $pills === []
+                ? 'Otwórz plan przy tym slocie'
+                : implode(' · ', $pills),
+            default => 'Zaplanuj w kalendarzu',
         };
+    }
+
+    protected function scheduleChipDetail(): string
+    {
+        $count = $this->scheduleSlotCount();
+        if ($count === 1) {
+            return $this->schedulePills()[0] ?? $this->polishSlotWord(1);
+        }
+
+        return $this->polishSlotWord($count);
     }
 
     protected function polishSlotWord(int $count): string

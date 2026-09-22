@@ -39,11 +39,17 @@ class TaskCreationService
                 $dueDate = \Illuminate\Support\Carbon::parse($startsAt)->toDateString();
             }
 
+            $intended = $data['work_item_type'] ?? null;
+            $category = isset($data['category']) ? trim((string) $data['category']) : '';
+            if ($category === '' && $intended === WorkItemType::Meeting) {
+                $category = 'Spotkanie';
+            }
+
             $task = new ProjectTask([
                 'name' => $data['name'],
                 'description' => $data['description'] ?? null,
                 'status' => TaskStatus::PENDING,
-                'category' => $data['category'] ?? null,
+                'category' => $category !== '' ? $category : null,
                 'priority' => $data['priority'] ?? null,
                 'due_date' => $dueDate,
                 'starts_at' => $startsAt,
@@ -57,7 +63,6 @@ class TaskCreationService
                     : null,
                 'created_by' => $creator->id,
             ]);
-            $intended = $data['work_item_type'] ?? null;
             if ($intended instanceof WorkItemType) {
                 $task->intendedWorkItemType = $intended;
             }

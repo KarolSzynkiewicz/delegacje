@@ -200,7 +200,8 @@
     @if(in_array('due_date', $visibleColumns))
         @php $ediDue = $this->ediCell($task, 'due_date'); @endphp
         <div class="dt-card__row">
-            <span class="dt-card__label">Do kiedy</span>
+            <span class="dt-card__label"
+                  data-tip="Klik na dacie: do tego dnia. × : później niż ta data.">Do kiedy</span>
             <span class="dt-card__value">
                 @if($ediDue)
                     <span class="tg-edi tg-edi--{{ $ediDue['kind'] }}">
@@ -222,7 +223,7 @@
             <span class="dt-card__label">W kalendarzu</span>
             <span class="dt-card__value">
                 @if($isWorkItem)
-                    @include('livewire.partials.tg-schedule-cell', ['item' => $task, 'assignFirst' => true, 'assignClickStop' => true])
+                    @include('livewire.partials.tg-schedule-cell', ['item' => $task, 'assignFirst' => true, 'assignClickStop' => true, 'showSlotList' => true])
                 @else
                     <span class="text-muted">—</span>
                 @endif

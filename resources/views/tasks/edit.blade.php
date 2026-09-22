@@ -147,8 +147,7 @@
                             @endforeach
                         </x-ui.input>
                     </div>
-                    
-                    @unless($lockWorkflow)
+
                     <div class="mb-3">
                         <x-ui.input 
                             type="text" 
@@ -158,7 +157,6 @@
                             placeholder="np. Bug, Feature, Dokumentacja..."
                         />
                     </div>
-                    @endunless
 
                     @if($task->attachments->count() > 0)
                         <div class="mb-3">

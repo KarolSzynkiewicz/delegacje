@@ -7,12 +7,13 @@
         && $this->rowWritable($item, 'assigned_to');
     $scheduleTitle = match (true) {
         $assignFirst => 'Najpierw przypisz osobę — bez tego nie wejdzie do planu',
-        $scheduleState === 'stale' => 'Slot przed dniem dzisiejszym — otwórz plan',
-        $scheduleState === 'scheduled' => 'Otwórz plan przy tym slocie',
-        default => 'Zaplanuj w kalendarzu',
+        default => $item->scheduleHoverTip(),
     };
     $chipClass = 'tg-time-chip tg-time-chip--cal tg-time-chip--'.$scheduleState.' tg-schedule tg-schedule--'.$scheduleState.' tg-dt-hit';
+    $showSlotList = (bool) ($showSlotList ?? false);
+    $slotPills = $showSlotList && $item->scheduleSlotCount() > 1 ? $item->schedulePills() : [];
 @endphp
+<div @class(['tg-schedule-stack' => $slotPills !== []])>
 @if($assignFirst)
     <button type="button"
             class="{{ $chipClass }}"
@@ -37,3 +38,11 @@
         <i class="bi bi-chevron-right tg-time-chip__go" aria-hidden="true"></i>
     </a>
 @endif
+@if($slotPills !== [])
+    <ul class="tg-schedule-slots">
+        @foreach($slotPills as $pill)
+            <li>{{ $pill }}</li>
+        @endforeach
+    </ul>
+@endif
+</div>

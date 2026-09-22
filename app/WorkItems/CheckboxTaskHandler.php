@@ -19,6 +19,7 @@ class CheckboxTaskHandler implements HandlesWorkItem
             GridField::AssignedTo,
             GridField::Priority,
             GridField::DueDate,
+            GridField::Category,
         ], true);
     }
 
@@ -73,6 +74,6 @@ class CheckboxTaskHandler implements HandlesWorkItem
 
     public function relocatable(GridField $field): bool
     {
-        return in_array($field, [GridField::Sprint, GridField::AssignedTo, GridField::Priority], true);
+        return in_array($field, [GridField::Sprint, GridField::AssignedTo, GridField::Priority, GridField::Category], true);
     }
 }

@@ -18,6 +18,7 @@ class ProcedureRunHandler implements HandlesWorkItem
             GridField::Priority,
             GridField::DueDate,
             GridField::Comments,
+            GridField::Category,
         ], true);
     }
 
@@ -29,6 +30,7 @@ class ProcedureRunHandler implements HandlesWorkItem
             GridField::AssignedTo,
             GridField::Priority,
             GridField::DueDate,
+            GridField::Category,
         ], true);
     }
 

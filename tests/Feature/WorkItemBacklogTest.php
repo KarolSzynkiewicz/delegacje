@@ -266,13 +266,16 @@ class WorkItemBacklogTest extends TestCase
         $item = WorkItem::query()->first();
         $this->assertSame(WorkItemType::Meeting, $item->type);
         $this->assertFalse($item->expandable());
+        $this->assertTrue($item->supports('category'));
+        $this->assertTrue($item->writable('category'));
         $this->assertSame(\App\WorkItems\StatusWidget::BinarySelect, $item->statusWidget());
 
         Livewire::actingAs($this->user)
             ->test(TasksGrid::class)
             ->assertSee('Spotkanie rekrutacyjne: Jan Kowalski #12')
             ->assertSee('Spotkanie')
-            ->assertSee('Oczekujące');
+            ->assertSee('Oczekujące')
+            ->assertSeeHtml("startEdit({$item->id}, 'category'");
     }
 
     public function test_callback_show_page_is_not_a_task_workspace(): void
@@ -641,6 +644,14 @@ class WorkItemBacklogTest extends TestCase
             'assigned_to' => $this->user->id,
             'created_by' => $this->user->id,
         ]);
+        ProjectTask::query()->create([
+            'name' => 'Bez daty',
+            'status' => TaskStatus::PENDING,
+            'priority' => 2,
+            'due_date' => null,
+            'assigned_to' => $this->user->id,
+            'created_by' => $this->user->id,
+        ]);
         $later = ProjectTask::query()->create([
             'name' => 'Później',
             'status' => TaskStatus::IN_PROGRESS,
@@ -658,6 +669,9 @@ class WorkItemBacklogTest extends TestCase
             ->test(TasksGrid::class)
             ->assertSeeHtml("pinFilter('status', 'in_progress', 'neq')")
             ->assertSeeHtml("pinFilter('filterDueDate', '2026-09-20')")
+            ->assertSeeHtml("pinFilter('filterDueDate', '2026-09-20', 'neq')")
+            ->assertSeeHtml('Pokaż później niż ten dzień')
+            ->assertSeeHtml('Klik na dacie: do tego dnia włącznie')
             ->assertSeeHtml("startEdit({$item->id}, 'due_date'")
             ->call('pinFilter', 'status', 'pending', 'neq')
             ->assertSet('selectedStatuses', ['pending'])
@@ -672,6 +686,15 @@ class WorkItemBacklogTest extends TestCase
             ->assertSee('Do kiedy: do 03.09.2026')
             ->assertSee('Wcześniej')
             ->assertDontSee('Później')
+            ->assertDontSee('Bez daty')
+            ->call('clearFilters')
+            ->call('pinFilter', 'filterDueDate', '2026-09-03', 'neq')
+            ->assertSet('filterDueDate', '2026-09-03')
+            ->assertSet('filterOps.filterDueDate', 'neq')
+            ->assertSee('Do kiedy: po 03.09.2026')
+            ->assertSee('Później')
+            ->assertDontSee('Wcześniej')
+            ->assertDontSee('Bez daty')
             ->call('startEdit', $item->id, 'due_date')
             ->assertSet('editingField', 'due_date');
     }

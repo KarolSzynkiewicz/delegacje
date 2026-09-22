@@ -256,6 +256,31 @@
         background: rgba(168, 85, 247, 0.38);
         color: #fff;
     }
+    .tg-col-legend {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.15rem;
+        height: 1.15rem;
+        margin-left: .2rem;
+        padding: 0;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--text-muted, #94a3b8);
+        font-size: .72rem;
+        line-height: 1;
+        vertical-align: middle;
+        cursor: help;
+        pointer-events: auto;
+        opacity: .7;
+    }
+    .tg-col-legend:hover,
+    .tg-col-legend:focus-visible {
+        opacity: 1;
+        color: #ddd6fe;
+        background: rgba(168, 85, 247, 0.2);
+    }
 
     /* All text inside any dropdown rendered by this component must be light */
     .dropdown-menu { color: var(--text-main, #f1f5f9) !important; }
@@ -1429,6 +1454,30 @@
         color: rgba(241, 245, 249, 0.45);
     }
     .xuiv2-tasks .tg-time-chip--none .tg-time-chip__icon {
+        background: rgba(255, 255, 255, 0.04);
+        color: rgba(241, 245, 249, 0.4);
+    }
+    .xuiv2-tasks .tg-schedule-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.3rem;
+        width: 100%;
+        min-width: 0;
+    }
+    .xuiv2-tasks .tg-schedule-slots {
+        list-style: none;
+        margin: 0;
+        padding: 0 0.15rem 0 1.85rem;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 0.7rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-muted, #94a3b8);
+        line-height: 1.35;
+    }
+    .xuiv2-tasks .tg-schedule-slots li + li {
+        margin-top: 0.1rem;
+    }
         background: rgba(255, 255, 255, 0.05);
         color: rgba(241, 245, 249, 0.45);
     }
@@ -1963,6 +2012,15 @@
                                 <i class="bi bi-arrow-down-up ms-1 opacity-25" style="font-size:0.65rem"></i>
                             @endif
                         </span>
+                        @if($colKey === 'due_date')
+                            <button type="button"
+                                    class="tg-col-legend"
+                                    data-tip="Klik na dacie: do tego dnia włącznie. × : później niż ta data (karty z terminem)."
+                                    aria-label="Jak działa filtr Do kiedy"
+                                    @click.stop>
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
+                        @endif
                         @if($colFiltered)
                             <button type="button"
                                     class="tg-col-filter-mark"

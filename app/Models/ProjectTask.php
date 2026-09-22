@@ -88,6 +88,10 @@ class ProjectTask extends Model
      */
     public static function createIntended(WorkItemType $type, array $attributes): static
     {
+        if ($type === WorkItemType::Meeting && trim((string) ($attributes['category'] ?? '')) === '') {
+            $attributes['category'] = 'Spotkanie';
+        }
+
         $task = new static($attributes);
         $task->intendedWorkItemType = $type;
         $task->save();

@@ -105,7 +105,7 @@ class ProcedureRunService
             ProjectTask::create([
                 'name' => $params['task_name'],
                 'description' => $params['description'] ?? null,
-                'category' => ($params['category'] ?? null) ?: 'Procedura',
+                'category' => $this->taskCategory($template, $params),
                 'status' => TaskStatus::IN_PROGRESS,
                 'assigned_to' => $params['assigned_to'] ?? null,
                 'due_date' => $params['due_date'] ?? null,
@@ -121,6 +121,21 @@ class ProcedureRunService
         $this->leaveStartNodes($run);
 
         return $run->fresh()->load(['task', 'version', 'steps']);
+    }
+
+    /**
+     * @param  array{category?: string|null}  $params
+     */
+    private function taskCategory(ProcedureTemplate $template, array $params): string
+    {
+        $fromParams = trim((string) ($params['category'] ?? ''));
+        if ($fromParams !== '') {
+            return $fromParams;
+        }
+
+        $fromTemplate = trim((string) ($template->category ?? ''));
+
+        return $fromTemplate !== '' ? $fromTemplate : 'Procedura';
     }
 
     /**

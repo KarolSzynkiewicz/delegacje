@@ -22,6 +22,8 @@
         sessionNamePrompt: null,
         sessionNameDraft: '',
         dueOpen: '',
+        grabHint: null,
+        grabHintTimer: null,
         hourPx: {{ $hourPx }},
         startHour: {{ $gridStartHour }},
         viewStartHour: {{ $viewStartHour }},
@@ -211,14 +213,23 @@
             this.syncQueueSelectedClass(input);
             this.lastQueueSelectId = id;
         },
-        onQueueSelectClick(event) {
+        queueSelectInput(event) {
             const wrap = event.target.closest('#wiPlan [data-plan-queue] .tg-select');
-            if (!wrap || !this.$el.contains(wrap)) return;
-            const input = wrap.querySelector('input[type=\'checkbox\']');
+            if (!wrap || !this.$el.contains(wrap)) return null;
+            return wrap.querySelector('input[type=\'checkbox\']');
+        },
+        onQueueSelectPointerDown(event) {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            const input = this.queueSelectInput(event);
             if (!input) return;
             event.preventDefault();
             event.stopPropagation();
             this.toggleQueueSelect(event, Number(input.value), input);
+        },
+        onQueueSelectClick(event) {
+            if (!this.queueSelectInput(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
         },
         applyDrawPointer(clientY) {
             if (!this.drawing || this.drawing.allDay) return;
@@ -483,6 +494,28 @@
             const minutes = this.slotFromY(event.clientY, hit.col);
             this.dropQueueOnCalendar(payload, hit.date, minutes, false, copy);
         },
+        showGrabHint(host, fromX, fromY) {
+            if (this.grabHint || !host) return;
+            const grip = host.querySelector('.wi-plan__grip');
+            if (!grip) return;
+            const r = grip.getBoundingClientRect();
+            this.grabHint = {
+                fromX,
+                fromY,
+                toX: r.left + Math.min(10, r.width / 2),
+                toY: r.top + r.height / 2,
+            };
+            grip.classList.add('is-nudge');
+            host.classList.add('is-nudge');
+        },
+        clearGrabHint() {
+            if (this.grabHintTimer) {
+                clearTimeout(this.grabHintTimer);
+                this.grabHintTimer = null;
+            }
+            this.grabHint = null;
+            document.querySelectorAll('#wiPlan .is-nudge').forEach((el) => el.classList.remove('is-nudge'));
+        },
         beginOpen(event, kind, id) {
             if (this.payload || this.resizing || this.drawing || !id) return;
             if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -490,13 +523,27 @@
             event.stopPropagation();
             const x0 = event.clientX;
             const y0 = event.clientY;
-            this.trackPointer(event, () => {}, (e) => {
+            const host = event.currentTarget;
+            let nudged = false;
+            this.trackPointer(event, (e) => {
+                const dx = e.clientX - x0;
+                const dy = e.clientY - y0;
+                if (!nudged && (dx * dx + dy * dy) >= 36) {
+                    nudged = true;
+                    this.showGrabHint(host, e.clientX, e.clientY);
+                }
+            }, (e) => {
                 const dx = e.clientX - x0;
                 const dy = e.clientY - y0;
                 if ((dx * dx + dy * dy) < 36) {
+                    this.clearGrabHint();
                     this.swallowNextClick();
                     $wire.openEvent(kind, id);
+                    return;
                 }
+                this.swallowNextClick();
+                if (this.grabHintTimer) clearTimeout(this.grabHintTimer);
+                this.grabHintTimer = window.setTimeout(() => this.clearGrabHint(), 900);
             });
         },
         onQueueGrip(event) {
@@ -528,6 +575,7 @@
             if (event.target.closest(blocked)) return;
             event.preventDefault();
             event.stopPropagation();
+            this.clearGrabHint();
             this.payload = {
                 kind,
                 id,
@@ -651,18 +699,25 @@
         },
         init() {
             this.scrollToWorkHours();
+            if (this.$el.dataset.queueSelectBound === '1') return;
+            this.$el.dataset.queueSelectBound = '1';
+            this.$el.addEventListener('pointerdown', (e) => this.onQueueSelectPointerDown(e), true);
             this.$el.addEventListener('click', (e) => this.onQueueSelectClick(e), true);
         }
      }">
 
     @if($undo)
-        <div class="wi-plan__undo"
+        <div class="wi-plan__undo-layer"
              wire:key="undo-{{ $undo['token'] }}"
              x-data
              x-init="setTimeout(() => $wire.dismissUndo(), 8000)">
-            <span>{{ $undo['message'] }}</span>
-            <button type="button" class="wi-plan__undo-action" wire:click="undoLastChange">Cofnij</button>
-            <button type="button" class="wi-plan__undo-close" title="Zamknij" wire:click="dismissUndo">×</button>
+            <div class="wi-plan__undo-flash" aria-hidden="true"></div>
+            <div class="wi-plan__undo" role="status" aria-live="polite">
+                <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                <span>{{ $undo['message'] }}</span>
+                <button type="button" class="wi-plan__undo-action" wire:click="undoLastChange">Cofnij</button>
+                <button type="button" class="wi-plan__undo-close" title="Zamknij" wire:click="dismissUndo">×</button>
+            </div>
         </div>
     @endif
 
@@ -1063,7 +1118,7 @@
         </div>
     @endif
 
-    <div x-show="sessionNamePrompt" x-cloak>
+    <div x-show="sessionNamePrompt" x-cloak @keydown.escape.window="if (sessionNamePrompt) cancelSessionName()">
         <div class="wi-plan__composer-backdrop" @click="cancelSessionName()"></div>
         <div class="wi-plan__composer" @click.stop>
             <div class="wi-plan__composer-head">
@@ -1091,7 +1146,12 @@
 
     @if($composerOpen)
         <div class="wi-plan__composer-backdrop" wire:click="closeComposer"></div>
-        <div class="wi-plan__composer" wire:click.stop>
+        <div class="wi-plan__composer"
+             wire:click.stop
+             role="dialog"
+             aria-modal="true"
+             aria-label="Nowy wpis"
+             @keydown.escape.window="$wire.closeComposer()">
             <div class="wi-plan__composer-head">
                 <span>{{ $composerUnscheduled ? ($composerType === 'meeting' ? 'Nowe spotkanie' : ($composerType === 'procedure' ? 'Nowa procedura' : 'Nowe zadanie')) : 'Nowy wpis' }}</span>
                 <button type="button" class="wi-plan__nav" wire:click="closeComposer">×</button>
@@ -1141,7 +1201,8 @@
                        class="form-control form-control-sm"
                        wire:model="composerTitle"
                        placeholder="{{ $composerType === 'meeting' ? 'Temat spotkania' : ($composerType === 'session' ? 'Nazwa (opcjonalnie)' : 'Nazwa') }}"
-                       x-init="$el.focus()">
+                       x-init="$el.focus()"
+                       wire:keydown.escape="closeComposer">
                 @error('composerTitle') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 @if($composerType === 'session')
                     <p class="wi-plan__composer-hint">Potem wrzucisz zadania z kolejki na tę kartę. Spotkań tu nie mieszaj.</p>
@@ -1180,6 +1241,14 @@
          :class="payload?.copy && 'is-copy'"
          :style="'left:' + ghostChip.x + 'px; top:' + ghostChip.y + 'px'"
          x-text="payload?.title"></div>
+
+    <div class="wi-plan__grab-hand"
+         x-show="grabHint"
+         x-cloak
+         aria-hidden="true"
+         :style="grabHint ? ('--from-x:' + grabHint.fromX + 'px; --from-y:' + grabHint.fromY + 'px; --to-x:' + grabHint.toX + 'px; --to-y:' + grabHint.toY + 'px') : ''">
+        <i class="bi bi-hand-index-thumb"></i>
+    </div>
 
 <style>
     .wi-plan { display: flex; flex-direction: column; gap: .75rem; min-height: calc(100vh - 8.5rem); position: relative; }
@@ -1275,6 +1344,16 @@
         border-radius: 10px !important;
         cursor: grab;
         user-select: none;
+    }
+    .wi-plan__queue .tg-select {
+        min-width: 1.85rem;
+        min-height: 1.85rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: .28rem;
+        margin: -.15rem .15rem -.15rem -.28rem;
+        cursor: pointer;
     }
     .wi-plan__queue .dt-card.card:active {
         cursor: grabbing;
@@ -1505,6 +1584,61 @@
         position: absolute; left: 0; top: 0; bottom: 0; width: 14px;
         z-index: 5; cursor: grab;
     }
+    .wi-plan__grip.is-nudge {
+        opacity: 1 !important;
+        background: linear-gradient(180deg, rgba(59, 130, 246, .55), rgba(168, 85, 247, .55));
+        animation: wi-plan-grip-pulse .5s ease 2;
+        transform-origin: left center;
+    }
+    .wi-plan__event.is-nudge,
+    .wi-plan__chip.is-nudge {
+        box-shadow: inset 3px 0 0 rgba(168, 85, 247, .85);
+    }
+    .wi-plan__grab-hand {
+        position: fixed;
+        z-index: 28;
+        left: var(--from-x);
+        top: var(--from-y);
+        width: 2rem;
+        height: 2rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        color: #ede9fe;
+        font-size: 1.35rem;
+        filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .5));
+        animation: wi-plan-grab-fly .42s cubic-bezier(.2, .8, .2, 1) forwards;
+    }
+    @keyframes wi-plan-grab-fly {
+        0% {
+            left: var(--from-x);
+            top: var(--from-y);
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.15) rotate(-28deg);
+        }
+        20% { opacity: 1; }
+        100% {
+            left: var(--to-x);
+            top: var(--to-y);
+            opacity: 1;
+            transform: translate(-20%, -35%) scale(1) rotate(12deg);
+        }
+    }
+    @keyframes wi-plan-grip-pulse {
+        0%, 100% { transform: scaleX(1); }
+        40% { transform: scaleX(1.85); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .wi-plan__grab-hand {
+            animation: none;
+            left: var(--to-x);
+            top: var(--to-y);
+            transform: translate(-20%, -35%);
+        }
+        .wi-plan__grip.is-nudge { animation: none; }
+    }
     .wi-plan__grip::before {
         content: '';
         position: absolute; left: 4px; top: 50%;
@@ -1682,27 +1816,67 @@
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .wi-plan__float.is-copy { box-shadow: 0 0 0 2px #fff, 0 10px 24px rgba(0,0,0,.35); }
+    .wi-plan__undo-flash {
+        position: fixed; inset: 0; z-index: 80; pointer-events: none;
+        background: radial-gradient(ellipse 70% 42% at 50% 18%, rgba(168, 85, 247, .34), rgba(59, 130, 246, .12) 42%, transparent 70%);
+        animation: wi-plan-undo-flash .7s ease forwards;
+    }
     .wi-plan__undo {
-        position: fixed; z-index: 70; left: 50%; bottom: 1.4rem; transform: translateX(-50%);
-        display: flex; align-items: center; gap: .65rem;
-        max-width: min(32rem, calc(100vw - 24px));
-        padding: .55rem .7rem .55rem .95rem;
-        background: rgba(20, 24, 34, .96); color: var(--text-main);
-        border: 1px solid var(--glass-border); border-radius: 10px;
-        box-shadow: 0 16px 40px rgba(0,0,0,.45);
-        font-size: .8rem;
+        position: fixed; z-index: 81; left: 50%; top: max(4.75rem, 12vh);
+        display: flex; align-items: center; gap: .7rem;
+        max-width: min(34rem, calc(100vw - 24px));
+        padding: .7rem .75rem .7rem 1rem;
+        color: var(--text-main);
+        border: 1px solid transparent;
+        border-radius: 14px;
+        background:
+            linear-gradient(180deg, rgba(16, 22, 36, .97), rgba(13, 18, 30, .97)) padding-box,
+            linear-gradient(135deg, var(--primary), var(--accent)) border-box;
+        box-shadow:
+            0 0 0 1px rgba(168, 85, 247, .28),
+            0 18px 50px rgba(0, 0, 0, .5),
+            0 0 48px rgba(59, 130, 246, .28);
+        font-size: .88rem;
+        font-weight: 500;
+        animation: wi-plan-undo-pop .55s cubic-bezier(.2, .9, .25, 1) both;
+    }
+    .wi-plan__undo > .bi {
+        flex-shrink: 0;
+        font-size: 1.35rem;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        filter: drop-shadow(0 0 10px rgba(168, 85, 247, .45));
     }
     .wi-plan__undo span { min-width: 0; }
     .wi-plan__undo-action {
-        flex-shrink: 0; border: 0; background: transparent; padding: 0;
-        color: #93c5fd; font-weight: 600; font-size: .8rem;
+        flex-shrink: 0; border: 0; border-radius: 999px;
+        padding: .28rem .78rem;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: #fff; font-weight: 650; font-size: .78rem;
+        box-shadow: 0 6px 16px rgba(59, 130, 246, .35);
     }
-    .wi-plan__undo-action:hover { color: #fff; }
+    .wi-plan__undo-action:hover { color: #fff; filter: brightness(1.08); }
     .wi-plan__undo-close {
         flex-shrink: 0; border: 0; background: transparent; color: var(--text-muted);
-        line-height: 1; font-size: 1.1rem; padding: 0 .15rem;
+        line-height: 1; font-size: 1.2rem; padding: 0 .2rem;
     }
     .wi-plan__undo-close:hover { color: var(--text-main); }
+    @keyframes wi-plan-undo-pop {
+        0% { opacity: 0; transform: translateX(-50%) translateY(-18px) scale(.82); }
+        58% { opacity: 1; transform: translateX(-50%) translateY(5px) scale(1.06); }
+        100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    }
+    @keyframes wi-plan-undo-flash {
+        0% { opacity: 0; }
+        18% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .wi-plan__undo { animation: none; transform: translateX(-50%); }
+        .wi-plan__undo-flash { animation: none; display: none; }
+    }
     [x-cloak] { display: none !important; }
     @media (max-width: 991.98px) {
         .wi-plan__body { grid-template-columns: 1fr; }

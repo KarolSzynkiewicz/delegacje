@@ -13,7 +13,9 @@
     $dueLabel = $task->due_date?->format('d.m.Y') ?: 'Brak terminu';
     $dueFilter = $this->pinClick('filterDueDate', $dueValue);
     $dueExclude = $this->pinClick('filterDueDate', $dueValue, 'neq');
-    $dueExcludeTip = 'Odfiltruj · bez '.$dueLabel;
+    $dueExcludeTip = $task->due_date
+        ? 'Pokaż później niż ten dzień'
+        : 'Pokaż z terminem';
     $dueWritable = $this->rowWritable($task, 'due_date');
     $dueEdit = 'startEdit('.$task->id.', \'due_date\')';
     $dueClass = 'tg-time-chip tg-time-chip--due tg-time-chip--'.$dueState;

@@ -488,6 +488,28 @@ class WorkItemPlan extends Component
                 'due_date' => $payload['due_date'],
             ]);
             $this->refreshPlanQueue();
+
+            return;
+        }
+
+        if ($undo['type'] === 'delete_block') {
+            $block = $this->blockForUser((int) $payload['id'], $this->calendarUser()->id);
+            if (! $block) {
+                return;
+            }
+            app(WorkItemPlanService::class)->deleteBlock($block);
+            $this->refreshPlanQueue();
+
+            return;
+        }
+
+        if ($undo['type'] === 'clear_meeting') {
+            $item = $this->workItem((int) $payload['work_item_id']);
+            if (! $item) {
+                return;
+            }
+            app(WorkItemPlanService::class)->clearMeetingSlot($item);
+            $this->refreshPlanQueue();
         }
     }
 
@@ -726,7 +748,7 @@ class WorkItemPlan extends Component
         $ends = $this->dateAt($this->composerDate, $this->composerAllDay ? 0 : $this->composerEnd);
 
         try {
-            $service->createOnCalendar(
+            $created = $service->createOnCalendar(
                 $this->composerType,
                 $this->composerTitle,
                 $this->calendarUser(),
@@ -747,6 +769,7 @@ class WorkItemPlan extends Component
         }
 
         $this->closeComposer();
+        $this->offerCreatedUndo($created, $starts, $this->composerAllDay);
         $this->refreshPlanQueue();
     }
 
@@ -927,6 +950,57 @@ class WorkItemPlan extends Component
     }
 
     /**
+     * @param  array{task?: ProjectTask, approval?: ApprovalRequest, meeting?: ProjectTask, procedure?: \App\Models\ProcedureRun, session?: WorkItemTimeBlock}  $created
+     */
+    protected function offerCreatedUndo(array $created, CarbonInterface $starts, bool $allDay): void
+    {
+        $message = $this->savedMessage($starts, $allDay);
+
+        if (isset($created['session'])) {
+            $this->offerUndo($message, 'delete_block', ['id' => $created['session']->id]);
+
+            return;
+        }
+
+        if (isset($created['meeting'])) {
+            $item = $this->workItemForSource($created['meeting']);
+            if ($item) {
+                $this->offerUndo($message, 'clear_meeting', ['work_item_id' => $item->id]);
+            }
+
+            return;
+        }
+
+        $source = $created['task'] ?? $created['approval'] ?? $created['procedure'] ?? null;
+        if (! $source) {
+            return;
+        }
+
+        $item = $this->workItemForSource($source);
+        $block = $item
+            ? WorkItemTimeBlock::query()
+                ->where('work_item_id', $item->id)
+                ->latest('id')
+                ->first()
+            : null;
+        if ($block) {
+            $this->offerUndo($message, 'delete_block', ['id' => $block->id]);
+        }
+    }
+
+    protected function workItemForSource(object $source): ?WorkItem
+    {
+        if (! method_exists($source, 'getMorphClass') || ! isset($source->id)) {
+            return null;
+        }
+
+        return WorkItem::query()
+            ->where('source_type', $source->getMorphClass())
+            ->where('source_id', $source->id)
+            ->first();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function blockSnapshot(WorkItemTimeBlock $block): array
@@ -972,6 +1046,16 @@ class WorkItemPlan extends Component
         }
 
         return 'Wydarzenie zostało przełożone na '.$when->translatedFormat('j M, H:i');
+    }
+
+    protected function savedMessage(CarbonInterface $starts, bool $allDay): string
+    {
+        $when = CarbonImmutable::parse($starts)->locale('pl');
+        if ($allDay) {
+            return 'Wydarzenie zostało zapisane · '.$when->translatedFormat('j M').' · cały dzień';
+        }
+
+        return 'Wydarzenie zostało zapisane · '.$when->translatedFormat('j M, H:i');
     }
 
     protected function resizedMessage(CarbonInterface $starts, CarbonInterface $ends): string

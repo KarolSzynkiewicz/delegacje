@@ -56,6 +56,32 @@ class ProcedureRunTaskCategoryTest extends TestCase
         $this->assertSame('Procedura', $task->category);
     }
 
+    public function test_starting_a_procedure_inherits_template_category(): void
+    {
+        $this->actingAs($this->user);
+
+        $template = ProcedureTemplate::query()->create([
+            'name' => 'Onboarding',
+            'category' => 'HR',
+            'created_by' => $this->user->id,
+            'definition' => [
+                'nodes' => [
+                    ['id' => 'start-1', 'type' => 'start', 'name' => 'Start'],
+                ],
+                'edges' => [],
+            ],
+        ]);
+
+        $run = app(ProcedureRunService::class)->startRun($template, [
+            'name_suffix' => 'Jan',
+        ]);
+
+        $task = ProjectTask::query()->where('procedure_run_id', $run->id)->first();
+
+        $this->assertNotNull($task);
+        $this->assertSame('HR', $task->category);
+    }
+
     public function test_procedure_task_show_page_does_not_render_task_subtasks(): void
     {
         $this->actingAs($this->user);
@@ -114,6 +140,8 @@ class ProcedureRunTaskCategoryTest extends TestCase
             ->assertSee('Szablon')
             ->assertSee('Onboarding')
             ->assertSee('Komentarze')
+            ->assertSee('Kategoria')
+            ->assertSee('Edytuj kategorię')
             ->assertDontSee('Zadanie:')
             ->assertDontSee('Nazwa zadania')
             ->assertDontSee('Dziennik operacyjny')

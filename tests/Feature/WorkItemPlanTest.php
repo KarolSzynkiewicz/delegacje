@@ -412,6 +412,11 @@ class WorkItemPlanTest extends TestCase
             ->assertSet('selectedIds', [])
             ->call('toggleSelectVisible')
             ->assertSet('selectedIds', [$item->id]);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->assertSeeHtml('onQueueSelectPointerDown')
+            ->assertSeeHtml('queueSelectBound');
     }
 
     public function test_opening_a_queue_item_embeds_the_task_card(): void
@@ -616,6 +621,32 @@ class WorkItemPlanTest extends TestCase
         $this->assertSame('2026-09-18 11:00:00', $block->ends_at->format('Y-m-d H:i:s'));
     }
 
+    public function test_composer_closes_from_escape_and_blocks_keep_a_left_grip(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Klocek do chwytu');
+        WorkItemTimeBlock::query()->create([
+            'work_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'starts_at' => '2026-09-17 10:00:00',
+            'ends_at' => '2026-09-17 10:30:00',
+            'created_by_id' => $this->user->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->assertSeeHtml('wi-plan__grab-hand')
+            ->assertSeeHtml('wi-plan__grip')
+            ->assertSeeHtml('showGrabHint')
+            ->call('openComposer', '2026-09-18', 10 * 60, 11 * 60, false)
+            ->assertSet('composerOpen', true)
+            ->assertSee('Nowy wpis')
+            ->assertSeeHtml('keydown.escape.window')
+            ->call('closeComposer')
+            ->assertSet('composerOpen', false)
+            ->assertDontSee('Nowy wpis');
+    }
+
     public function test_click_composer_defaults_to_fifteen_minutes(): void
     {
         $this->actingAs($this->user);
@@ -806,7 +837,9 @@ class WorkItemPlanTest extends TestCase
         $component = Livewire::actingAs($this->user)
             ->test(WorkItemPlan::class)
             ->call('dropOnCell', 'block', $block->id, '2026-09-18', 12 * 60)
-            ->assertSee('Cofnij');
+            ->assertSee('Cofnij')
+            ->assertSeeHtml('wi-plan__undo-flash')
+            ->assertSeeHtml('wi-plan__undo-layer');
 
         $block->refresh();
         $this->assertSame('2026-09-18 12:00:00', $block->starts_at->format('Y-m-d H:i:s'));
@@ -816,6 +849,32 @@ class WorkItemPlanTest extends TestCase
         $block->refresh();
         $this->assertSame('2026-09-17 10:00:00', $block->starts_at->format('Y-m-d H:i:s'));
         $this->assertSame('2026-09-17 11:00:00', $block->ends_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_composer_save_flashes_undo_and_can_take_the_block_off(): void
+    {
+        $this->actingAs($this->user);
+
+        $component = Livewire::actingAs($this->user)
+            ->test(WorkItemPlan::class)
+            ->call('openComposer', '2026-09-18', 10 * 60, 11 * 60, false)
+            ->set('composerTitle', 'Zapis z błyskiem')
+            ->set('composerType', 'task')
+            ->call('submitComposer')
+            ->assertHasNoErrors()
+            ->assertSee('Wydarzenie zostało zapisane')
+            ->assertSee('Cofnij')
+            ->assertSeeHtml('wi-plan__undo-flash');
+
+        $item = WorkItem::query()->where('title', 'Zapis z błyskiem')->first();
+        $this->assertNotNull($item);
+        $block = WorkItemTimeBlock::query()->where('work_item_id', $item->id)->first();
+        $this->assertNotNull($block);
+
+        $component->call('undoLastChange')->assertSet('undo', null);
+
+        $this->assertNull(WorkItemTimeBlock::query()->find($block->id));
+        $this->assertNotNull(WorkItem::query()->find($item->id));
     }
 
     public function test_undo_restores_an_unscheduled_session(): void
@@ -1470,7 +1529,7 @@ class WorkItemPlanTest extends TestCase
 
         $this->assertSame('stale', $item->scheduleState());
         $this->assertSame('skisło', $item->scheduleLabel());
-        $this->assertSame('Zaległy · 1', $item->scheduleChipLabel());
+        $this->assertSame('Zaległy · 16.09 08:00–08:30', $item->scheduleChipLabel());
         $this->assertStringContainsString('pin='.$item->id, $item->planPinUrl());
         $this->assertStringContainsString('w=2026-09-14', $item->planPinUrl());
     }
@@ -1488,7 +1547,7 @@ class WorkItemPlanTest extends TestCase
         ]);
 
         Livewire::test(TasksGrid::class)
-            ->assertSee('Zaległy · 1')
+            ->assertSee('Zaległy · 16.09 08:00–08:30')
             ->assertSeeHtml('pin='.$item->id)
             ->assertSeeHtml('tg-schedule--stale')
             ->assertSeeHtml('tg-time-chip--stale')
@@ -1515,6 +1574,8 @@ class WorkItemPlanTest extends TestCase
 
         Livewire::test(TasksGrid::class)
             ->assertSee('Zaplanowane · 2 sloty')
+            ->assertSee('17.09 08:00–08:30')
+            ->assertSee('17.09 10:00–10:30')
             ->assertSee('24.09.2026')
             ->assertSee('Brak terminu')
             ->assertSeeHtml('bi-bullseye')
@@ -1536,7 +1597,28 @@ class WorkItemPlanTest extends TestCase
 
         Livewire::test(\App\Livewire\TaskShowQuickEdit::class, ['task' => $item->source])
             ->assertSee('W kalendarzu')
+            ->assertSee('17.09 08:00–08:30')
             ->assertSeeHtml('pin='.$item->id);
+    }
+
+    public function test_task_show_lists_each_slot_when_there_are_several(): void
+    {
+        $this->actingAs($this->user);
+        $item = $this->workItem('Podgląd wielu slotów');
+        foreach (['08:00:00', '14:00:00'] as $time) {
+            WorkItemTimeBlock::query()->create([
+                'work_item_id' => $item->id,
+                'user_id' => $this->user->id,
+                'starts_at' => '2026-09-17 '.$time,
+                'ends_at' => '2026-09-17 '.str_replace('00:00', '30:00', $time),
+                'created_by_id' => $this->user->id,
+            ]);
+        }
+
+        Livewire::test(\App\Livewire\TaskShowQuickEdit::class, ['task' => $item->source])
+            ->assertSee('Zaplanowane · 2 sloty')
+            ->assertSee('17.09 08:00–08:30')
+            ->assertSee('17.09 14:00–14:30');
     }
 
     public function test_grid_keeps_the_bulk_bar_in_the_dom_before_selection(): void

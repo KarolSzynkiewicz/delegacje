@@ -127,6 +127,27 @@
             border-color: rgba(255, 255, 255, 0.08);
             color: rgba(241, 245, 249, 0.45);
         }
+        .task-show-meta .tg-schedule-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.35rem;
+            width: 100%;
+            min-width: 0;
+        }
+        .task-show-meta .tg-schedule-slots {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.72rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted, #94a3b8);
+        }
+        .task-show-meta .tg-schedule-slots li {
+            padding: 0.1rem 0;
+        }
         @media (hover: none) {
             .task-show-meta .tg-facet__edit { opacity: 0.85; }
         }
@@ -260,9 +281,8 @@
                 </span>
             </div>
 
-            @unless($task->isProcedure() || $task->isCallback() || $task->isMeeting())
-                <div class="dt-card__row">
-                    <span class="dt-card__label">Kategoria</span>
+            <div class="dt-card__row">
+                <span class="dt-card__label">Kategoria</span>
                     <span class="dt-card__value">
                         <div class="tg-facet">
                             @if($task->category)
@@ -291,7 +311,6 @@
                         </div>
                     </span>
                 </div>
-            @endunless
 
             <div class="dt-card__row">
                 <span class="dt-card__label">Do kiedy</span>
@@ -341,7 +360,7 @@
                 <div class="dt-card__row">
                     <span class="dt-card__label">W kalendarzu</span>
                     <span class="dt-card__value">
-                        @include('livewire.partials.tg-schedule-cell', ['item' => $workItem])
+                        @include('livewire.partials.tg-schedule-cell', ['item' => $workItem, 'showSlotList' => true])
                     </span>
                 </div>
             @endif
