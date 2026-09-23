@@ -13,6 +13,9 @@
 @endphp
 
 <div class="wi-plan" id="wiPlan"
+     data-pane="{{ $pinnedId ? 'board' : 'queue' }}"
+     :data-pane="pane"
+     :data-handoff="handoff ? '1' : ''"
      x-data="{
         payload: null,
         armed: false,
@@ -24,6 +27,8 @@
         dueOpen: '',
         grabHint: null,
         grabHintTimer: null,
+        pane: @js($pinnedId ? 'board' : 'queue'),
+        handoff: @js($pinnedId ? ['id' => (int) $pinnedId, 'title' => (string) $pinnedTitle, 'type' => (string) ($pinnedType ?: 'task')] : null),
         hourPx: {{ $hourPx }},
         startHour: {{ $gridStartHour }},
         viewStartHour: {{ $viewStartHour }},
@@ -168,6 +173,10 @@
                 }
             }
             this.hideQueueSource(payload);
+            if (this.handoff && Number(this.handoff.id) === Number(payload.id)) {
+                this.handoff = null;
+            }
+            this.syncHandoffCard();
             $wire.dropOnCell(payload.kind, payload.id, date, minutes, !!allDay, !!copy);
         },
         confirmSessionName() {
@@ -547,6 +556,10 @@
             });
         },
         onQueueGrip(event) {
+            if (this.paneShell()) {
+                this.phonePickQueue(event);
+                return;
+            }
             if (event.target.closest('input, textarea, select, button, .tg-select, .wi-plan__queue-add, .tg-toolbar, .rp-active-filters')) {
                 return;
             }
@@ -656,6 +669,10 @@
             });
         },
         beginDraw(event, date, allDay) {
+            if (this.paneShell()) {
+                this.phoneTapBoard(event, date, allDay);
+                return;
+            }
             if (this.payload || this.resizing) return;
             if (event.target.closest('.wi-plan__event, .wi-plan__chip, .wi-plan__flag, .wi-plan__due, .wi-plan__chip-off, .wi-plan__float, .wi-plan__pop')) return;
             if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -697,10 +714,105 @@
             el.scrollTop = Math.max(0, (this.viewStartHour - this.startHour) * this.hourPx);
             el.dataset.scrolled = '1';
         },
+        paneShell() {
+            return window.matchMedia('(max-width: 991.98px)').matches;
+        },
+        syncHandoffCard() {
+            const id = this.handoff && this.handoff.id ? String(this.handoff.id) : '';
+            document.querySelectorAll('#wiPlan [data-plan-queue] [data-plan-drag]').forEach((el) => {
+                const raw = el.dataset.planDrag || '';
+                el.classList.toggle('is-handoff', !!id && raw === ('queue:' + id));
+            });
+        },
+        persistShell() {
+            try {
+                sessionStorage.setItem('wi-plan-shell', JSON.stringify({ pane: this.pane, handoff: this.handoff }));
+            } catch (e) {}
+        },
+        restoreShell() {
+            try {
+                const raw = sessionStorage.getItem('wi-plan-shell');
+                if (!raw) return;
+                const saved = JSON.parse(raw);
+                if (saved.pane === 'queue' || saved.pane === 'board') this.pane = saved.pane;
+                if (saved.handoff && saved.handoff.id) this.handoff = saved.handoff;
+            } catch (e) {}
+        },
+        panePan(event, scroller, onTap) {
+            if (event.pointerType === 'mouse' && event.button !== 0) return;
+            const x0 = event.clientX;
+            const y0 = event.clientY;
+            const scroll0 = scroller ? { left: scroller.scrollLeft, top: scroller.scrollTop } : { left: 0, top: 0 };
+            let panned = false;
+            const mousePan = event.pointerType === 'mouse';
+            this.trackPointer(event, (e) => {
+                const dx = e.clientX - x0;
+                const dy = e.clientY - y0;
+                if ((dx * dx + dy * dy) >= 144) panned = true;
+                if (panned && mousePan && scroller) {
+                    scroller.scrollLeft = scroll0.left - (e.clientX - x0);
+                    scroller.scrollTop = scroll0.top - (e.clientY - y0);
+                }
+            }, (e) => {
+                this.swallowNextClick();
+                if (panned) return;
+                onTap(e, x0, y0);
+            });
+        },
+        phonePickQueue(event) {
+            if (event.target.closest('input, textarea, select, button, .tg-select, .wi-plan__queue-add, .tg-toolbar, .rp-active-filters')) {
+                return;
+            }
+            const host = event.target.closest('[data-plan-drag]');
+            const queue = event.currentTarget;
+            this.panePan(event, queue, () => {
+                if (!host || !host.closest('[data-plan-queue]')) return;
+                const raw = host.dataset.planDrag || '';
+                const parts = raw.split(':');
+                if (parts[0] !== 'queue' || !parts[1]) return;
+                this.handoff = {
+                    id: Number(parts[1]),
+                    title: host.dataset.planTitle || ('#' + parts[1]),
+                    type: host.dataset.planType || 'task',
+                };
+                this.pane = 'board';
+            });
+        },
+        phoneTapBoard(event, date, allDay) {
+            if (this.payload || this.resizing) return;
+            if (event.target.closest('.wi-plan__event, .wi-plan__chip, .wi-plan__flag, .wi-plan__due, .wi-plan__chip-off, .wi-plan__float, .wi-plan__pop')) return;
+            const col = event.currentTarget;
+            this.panePan(event, this.$refs.board, (e, x0, y0) => {
+                const minutes = allDay ? 0 : this.slotFromY(e.clientY || y0, col);
+                if (this.handoff && this.handoff.id) {
+                    if (allDay && this.handoff.type === 'meeting') return;
+                    this.dropQueueOnCalendar({
+                        kind: 'queue',
+                        id: this.handoff.id,
+                        itemType: this.handoff.type,
+                    }, date, minutes, !!allDay, false);
+                    return;
+                }
+                $wire.openComposer(date, minutes, minutes + this.defaultMinutes, !!allDay);
+            });
+        },
         init() {
             this.scrollToWorkHours();
+            if (!this.handoff) {
+                this.restoreShell();
+            }
+            this.persistShell();
+            this.syncHandoffCard();
+            this.$watch('pane', () => this.persistShell());
+            this.$watch('handoff', () => {
+                this.persistShell();
+                this.syncHandoffCard();
+            });
             if (this.$el.dataset.queueSelectBound === '1') return;
             this.$el.dataset.queueSelectBound = '1';
+            if (window.Livewire) {
+                Livewire.hook('morph.updated', () => this.syncHandoffCard());
+            }
             this.$el.addEventListener('pointerdown', (e) => this.onQueueSelectPointerDown(e), true);
             this.$el.addEventListener('click', (e) => this.onQueueSelectClick(e), true);
         }
@@ -722,6 +834,20 @@
     @endif
 
     <div class="wi-plan__toolbar">
+        <div class="wi-plan__panes" role="tablist" aria-label="Widok planu">
+            <button type="button" role="tab"
+                    :class="pane === 'queue' ? 'is-on' : ''"
+                    :aria-selected="pane === 'queue'"
+                    @click="pane = 'queue'">
+                <i class="bi bi-list-ul" aria-hidden="true"></i>Tablica
+            </button>
+            <button type="button" role="tab"
+                    :class="pane === 'board' ? 'is-on' : ''"
+                    :aria-selected="pane === 'board'"
+                    @click="pane = 'board'">
+                <i class="bi bi-calendar3" aria-hidden="true"></i>Kalendarz
+            </button>
+        </div>
         <label class="wi-plan__user">
             <i class="bi bi-person"></i>
             <select wire:model.live="userId" class="form-select form-select-sm">
@@ -741,12 +867,23 @@
             </button>
             <button type="button" class="wi-plan__today" wire:click="goToToday">Dziś</button>
         </div>
+        <div class="wi-plan__handoff" :class="handoff ? 'is-visible' : ''" x-cloak>
+            <span class="wi-plan__handoff-kicker">Pin</span>
+            <strong class="wi-plan__handoff-title" x-text="handoff?.title || ''"></strong>
+            <span class="wi-plan__handoff-id font-mono" x-text="handoff ? '#' + handoff.id : ''"></span>
+            <span class="wi-plan__handoff-tip">Kliknij godzinę</span>
+            <button type="button" class="wi-plan__handoff-clear" title="Anuluj pin" @click="handoff = null">×</button>
+        </div>
+        <p class="wi-plan__board-hint" :class="!handoff ? 'is-visible' : ''">
+            Przeciągnij siatkę, żeby przewinąć. Kartę wybierasz na Tablicy.
+        </p>
     </div>
 
     <div class="wi-plan__body">
         <aside class="wi-plan__queue" data-plan-queue @pointerdown="onQueueGrip($event)">
             <div class="wi-plan__queue-head">
                 <span>Do przypięcia</span>
+                <p class="wi-plan__pane-hint">Kliknij kartę, żeby przejść z nią do kalendarza.</p>
                 @unless($pinId)
                     <div class="wi-plan__queue-add">
                         <button type="button" wire:click="openUnscheduledComposer('task')">
@@ -767,7 +904,10 @@
                     Przypisz kogoś w backlogu — bez tego zadanie nie wejdzie do kolejki.
                 </p>
             @elseif($pinId && $pinnedTitle)
-                <p class="wi-plan__pin-hint">Nowe: <strong>{{ $pinnedTitle }}</strong> — przeciągnij na godzinę w siatce.</p>
+                <p class="wi-plan__pin-hint">Nowe: <strong>{{ $pinnedTitle }}</strong>
+                    <span class="wi-plan__pin-hint-desktop"> — przeciągnij na godzinę w siatce.</span>
+                    <span class="wi-plan__pin-hint-pane"> — kliknij godzinę w kalendarzu.</span>
+                </p>
             @endif
             <livewire:tasks-grid
                 :plan-queue="true"
@@ -1253,6 +1393,11 @@
 <style>
     .wi-plan { display: flex; flex-direction: column; gap: .75rem; min-height: calc(100vh - 8.5rem); position: relative; }
     .wi-plan__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .85rem; }
+    .wi-plan__panes { display: none; }
+    .wi-plan__handoff { display: none; }
+    .wi-plan__board-hint,
+    .wi-plan__pane-hint,
+    .wi-plan__pin-hint-pane { display: none; }
     .wi-plan__user { display: inline-flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: .8rem; flex: 0 0 auto; }
     .wi-plan__user .form-select { min-width: 160px; background: rgba(255,255,255,.04); border-color: var(--glass-border); color: var(--text-main); }
     .wi-plan__filters { flex: 1 1 14rem; min-width: 0; }
@@ -1879,9 +2024,134 @@
     }
     [x-cloak] { display: none !important; }
     @media (max-width: 991.98px) {
-        .wi-plan__body { grid-template-columns: 1fr; }
-        .wi-plan__queue { max-height: 12rem; }
-        .wi-plan__board { max-height: calc(100vh - 18rem); }
+        .wi-plan__card,
+        .wi-plan__chip,
+        .wi-plan__event,
+        .wi-plan__col,
+        .wi-plan__allday-cell,
+        .wi-plan__board,
+        .wi-plan__queue {
+            touch-action: pan-x pan-y;
+        }
+        .wi-plan__queue .dt-card.card,
+        .wi-plan__queue .dt-card.card:active { cursor: pointer; }
+        .wi-plan__queue .tg-dt-card.is-handoff {
+            border-color: rgba(168, 85, 247, .55);
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, .45), 0 8px 22px rgba(59, 130, 246, .18);
+        }
+        .wi-plan[data-pane='board'] .wi-plan__board { cursor: grab; }
+        .wi-plan[data-pane='board'][data-handoff='1'] .wi-plan__col,
+        .wi-plan[data-pane='board'][data-handoff='1'] .wi-plan__allday-cell { cursor: pointer; }
+        .wi-plan__toolbar {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: .55rem;
+        }
+        .wi-plan__panes {
+            display: flex;
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            overflow: hidden;
+            background: rgba(255,255,255,.03);
+        }
+        .wi-plan__panes button {
+            flex: 1 1 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .35rem;
+            border: 0;
+            background: transparent;
+            color: var(--text-muted);
+            padding: .5rem .65rem;
+            font-size: .8rem;
+            font-weight: 600;
+        }
+        .wi-plan__panes button.is-on {
+            color: var(--text-main);
+            background: linear-gradient(135deg, rgba(59, 130, 246, .22), rgba(168, 85, 247, .22));
+        }
+        .wi-plan__user { width: 100%; }
+        .wi-plan__user .form-select { min-width: 0; width: 100%; }
+        .wi-plan__filters { flex: none; width: 100%; min-width: 0; }
+        .wi-plan__week {
+            margin-left: 0;
+            width: 100%;
+            justify-content: space-between;
+        }
+        .wi-plan__week-label { min-width: 0; flex: 1; }
+        .wi-plan__pane-hint {
+            display: block;
+            margin: .2rem 0 0;
+            font-size: .72rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+        .wi-plan__board-hint {
+            display: none;
+            margin: 0;
+            padding: .4rem .55rem;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255,255,255,.03);
+            color: var(--text-muted);
+            font-size: .72rem;
+            line-height: 1.35;
+        }
+        .wi-plan[data-pane='board'] .wi-plan__board-hint.is-visible { display: block; }
+        .wi-plan__pin-hint-desktop { display: none; }
+        .wi-plan__pin-hint-pane { display: inline; }
+        .wi-plan__handoff {
+            display: none;
+            align-items: center;
+            gap: .4rem;
+            min-width: 0;
+            padding: .45rem .6rem;
+            border-radius: 10px;
+            border: 1px solid rgba(168, 85, 247, .4);
+            background: linear-gradient(135deg, rgba(59, 130, 246, .14), rgba(168, 85, 247, .14));
+            color: var(--text-main);
+            font-size: .78rem;
+        }
+        .wi-plan__handoff-kicker {
+            flex-shrink: 0;
+            font-size: .62rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: #c4b5fd;
+        }
+        .wi-plan__handoff-title {
+            min-width: 0;
+            flex: 1 1 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .wi-plan__handoff-id { flex-shrink: 0; color: var(--text-muted); font-size: .7rem; }
+        .wi-plan__handoff-tip { flex-shrink: 0; margin-left: auto; font-size: .68rem; color: #c4b5fd; }
+        .wi-plan__handoff-clear {
+            flex-shrink: 0;
+            border: 0;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: 0 .15rem;
+        }
+        .wi-plan[data-pane='queue'] .wi-plan__week,
+        .wi-plan[data-pane='queue'] .wi-plan__handoff,
+        .wi-plan[data-pane='queue'] .wi-plan__board-hint,
+        .wi-plan[data-pane='queue'] .wi-plan__board,
+        .wi-plan[data-pane='board'] .wi-plan__user,
+        .wi-plan[data-pane='board'] .wi-plan__filters,
+        .wi-plan[data-pane='board'] .wi-plan__queue { display: none !important; }
+        .wi-plan[data-pane='board'] .wi-plan__handoff.is-visible { display: flex !important; }
+        .wi-plan__body { grid-template-columns: 1fr; min-height: 0; }
+        .wi-plan__queue,
+        .wi-plan__board { max-height: calc(100vh - 14rem); }
     }
 </style>
 </div>

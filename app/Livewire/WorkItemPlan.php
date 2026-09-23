@@ -816,6 +816,8 @@ class WorkItemPlan extends Component
             'days' => $days,
             'hours' => range(WorkItemPlanService::GRID_START_HOUR, WorkItemPlanService::GRID_END_HOUR - 1),
             'pinnedTitle' => $pinned?->title,
+            'pinnedId' => $pinNeedsAssignee ? null : $pinned?->id,
+            'pinnedType' => $pinNeedsAssignee ? null : $pinned?->type?->value,
             'pinNeedsAssignee' => $pinNeedsAssignee,
             'eventsByDay' => $occupancy['timed'],
             'allDayByDay' => $occupancy['allDay'],

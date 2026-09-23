@@ -47,9 +47,27 @@ class WorkItemPlanTest extends TestCase
             ->assertOk()
             ->assertSee('Do przypięcia')
             ->assertSee('Plan')
+            ->assertSee('Tablica')
+            ->assertSee('Kalendarz')
             ->assertSee('07:00')
             ->assertSee('20:00')
             ->assertSee('id="wi-plan-filters"', false);
+    }
+
+    public function test_plan_mobile_shell_uses_panes_and_tap_handoff(): void
+    {
+        $this->actingAs($this->user);
+
+        Livewire::test(WorkItemPlan::class)
+            ->assertSeeHtml('data-pane="queue"')
+            ->assertSeeHtml('wi-plan__panes')
+            ->assertSeeHtml('paneShell')
+            ->assertSeeHtml('phonePickQueue')
+            ->assertSeeHtml('phoneTapBoard')
+            ->assertSeeHtml('panePan')
+            ->assertSee('Kliknij kartę')
+            ->assertSee('Kliknij godzinę')
+            ->assertSee('Przeciągnij siatkę');
     }
 
     public function test_open_item_without_block_is_in_the_queue(): void
@@ -240,6 +258,9 @@ class WorkItemPlanTest extends TestCase
             ->test(WorkItemPlan::class, ['pinId' => $pinned->id])
             ->assertSee('Spotkanie: tylko to')
             ->assertSee('przeciągnij na godzinę', false)
+            ->assertSee('Kliknij godzinę')
+            ->assertSeeHtml('data-pane="board"')
+            ->assertSeeHtml('wi-plan__panes')
             ->assertDontSee('Inne zadanie z kolejki');
 
         Livewire::actingAs($this->user)
