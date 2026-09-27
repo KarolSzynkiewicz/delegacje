@@ -136,7 +136,16 @@
     $benchWithoutRotation = (int) ($benchWithoutRotation ?? 0);
     $benchDayLabel = $benchDayLabel ?? 'sobotę';
     $toSendCount = (int) ($toSendCount ?? 0);
+    $toSendNextDemand = (int) ($toSendNextDemand ?? 0);
+    $toSendStaying = (int) ($toSendStaying ?? 0);
     $rotationWindow = $rotationHorizonLabel ?? 'poniedziałku tego tygodnia do środy następnego';
+    $housingHouses = collect($housingHouses ?? []);
+    $fieldVehicles = collect($fieldVehicles ?? []);
+    $benchWithPeople = collect($benchWithPeople ?? []);
+    $benchWithoutPeople = collect($benchWithoutPeople ?? []);
+    $toSendDemandByProject = collect($toSendDemandByProject ?? []);
+    $toSendStayingPeople = collect($toSendStayingPeople ?? []);
+    $toSendLeavingPeople = collect($toSendLeavingPeople ?? []);
 @endphp
 
 <div
@@ -208,39 +217,47 @@
         <div class="mt-3 pt-3 border-top" style="border-color: var(--glass-border) !important;">
             <div class="row g-3">
                 <div class="col-6 col-lg-3">
-                    <div
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                    <button
+                        type="button"
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
                         data-tip="Osoby w domach w tym tygodniu / miejsca we wszystkich domach, które wtedy mamy — własnych i wynajętych, także pustych. Kto zmienia dom w trakcie tygodnia, liczy się w każdym."
+                        @click.prevent="openPanel('housing', $event)"
                     >
                         <i class="bi bi-house-door weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Domy</div>
                         <div class="weekly-logistics-metric__value">{{ $housingOccupied }}/{{ $housingCapacity }}</div>
-                    </div>
+                    </button>
                 </div>
                 <div class="col-6 col-lg-3">
-                    <div
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                    <button
+                        type="button"
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
                         data-tip="Osoby z przypisań do aut poza bazą / fotele tych aut. Auto w serwisie w tym tygodniu albo na wyjeździe, zjeździe lub transferze nie wchodzi. Puste auto poza bazą wchodzi do miejsc."
+                        @click.prevent="openPanel('field-vehicles', $event)"
                     >
                         <i class="bi bi-car-front weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Auta</div>
                         <div class="weekly-logistics-metric__value">{{ $vehicleOccupied }}/{{ $vehicleCapacity }}</div>
-                    </div>
+                    </button>
                 </div>
                 <div class="col-6 col-lg-3">
-                    <div
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                    <button
+                        type="button"
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
                         data-tip="Stan na {{ $benchDayLabel }} tego tygodnia. Pierwsza liczba: w bazie i mają rotację obejmującą ten dzień albo zaczynającą się do końca okna {{ $rotationWindow }}. Druga: w bazie bez takiej rotacji. Na projekcie i w drodze nie wchodzą."
+                        @click.prevent="openPanel('bench', $event)"
                     >
                         <i class="bi bi-person-workspace weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Ławka</div>
                         <div class="weekly-logistics-metric__value">{{ $benchWithRotation }}/{{ $benchWithoutRotation }}</div>
-                    </div>
+                    </button>
                 </div>
                 <div class="col-6 col-lg-3">
-                    <div
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                    <button
+                        type="button"
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
                         data-tip="Popyt przyszłego tygodnia minus osoby, które wtedy nadal są na projekcie. Odpadają ci, których rotacja kończy się w oknie {{ $rotationWindow }} — także gdy przypisanie jeszcze ich obejmuje. Liczba ujemna to nadmiar."
+                        @click.prevent="openPanel('to-send', $event)"
                     >
                         <i class="bi bi-box-arrow-up-right weekly-logistics-metric__icon" aria-hidden="true"></i>
                         <div class="weekly-logistics-metric__label">Do dosłania</div>
@@ -248,7 +265,7 @@
                         @if($toSendCount < 0)
                             <div class="weekly-logistics-metric__hint">nadmiar</div>
                         @endif
-                    </div>
+                    </button>
                 </div>
             </div>
         </div>
@@ -358,6 +375,129 @@
                         </ul>
                     @else
                         <p class="text-muted small mb-0">Nikt nie kończy rotacji w tym tygodniu ani do najbliższej środy po nim.</p>
+                    @endif
+                </div>
+
+                <div x-show="active === 'housing'" x-cloak>
+                    <p class="text-muted small mb-2">Osoby w domu / miejsca. Suma to {{ $housingOccupied }}/{{ $housingCapacity }}. Pusty dom też jest na liście. Kto zmienia dom w tygodniu, liczy się w każdym.</p>
+                    @if($housingHouses->isNotEmpty())
+                        <ul class="mb-0 small list-unstyled">
+                            @foreach($housingHouses->sortByDesc('occupied') as $house)
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                    <a href="{{ route('accommodations.show', $house->id) }}" class="text-decoration-none min-w-0 flex-grow-1">
+                                        <span class="fw-semibold">{{ $house->name }}</span>
+                                    </a>
+                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $house->occupied }}/{{ $house->capacity }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-0">W tym tygodniu nie ma domów własnych ani wynajętych.</p>
+                    @endif
+                </div>
+
+                <div x-show="active === 'field-vehicles'" x-cloak>
+                    <p class="text-muted small mb-2">Osoby z przypisań / fotele. Suma to {{ $vehicleOccupied }}/{{ $vehicleCapacity }}. Tylko auta poza bazą, bez serwisu i bez wyjazdu, zjazdu albo transferu w tym tygodniu.</p>
+                    @if($fieldVehicles->isNotEmpty())
+                        <ul class="mb-0 small list-unstyled">
+                            @foreach($fieldVehicles->sortByDesc('occupied') as $vehicle)
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                    <a href="{{ route('vehicles.show', $vehicle->id) }}" class="text-decoration-none min-w-0 flex-grow-1">
+                                        <span class="fw-semibold">{{ $vehicle->name }}</span>
+                                    </a>
+                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $vehicle->occupied }}/{{ $vehicle->capacity }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-0">Żadne auto nie jest w tym tygodniu w terenie.</p>
+                    @endif
+                </div>
+
+                <div x-show="active === 'bench'" x-cloak>
+                    <p class="text-muted small mb-2">Stan na {{ $benchDayLabel }}. W bazie z rotacją: {{ $benchWithRotation }}. W bazie bez rotacji: {{ $benchWithoutRotation }}. Rotacja liczy się, gdy obejmuje ten dzień albo zaczyna się do końca okna {{ $rotationWindow }}.</p>
+                    <p class="small fw-semibold mb-1">W bazie z rotacją</p>
+                    @if($benchWithPeople->isNotEmpty())
+                        <ul class="mb-3 small list-unstyled">
+                            @foreach($benchWithPeople as $person)
+                                <li class="weekly-summary-popover-line">
+                                    <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none">
+                                        <span class="fw-semibold">{{ $person->name }}</span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-3">Nikt.</p>
+                    @endif
+                    <p class="small fw-semibold mb-1">W bazie bez rotacji</p>
+                    @if($benchWithoutPeople->isNotEmpty())
+                        <ul class="mb-0 small list-unstyled">
+                            @foreach($benchWithoutPeople as $person)
+                                <li class="weekly-summary-popover-line">
+                                    <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none">
+                                        <span class="fw-semibold">{{ $person->name }}</span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-0">Nikt.</p>
+                    @endif
+                </div>
+
+                <div x-show="active === 'to-send'" x-cloak>
+                    <p class="text-muted small mb-2">
+                        Popyt przyszłego tygodnia {{ $toSendNextDemand }}
+                        − zostają {{ $toSendStaying }}
+                        = <span class="fw-semibold">{{ $toSendCount }}</span>@if($toSendCount < 0) (nadmiar)@endif.
+                        Odpadają osoby, których rotacja kończy się w oknie {{ $rotationWindow }}.
+                    </p>
+                    <p class="small fw-semibold mb-1">Popyt przyszłego tygodnia</p>
+                    @if($toSendDemandByProject->isNotEmpty())
+                        <ul class="mb-3 small list-unstyled">
+                            @foreach($toSendDemandByProject as $row)
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                    <a href="{{ route('projects.show', $row->project_id) }}" class="text-decoration-none min-w-0 flex-grow-1">
+                                        <span class="fw-semibold">{{ $row->project_name }}</span>
+                                    </a>
+                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $row->needed }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-3">Brak popytu.</p>
+                    @endif
+                    <p class="small fw-semibold mb-1">Zostają na przyszły tydzień</p>
+                    @if($toSendStayingPeople->isNotEmpty())
+                        <ul class="mb-3 small list-unstyled">
+                            @foreach($toSendStayingPeople as $person)
+                                <li class="weekly-summary-popover-line">
+                                    <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none">
+                                        <span class="fw-semibold">{{ $person->name }}</span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-3">Nikt z przypisaniem nie zostaje.</p>
+                    @endif
+                    <p class="small fw-semibold mb-1">Odchodzą — rotacja kończy się w oknie</p>
+                    @if($toSendLeavingPeople->isNotEmpty())
+                        <ul class="mb-0 small list-unstyled">
+                            @foreach($toSendLeavingPeople as $person)
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                    <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none min-w-0 flex-grow-1">
+                                        <span class="fw-semibold">{{ $person->name }}</span>
+                                    </a>
+                                    @if($person->rotation_end)
+                                        <span class="text-muted flex-shrink-0 tabular-nums">{{ \Illuminate\Support\Carbon::parse($person->rotation_end)->format('d.m.Y') }}</span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-0">Nikt z przypisanych na przyszły tydzień nie kończy rotacji w tym oknie.</p>
                     @endif
                 </div>
 
@@ -588,6 +728,10 @@ document.addEventListener('alpine:init', () => {
                 returns: 'Zjazdy (tydzień)',
                 departures: 'Wyjazdy (tydzień)',
                 'employees-by-project': 'Pracownicy wg projektu (tydzień)',
+                housing: 'Domy (tydzień)',
+                'field-vehicles': 'Auta w terenie (tydzień)',
+                bench: 'Ławka',
+                'to-send': 'Do dosłania',
                 'expiring-documents': 'Dokumenty (miesiąc)',
                 'expiring-leases': 'Najmy (miesiąc)',
                 'expiring-vehicles': 'Auta (OC / przegląd)',
@@ -602,6 +746,10 @@ document.addEventListener('alpine:init', () => {
                 returns: 'bi-arrow-return-left',
                 departures: 'bi-arrow-right',
                 'employees-by-project': 'bi-people',
+                housing: 'bi-house-door',
+                'field-vehicles': 'bi-car-front',
+                bench: 'bi-person-workspace',
+                'to-send': 'bi-box-arrow-up-right',
                 'expiring-documents': 'bi-file-earmark-text',
                 'expiring-leases': 'bi-house',
                 'expiring-vehicles': 'bi-car-front',

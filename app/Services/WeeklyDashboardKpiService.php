@@ -208,14 +208,14 @@ final class WeeklyDashboardKpiService
      * Domy trzymane w tym tygodniu: obłożenie (suma osób per dom) / suma miejsc.
      * Pusty dom wchodzi do mianownika. Ta sama osoba w dwóch domach liczy się dwa razy.
      *
-     * @return array{occupied: int, capacity: int}
+     * @return array{occupied: int, capacity: int, houses: Collection<int, object>}
      */
     public function housingForWeek(Carbon $weekStart, Carbon $weekEnd): array
     {
         $start = $weekStart->copy()->startOfDay();
         $end = $weekEnd->copy()->endOfDay();
 
-        $heldIds = Accommodation::query()
+        $houses = Accommodation::query()
             ->where(function ($query) use ($start, $end) {
                 $query->whereDoesntHave('leases', fn ($lease) => $lease->where('type', 'wynajmowany'))
                     ->orWhereHas('leases', function ($lease) use ($start, $end) {
@@ -224,29 +224,37 @@ final class WeeklyDashboardKpiService
                             ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $start->toDateString()));
                     });
             })
-            ->pluck('id');
+            ->orderBy('name')
+            ->get(['id', 'name', 'capacity']);
 
-        $capacity = (int) Accommodation::query()->whereIn('id', $heldIds)->sum('capacity');
+        $occupiedByHouse = $houses->isEmpty()
+            ? collect()
+            : AccommodationAssignment::query()
+                ->overlappingWith($start, $end)
+                ->whereIn('accommodation_id', $houses->pluck('id'))
+                ->get(['accommodation_id', 'employee_id'])
+                ->groupBy(fn ($row) => (int) $row->accommodation_id)
+                ->map(fn (Collection $rows) => $rows->pluck('employee_id')->unique()->count());
 
-        if ($heldIds->isEmpty()) {
-            return ['occupied' => 0, 'capacity' => 0];
-        }
+        $rows = $houses->map(fn (Accommodation $house) => (object) [
+            'id' => (int) $house->id,
+            'name' => (string) $house->name,
+            'occupied' => (int) ($occupiedByHouse[$house->id] ?? 0),
+            'capacity' => (int) ($house->capacity ?? 0),
+        ]);
 
-        $occupied = AccommodationAssignment::query()
-            ->overlappingWith($start, $end)
-            ->whereIn('accommodation_id', $heldIds)
-            ->get(['accommodation_id', 'employee_id'])
-            ->groupBy('accommodation_id')
-            ->sum(fn (Collection $rows) => $rows->pluck('employee_id')->unique()->count());
-
-        return ['occupied' => (int) $occupied, 'capacity' => $capacity];
+        return [
+            'occupied' => (int) $rows->sum('occupied'),
+            'capacity' => (int) $rows->sum('capacity'),
+            'houses' => $rows->values(),
+        ];
     }
 
     /**
      * Auta w terenie: poza bazą, bez serwisu w tym tygodniu i bez zdarzenia logistycznego.
      * Licznik to osoby z przypisań do tych aut. Mianownik to suma ich pojemności, także pustych.
      *
-     * @return array{occupied: int, capacity: int}
+     * @return array{occupied: int, capacity: int, vehicles: Collection<int, object>}
      */
     public function vehiclesForWeek(Carbon $weekStart, Carbon $weekEnd): array
     {
@@ -276,24 +284,39 @@ final class WeeklyDashboardKpiService
             ->where('outside_base', true)
             ->when($inServiceIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $inServiceIds->all()))
             ->when($onLogisticsEventIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $onLogisticsEventIds->all()))
-            ->get(['id', 'capacity']);
+            ->orderBy('registration_number')
+            ->get(['id', 'brand', 'model', 'registration_number', 'capacity']);
 
-        $capacity = (int) $vehicles->sum(fn ($vehicle) => (int) ($vehicle->capacity ?? 0));
-        $ids = $vehicles->pluck('id');
+        $occupiedByVehicle = $vehicles->isEmpty()
+            ? collect()
+            : VehicleAssignment::query()
+                ->overlappingWith($start, $end)
+                ->whereIn('vehicle_id', $vehicles->pluck('id'))
+                ->where(fn ($q) => $q->where('is_return_trip', false)->orWhereNull('is_return_trip'))
+                ->get(['vehicle_id', 'employee_id'])
+                ->groupBy(fn ($row) => (int) $row->vehicle_id)
+                ->map(fn (Collection $rows) => $rows->pluck('employee_id')->unique()->count());
 
-        if ($ids->isEmpty()) {
-            return ['occupied' => 0, 'capacity' => 0];
-        }
+        $rows = $vehicles->map(function (Vehicle $vehicle) use ($occupiedByVehicle) {
+            $name = trim(implode(' ', array_filter([
+                $vehicle->brand,
+                $vehicle->model,
+                $vehicle->registration_number,
+            ])));
 
-        $occupied = VehicleAssignment::query()
-            ->overlappingWith($start, $end)
-            ->whereIn('vehicle_id', $ids)
-            ->where(fn ($q) => $q->where('is_return_trip', false)->orWhereNull('is_return_trip'))
-            ->get(['vehicle_id', 'employee_id'])
-            ->groupBy('vehicle_id')
-            ->sum(fn (Collection $rows) => $rows->pluck('employee_id')->unique()->count());
+            return (object) [
+                'id' => (int) $vehicle->id,
+                'name' => $name !== '' ? $name : 'Auto #'.$vehicle->id,
+                'occupied' => (int) ($occupiedByVehicle[$vehicle->id] ?? 0),
+                'capacity' => (int) ($vehicle->capacity ?? 0),
+            ];
+        });
 
-        return ['occupied' => (int) $occupied, 'capacity' => $capacity];
+        return [
+            'occupied' => (int) $rows->sum('occupied'),
+            'capacity' => (int) $rows->sum('capacity'),
+            'vehicles' => $rows->values(),
+        ];
     }
 
     /**
@@ -332,7 +355,7 @@ final class WeeklyDashboardKpiService
      * Ławka w dzień wysyłki: w bazie z rotacją / w bazie bez rotacji.
      * Rotacja liczy się, gdy obejmuje ten dzień albo zaczyna się do środy odcięcia włącznie.
      *
-     * @return array{with_rotation: int, without_rotation: int, day: Carbon}
+     * @return array{with_rotation: int, without_rotation: int, day: Carbon, with_rotation_people: Collection, without_rotation_people: Collection}
      */
     public function benchOnDispatchDay(Carbon $weekStart, Carbon $weekEnd): array
     {
@@ -354,12 +377,30 @@ final class WeeklyDashboardKpiService
             ->pluck('employee_id')
             ->map(fn ($id) => (int) $id);
 
-        $withRotation = $inBase->intersect($withRotationIds)->count();
+        $withIds = $inBase->intersect($withRotationIds)->values();
+        $withoutIds = $inBase->diff($withRotationIds)->values();
+        $names = Employee::query()
+            ->whereIn('id', $inBase)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->keyBy('id');
+
+        $person = function (int $id) use ($names) {
+            $employee = $names->get($id);
+
+            return (object) [
+                'id' => $id,
+                'name' => $employee?->full_name ?? '—',
+            ];
+        };
 
         return [
-            'with_rotation' => $withRotation,
-            'without_rotation' => $inBase->count() - $withRotation,
+            'with_rotation' => $withIds->count(),
+            'without_rotation' => $withoutIds->count(),
             'day' => $day,
+            'with_rotation_people' => $withIds->map(fn (int $id) => $person($id))->sortBy('name')->values(),
+            'without_rotation_people' => $withoutIds->map(fn (int $id) => $person($id))->sortBy('name')->values(),
         ];
     }
 
@@ -368,7 +409,14 @@ final class WeeklyDashboardKpiService
      * Popyt przyszłego tygodnia minus osoby z przypisaniem na przyszły tydzień,
      * których rotacja nie kończy się do środy odcięcia. Ujemny wynik to nadmiar.
      *
-     * @return array{to_send: int, next_demand: int, staying: int}
+     * @return array{
+     *     to_send: int,
+     *     next_demand: int,
+     *     staying: int,
+     *     demand_by_project: Collection<int, object>,
+     *     staying_people: Collection<int, object>,
+     *     leaving_people: Collection<int, object>
+     * }
      */
     public function toSendForNextWeek(Carbon $weekStart, Carbon $weekEnd): array
     {
@@ -376,24 +424,60 @@ final class WeeklyDashboardKpiService
         $nextEnd = $weekEnd->copy()->addWeek()->endOfDay();
         $cutoff = $this->rotationCutoffAfterWeek($weekEnd);
 
-        $nextDemand = $this->totalDemandForWeek($nextStart, $nextEnd);
+        $neededByProject = $this->demandSlotsByProjectForWeek($nextStart, $nextEnd);
+        $nextDemand = (int) $neededByProject->sum();
+        $projectNames = $neededByProject->isEmpty()
+            ? collect()
+            : Project::query()->whereIn('id', $neededByProject->keys())->get(['id', 'name'])
+                ->mapWithKeys(fn (Project $project) => [(int) $project->id => (string) $project->name]);
+        $demandByProject = $neededByProject
+            ->map(fn (int $needed, int|string $projectId) => (object) [
+                'project_id' => (int) $projectId,
+                'project_name' => (string) ($projectNames->get((int) $projectId) ?? '?'),
+                'needed' => $needed,
+            ])
+            ->sortBy('project_name')
+            ->values();
 
         $assignedNext = ProjectAssignment::query()
             ->overlappingWith($nextStart, $nextEnd)
             ->pluck('employee_id')
             ->map(fn ($id) => (int) $id)
-            ->unique();
+            ->unique()
+            ->values();
 
-        $endingIds = $this->rotationsEndingThrough($weekStart, $cutoff)
-            ->pluck('employee_id')
-            ->map(fn ($id) => (int) $id);
+        $ending = $this->rotationsEndingThrough($weekStart, $cutoff);
+        $endingIds = $ending->pluck('employee_id')->map(fn ($id) => (int) $id);
+        $endingByEmployee = $ending->keyBy(fn ($rotation) => (int) $rotation->employee_id);
 
-        $staying = $assignedNext->diff($endingIds)->count();
+        $stayingIds = $assignedNext->diff($endingIds)->values();
+        $leavingIds = $assignedNext->intersect($endingIds)->values();
+        $names = Employee::query()
+            ->whereIn('id', $assignedNext)
+            ->get(['id', 'first_name', 'last_name'])
+            ->keyBy('id');
+
+        $named = function (Collection $ids) use ($names, $endingByEmployee) {
+            return $ids->map(function (int $id) use ($names, $endingByEmployee) {
+                $employee = $names->get($id);
+
+                return (object) [
+                    'id' => $id,
+                    'name' => $employee?->full_name ?? '—',
+                    'rotation_end' => $endingByEmployee->get($id)?->end_date,
+                ];
+            })->sortBy('name')->values();
+        };
+
+        $staying = $stayingIds->count();
 
         return [
             'to_send' => $nextDemand - $staying,
             'next_demand' => $nextDemand,
             'staying' => $staying,
+            'demand_by_project' => $demandByProject,
+            'staying_people' => $named($stayingIds),
+            'leaving_people' => $named($leavingIds),
         ];
     }
 

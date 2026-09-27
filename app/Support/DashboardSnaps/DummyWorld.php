@@ -141,12 +141,39 @@ final class DummyWorld
             'rotationHorizonLabel' => $weekStart->format('d.m').' – '.$weekStart->copy()->endOfWeek()->next(Carbon::WEDNESDAY)->format('d.m.Y'),
             'housingOccupied' => 6,
             'housingCapacity' => 8,
+            'housingHouses' => collect([
+                (object) ['id' => 61, 'name' => 'Papenburg — Am Deich 12', 'occupied' => 4, 'capacity' => 5],
+                (object) ['id' => 62, 'name' => 'Kilonia — Werftstraße', 'occupied' => 2, 'capacity' => 3],
+            ]),
             'vehicleOccupied' => 4,
             'vehicleCapacity' => 5,
+            'fieldVehicles' => collect([
+                (object) ['id' => 21, 'name' => 'VW Transporter GDA 8K21', 'occupied' => 4, 'capacity' => 5],
+            ]),
             'benchWithRotation' => 2,
             'benchWithoutRotation' => 1,
+            'benchWithPeople' => collect([
+                (object) ['id' => $people[4]->id, 'name' => $people[4]->full_name],
+                (object) ['id' => $people[3]->id, 'name' => $people[3]->full_name],
+            ]),
+            'benchWithoutPeople' => collect([
+                (object) ['id' => $people[2]->id, 'name' => $people[2]->full_name],
+            ]),
             'benchDayLabel' => 'sobotę',
             'toSendCount' => 3,
+            'toSendNextDemand' => 5,
+            'toSendStaying' => 2,
+            'toSendDemandByProject' => collect([
+                (object) ['project_id' => 51, 'project_name' => 'Meyer Werft — blok 7', 'needed' => 3],
+                (object) ['project_id' => 52, 'project_name' => 'HDW Kilonia — pokład', 'needed' => 2],
+            ]),
+            'toSendStayingPeople' => collect([
+                (object) ['id' => $people[0]->id, 'name' => $people[0]->full_name, 'rotation_end' => null],
+                (object) ['id' => $people[1]->id, 'name' => $people[1]->full_name, 'rotation_end' => null],
+            ]),
+            'toSendLeavingPeople' => collect([
+                (object) ['id' => $people[3]->id, 'name' => $people[3]->full_name, 'rotation_end' => $weekStart->copy()->addDays(4)],
+            ]),
             'expiringItems' => [
                 'documents' => $docs,
                 'accommodations' => collect([
