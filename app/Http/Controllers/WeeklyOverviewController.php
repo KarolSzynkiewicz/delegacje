@@ -77,13 +77,6 @@ class WeeklyOverviewController extends Controller
             ->orderBy('end_date')
             ->get();
 
-        $transferEvents = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::TRANSFER)
-            ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
-            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
-            ->with(['participants.employee', 'vehicle', 'fromLocation', 'toLocation'])
-            ->orderBy('event_date')
-            ->get();
-
         // Filter departures to show only those with unassigned participants
         // Now optimized - no N+1! projectAssignments are already loaded
         $departures = $allDepartures->map(function ($departure) {
@@ -126,9 +119,13 @@ class WeeklyOverviewController extends Controller
             ->get();
 
         $employeesInFieldCount = $this->weeklyDashboardKpiService->countEmployeesInFieldForWeek($weekStart, $weekEnd);
+        $employeesNeededCount = $this->weeklyDashboardKpiService->totalDemandForWeek($weekStart, $weekEnd);
         $employeesInFieldByProject = $this->weeklyDashboardKpiService->employeesInFieldByProjectForWeek($weekStart, $weekEnd);
+        $rotationHorizonEnd = $this->weeklyDashboardKpiService->rotationCutoffAfterWeek($weekEnd);
+        $rotationsEnding = $this->weeklyDashboardKpiService->rotationsEndingThrough($weekStart, $rotationHorizonEnd);
+        $rotationHorizonLabel = $weekStart->format('d.m').' – '.$rotationHorizonEnd->format('d.m.Y');
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'transferEvents', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel'));
     }
 
     /**

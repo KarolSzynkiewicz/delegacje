@@ -218,6 +218,9 @@ class ViewTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertViewIs('weekly-overview.index');
+        $response->assertSee('Kończą rotację', false);
+        $response->assertSee('Wyjeżdża:', false);
+        $response->assertSee('Zjeżdża:', false);
     }
 
     /**

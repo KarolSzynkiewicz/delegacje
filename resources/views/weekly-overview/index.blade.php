@@ -73,9 +73,11 @@
     @include('weekly-overview.partials.week-summary', [
         'returnTrips' => $returnTrips,
         'allDepartures' => $allDepartures,
-        'transferEvents' => $transferEvents,
         'employeesInFieldCount' => $employeesInFieldCount,
+        'employeesNeededCount' => $employeesNeededCount,
         'employeesInFieldByProject' => $employeesInFieldByProject,
+        'rotationsEnding' => $rotationsEnding,
+        'rotationHorizonLabel' => $rotationHorizonLabel,
         'expiringItems' => $expiringItems,
         'projectsEndingThisMonth' => $projectsEndingThisMonth,
     ])

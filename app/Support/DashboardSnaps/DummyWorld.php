@@ -124,12 +124,21 @@ final class DummyWorld
         return [
             'returnTrips' => collect([$mkEvent(41, $weekStart->copy()->addDays(4), [$people[3], $people[4]])]),
             'allDepartures' => collect([$mkEvent(42, $weekStart->copy()->addDays(1), [$people[0], $people[1], $people[2]], $location)]),
-            'transferEvents' => collect([$mkEvent(43, $weekStart->copy()->addDays(2), [$people[1]])]),
             'employeesInFieldCount' => 4,
+            'employeesNeededCount' => 5,
             'employeesInFieldByProject' => collect([
-                (object) ['project_id' => 51, 'project_name' => 'Meyer Werft — blok 7', 'employee_count' => 3],
-                (object) ['project_id' => 52, 'project_name' => 'HDW Kilonia — pokład', 'employee_count' => 2],
+                (object) ['project_id' => 51, 'project_name' => 'Meyer Werft — blok 7', 'employee_count' => 3, 'needed_count' => 3],
+                (object) ['project_id' => 52, 'project_name' => 'HDW Kilonia — pokład', 'employee_count' => 2, 'needed_count' => 2],
             ]),
+            'rotationsEnding' => collect([
+                new SnapRecord([
+                    'id' => 71,
+                    'end_date' => $weekStart->copy()->addDays(4),
+                    'employee' => $people[3],
+                    'employee_id' => $people[3]->id,
+                ]),
+            ]),
+            'rotationHorizonLabel' => $weekStart->format('d.m').' – '.$weekStart->copy()->endOfWeek()->next(Carbon::WEDNESDAY)->format('d.m.Y'),
             'expiringItems' => [
                 'documents' => $docs,
                 'accommodations' => collect([

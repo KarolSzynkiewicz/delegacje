@@ -42,6 +42,18 @@
         color: var(--text-main) !important;
         font-variant-numeric: tabular-nums;
     }
+    .weekly-logistics-metric__sentence {
+        font-size: 0.95rem;
+        font-weight: 600;
+        line-height: 1.35;
+        color: var(--text-main) !important;
+        font-variant-numeric: tabular-nums;
+    }
+    .weekly-logistics-metric__hint {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        margin-top: 0.3rem;
+    }
     .weekly-logistics-popover-panel {
         background: rgba(30, 41, 59, 0.97) !important;
         backdrop-filter: none !important;
@@ -87,6 +99,35 @@
         || $expiringVehicleIssuesCount > 0
         || $expiringLeasesCount > 0
         || $projectsEndingThisMonthCount > 0;
+
+    $pl = function (int $n, string $one, string $few, string $many): string {
+        $mod10 = $n % 10;
+        $mod100 = $n % 100;
+        if ($n === 1) {
+            return $one;
+        }
+        if ($mod10 >= 2 && $mod10 <= 4 && ($mod100 < 12 || $mod100 > 14)) {
+            return $few;
+        }
+
+        return $many;
+    };
+
+    $peopleOnEvents = function ($events): int {
+        return collect($events)
+            ->flatMap(fn ($event) => $event->participants ?? collect())
+            ->pluck('employee_id')
+            ->filter()
+            ->unique()
+            ->count();
+    };
+
+    $departureEventsCount = collect($allDepartures ?? [])->count();
+    $returnEventsCount = collect($returnTrips ?? [])->count();
+    $departurePeopleCount = $peopleOnEvents($allDepartures ?? collect());
+    $returnPeopleCount = $peopleOnEvents($returnTrips ?? collect());
+    $rotationsEndingCount = collect($rotationsEnding ?? [])->count();
+    $employeesNeededCount = (int) ($employeesNeededCount ?? 0);
 @endphp
 
 <div
@@ -100,12 +141,15 @@
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="Lista transferów"
-                    @click.prevent="openPanel('transfers', $event)"
+                    data-tip="Osoby, których rotacja kończy się w tym tygodniu albo najpóźniej w przyszłą środę (włącznie)"
+                    @click.prevent="openPanel('rotations-ending', $event)"
                 >
-                    <i class="bi bi-arrow-left-right weekly-logistics-metric__icon" aria-hidden="true"></i>
-                    <div class="weekly-logistics-metric__label">Transfery</div>
-                    <div class="weekly-logistics-metric__value">{{ $transferEvents->count() }}</div>
+                    <i class="bi bi-hourglass-bottom weekly-logistics-metric__icon" aria-hidden="true"></i>
+                    <div class="weekly-logistics-metric__label">Kończą rotację</div>
+                    <div class="weekly-logistics-metric__value">{{ $rotationsEndingCount }}</div>
+                    @if(! empty($rotationHorizonLabel))
+                        <div class="weekly-logistics-metric__hint">{{ $rotationHorizonLabel }}</div>
+                    @endif
                 </button>
             </div>
             <div class="col-6 col-lg-3">
@@ -117,7 +161,10 @@
                 >
                     <i class="bi bi-arrow-right-circle weekly-logistics-metric__icon" aria-hidden="true"></i>
                     <div class="weekly-logistics-metric__label">Wyjazdy</div>
-                    <div class="weekly-logistics-metric__value">{{ $allDepartures->count() }}</div>
+                    <div class="weekly-logistics-metric__sentence">
+                        Wyjeżdża: {{ $departurePeopleCount }} {{ $pl($departurePeopleCount, 'osoba', 'osoby', 'osób') }}
+                        / {{ $departureEventsCount }} {{ $pl($departureEventsCount, 'wyjazd', 'wyjazdy', 'wyjazdów') }}
+                    </div>
                 </button>
             </div>
             <div class="col-6 col-lg-3">
@@ -129,19 +176,22 @@
                 >
                     <i class="bi bi-arrow-return-left weekly-logistics-metric__icon" aria-hidden="true"></i>
                     <div class="weekly-logistics-metric__label">Zjazdy</div>
-                    <div class="weekly-logistics-metric__value">{{ $returnTrips->count() }}</div>
+                    <div class="weekly-logistics-metric__sentence">
+                        Zjeżdża: {{ $returnPeopleCount }} {{ $pl($returnPeopleCount, 'osoba', 'osoby', 'osób') }}
+                        / {{ $returnEventsCount }} {{ $pl($returnEventsCount, 'zjazd', 'zjazdy', 'zjazdów') }}
+                    </div>
                 </button>
             </div>
             <div class="col-6 col-lg-3">
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="Ile osób w którym projekcie (przypisanie przecina ten tydzień)"
+                    data-tip="Przypisani / zapotrzebowanie we wszystkich kierunkach"
                     @click.prevent="openPanel('employees-by-project', $event)"
                 >
                     <i class="bi bi-people weekly-logistics-metric__icon" aria-hidden="true"></i>
                     <div class="weekly-logistics-metric__label">Pracownicy</div>
-                    <div class="weekly-logistics-metric__value">{{ $employeesInFieldCount }}</div>
+                    <div class="weekly-logistics-metric__value">{{ $employeesInFieldCount }}/{{ $employeesNeededCount }}</div>
                 </button>
             </div>
         </div>
@@ -232,25 +282,25 @@
                     <button type="button" class="btn-close flex-shrink-0" aria-label="Zamknij" @click="close()"></button>
                 </div>
 
-                <div x-show="active === 'transfers'" x-cloak>
-                    @if($transferEvents->isNotEmpty())
+                <div x-show="active === 'rotations-ending'" x-cloak>
+                    @if(collect($rotationsEnding ?? [])->isNotEmpty())
+                        <p class="text-muted small mb-2">Koniec rotacji w oknie {{ $rotationHorizonLabel }} (ten tydzień i przyszła środa włącznie).</p>
                         <ul class="mb-0 small list-unstyled">
-                            @foreach($transferEvents as $transfer)
-                                @php
-                                    $transferParticipantsCount = $transfer->participants->pluck('employee_id')->filter()->unique()->count();
-                                @endphp
-                                <li class="mb-1">
-                                    <a href="{{ route('transfers.show', $transfer) }}" class="text-decoration-none">
-                                        <strong>{{ $transfer->event_date->format('d.m.Y') }}</strong>
-                                        @if($transferParticipantsCount > 0)
-                                            ({{ $transferParticipantsCount }} {{ $transferParticipantsCount === 1 ? 'osoba' : 'osób' }})
-                                        @endif
-                                    </a>
+                            @foreach($rotationsEnding as $rotation)
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                    @if($rotation->employee)
+                                        <a href="{{ route('employees.rotations.show', [$rotation->employee, $rotation]) }}" class="text-decoration-none min-w-0 flex-grow-1">
+                                            <span class="fw-semibold">{{ $rotation->employee->full_name }}</span>
+                                        </a>
+                                    @else
+                                        <span class="fw-semibold">—</span>
+                                    @endif
+                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $rotation->end_date->format('d.m.Y') }}</span>
                                 </li>
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-0">Brak transferów w tym tygodniu.</p>
+                        <p class="text-muted small mb-0">Nikt nie kończy rotacji w tym tygodniu ani do najbliższej środy po nim.</p>
                     @endif
                 </div>
 
@@ -284,12 +334,12 @@
                                     <a href="{{ route('projects.show', $row->project_id) }}" class="text-decoration-none min-w-0 flex-grow-1">
                                         <span class="fw-semibold">{{ $row->project_name }}</span>
                                     </a>
-                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ (int) $row->employee_count }}</span>
+                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ (int) $row->employee_count }}/{{ (int) ($row->needed_count ?? 0) }}</span>
                                 </li>
                             @endforeach
                         </ul>
                         <p class="text-muted small mb-0 mt-2 pt-2 border-top" style="border-color: var(--glass-border) !important;">
-                            Suma po projektach może być wyższa niż liczba na kafelku, jeśli ta sama osoba jest w kilku projektach.
+                            Przy każdym kierunku: przypisani / zapotrzebowanie. Na kafelku {{ $employeesInFieldCount }}/{{ $employeesNeededCount }} to unikalne osoby wobec sumy popytu ze wszystkich kierunków. Suma osób po projektach może być wyższa, jeśli ta sama osoba jest w kilku projektach.
                         </p>
                     @else
                         <p class="text-muted small mb-0">Brak przypisań do projektów przecinających ten tydzień.</p>
@@ -477,7 +527,7 @@ document.addEventListener('alpine:init', () => {
         },
         panelTitle() {
             const map = {
-                transfers: 'Transfery (tydzień)',
+                'rotations-ending': 'Kończą rotację',
                 returns: 'Zjazdy (tydzień)',
                 departures: 'Wyjazdy (tydzień)',
                 'employees-by-project': 'Pracownicy wg projektu (tydzień)',
@@ -491,7 +541,7 @@ document.addEventListener('alpine:init', () => {
         },
         panelIconClass() {
             const map = {
-                transfers: 'bi-arrow-left-right',
+                'rotations-ending': 'bi-hourglass-bottom',
                 returns: 'bi-arrow-return-left',
                 departures: 'bi-arrow-right',
                 'employees-by-project': 'bi-people',

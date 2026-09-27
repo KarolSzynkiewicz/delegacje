@@ -7,6 +7,8 @@ use App\Enums\LogisticsEventType;
 use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
+use App\Models\ProjectDemand;
+use App\Models\Rotation;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -78,7 +80,7 @@ final class WeeklyDashboardKpiService
     /**
      * Liczba unikalnych pracowników w polu, pogrupowana po projekcie (tydzień przecina przypisanie).
      *
-     * @return Collection<int, object{project_id: int, project_name: string, employee_count: int}>
+     * @return Collection<int, object{project_id: int, project_name: string, employee_count: int, needed_count: int}>
      */
     public function employeesInFieldByProjectForWeek(Carbon $weekStart, Carbon $weekEnd): Collection
     {
@@ -93,22 +95,103 @@ final class WeeklyDashboardKpiService
             ->groupBy('project_assignments.project_id')
             ->get();
 
-        if ($rows->isEmpty()) {
-            return collect();
-        }
+        $neededByProject = $this->demandSlotsByProjectForWeek($weekStart, $weekEnd);
 
-        $names = Project::query()
-            ->whereIn('id', $rows->pluck('project_id'))
-            ->pluck('name', 'id');
+        $names = $rows->isEmpty()
+            ? collect()
+            : Project::query()
+                ->whereIn('id', $rows->pluck('project_id'))
+                ->pluck('name', 'id');
 
-        return $rows
+        $rows = $rows
             ->map(fn ($row) => (object) [
                 'project_id' => (int) $row->project_id,
                 'project_name' => (string) ($names[$row->project_id] ?? '?'),
                 'employee_count' => (int) $row->employee_count,
-            ])
+                'needed_count' => (int) ($neededByProject[$row->project_id] ?? 0),
+            ]);
+
+        $missingDemandIds = $neededByProject
+            ->filter(fn (int $needed) => $needed > 0)
+            ->keys()
+            ->diff($rows->pluck('project_id'));
+
+        if ($missingDemandIds->isNotEmpty()) {
+            $demandNames = Project::query()
+                ->whereIn('id', $missingDemandIds)
+                ->pluck('name', 'id');
+
+            foreach ($missingDemandIds as $projectId) {
+                $rows->push((object) [
+                    'project_id' => (int) $projectId,
+                    'project_name' => (string) ($demandNames[$projectId] ?? '?'),
+                    'employee_count' => 0,
+                    'needed_count' => (int) $neededByProject[$projectId],
+                ]);
+            }
+        }
+
+        return $rows
             ->sortBy('project_name')
             ->values();
+    }
+
+    /**
+     * Suma zapotrzebowania (slotów) we wszystkich projektach przecinających tydzień.
+     * Ta sama reguła co na karcie kierunku: wpisy tej samej roli w tym tygodniu są sumowane.
+     */
+    public function totalDemandForWeek(Carbon $weekStart, Carbon $weekEnd): int
+    {
+        return (int) $this->demandSlotsByProjectForWeek($weekStart, $weekEnd)->sum();
+    }
+
+    /**
+     * Środa po niedzieli zamykającej przeglądany tydzień.
+     * Osoby kończące rotację liczymy do tego dnia włącznie.
+     */
+    public function rotationCutoffAfterWeek(Carbon $weekEnd): Carbon
+    {
+        return $weekEnd->copy()->startOfDay()->next(Carbon::WEDNESDAY);
+    }
+
+    /**
+     * Unikalne osoby, których rotacja kończy się w przeglądanym tygodniu
+     * albo najpóźniej w środę po tym tygodniu (włącznie).
+     *
+     * @return Collection<int, Rotation>
+     */
+    public function rotationsEndingThrough(Carbon $weekStart, Carbon $horizonEnd): Collection
+    {
+        return Rotation::query()
+            ->whereNotNull('end_date')
+            ->whereDate('end_date', '>=', $weekStart->toDateString())
+            ->whereDate('end_date', '<=', $horizonEnd->toDateString())
+            ->with('employee')
+            ->orderBy('end_date')
+            ->orderBy('id')
+            ->get()
+            ->unique('employee_id')
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, int> project_id => liczba slotów zapotrzebowania
+     */
+    private function demandSlotsByProjectForWeek(Carbon $weekStart, Carbon $weekEnd): Collection
+    {
+        $rows = ProjectDemand::query()
+            ->overlappingWith($weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay())
+            ->where('required_count', '>', 0)
+            ->get(['project_id', 'role_id', 'required_count']);
+
+        return $rows
+            ->groupBy(fn ($row) => $row->project_id.'|'.$row->role_id)
+            ->map(fn ($group) => (object) [
+                'project_id' => (int) $group->first()->project_id,
+                'needed' => (int) $group->sum('required_count'),
+            ])
+            ->groupBy('project_id')
+            ->map(fn (Collection $group) => (int) $group->sum('needed'));
     }
 
     /**
