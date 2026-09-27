@@ -127,7 +127,20 @@ class WeeklyOverviewController extends Controller
         $rotationsEnding = $this->weeklyDashboardKpiService->rotationsEndingThrough($weekStart, $rotationHorizonEnd);
         $rotationHorizonLabel = $weekStart->format('d.m').' – '.$rotationHorizonEnd->format('d.m.Y');
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel'));
+        $housing = $this->weeklyDashboardKpiService->housingForWeek($weekStart, $weekEnd);
+        $vehicles = $this->weeklyDashboardKpiService->vehiclesForWeek($weekStart, $weekEnd);
+        $bench = $this->weeklyDashboardKpiService->benchOnDispatchDay($weekStart, $weekEnd);
+        $toSend = $this->weeklyDashboardKpiService->toSendForNextWeek($weekStart, $weekEnd);
+        $housingOccupied = $housing['occupied'];
+        $housingCapacity = $housing['capacity'];
+        $vehicleOccupied = $vehicles['occupied'];
+        $vehicleCapacity = $vehicles['capacity'];
+        $benchWithRotation = $bench['with_rotation'];
+        $benchWithoutRotation = $bench['without_rotation'];
+        $benchDayLabel = $this->weeklyDashboardKpiService->dispatchDayLabel($bench['day']);
+        $toSendCount = $toSend['to_send'];
+
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel', 'housingOccupied', 'housingCapacity', 'vehicleOccupied', 'vehicleCapacity', 'benchWithRotation', 'benchWithoutRotation', 'benchDayLabel', 'toSendCount'));
     }
 
     /**

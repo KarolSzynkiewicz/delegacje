@@ -139,6 +139,14 @@ final class DummyWorld
                 ]),
             ]),
             'rotationHorizonLabel' => $weekStart->format('d.m').' – '.$weekStart->copy()->endOfWeek()->next(Carbon::WEDNESDAY)->format('d.m.Y'),
+            'housingOccupied' => 6,
+            'housingCapacity' => 8,
+            'vehicleOccupied' => 4,
+            'vehicleCapacity' => 5,
+            'benchWithRotation' => 2,
+            'benchWithoutRotation' => 1,
+            'benchDayLabel' => 'sobotę',
+            'toSendCount' => 3,
             'expiringItems' => [
                 'documents' => $docs,
                 'accommodations' => collect([

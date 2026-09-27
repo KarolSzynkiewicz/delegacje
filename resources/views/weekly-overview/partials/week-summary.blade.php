@@ -128,6 +128,15 @@
     $returnPeopleCount = $peopleOnEvents($returnTrips ?? collect());
     $rotationsEndingCount = collect($rotationsEnding ?? [])->count();
     $employeesNeededCount = (int) ($employeesNeededCount ?? 0);
+    $housingOccupied = (int) ($housingOccupied ?? 0);
+    $housingCapacity = (int) ($housingCapacity ?? 0);
+    $vehicleOccupied = (int) ($vehicleOccupied ?? 0);
+    $vehicleCapacity = (int) ($vehicleCapacity ?? 0);
+    $benchWithRotation = (int) ($benchWithRotation ?? 0);
+    $benchWithoutRotation = (int) ($benchWithoutRotation ?? 0);
+    $benchDayLabel = $benchDayLabel ?? 'sobotę';
+    $toSendCount = (int) ($toSendCount ?? 0);
+    $rotationWindow = $rotationHorizonLabel ?? 'poniedziałku tego tygodnia do środy następnego';
 @endphp
 
 <div
@@ -193,6 +202,54 @@
                     <div class="weekly-logistics-metric__label">Pracownicy</div>
                     <div class="weekly-logistics-metric__value">{{ $employeesInFieldCount }}/{{ $employeesNeededCount }}</div>
                 </button>
+            </div>
+        </div>
+
+        <div class="mt-3 pt-3 border-top" style="border-color: var(--glass-border) !important;">
+            <div class="row g-3">
+                <div class="col-6 col-lg-3">
+                    <div
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                        data-tip="Osoby w domach w tym tygodniu / miejsca we wszystkich domach, które wtedy mamy — własnych i wynajętych, także pustych. Kto zmienia dom w trakcie tygodnia, liczy się w każdym."
+                    >
+                        <i class="bi bi-house-door weekly-logistics-metric__icon" aria-hidden="true"></i>
+                        <div class="weekly-logistics-metric__label">Domy</div>
+                        <div class="weekly-logistics-metric__value">{{ $housingOccupied }}/{{ $housingCapacity }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                        data-tip="Osoby z przypisań do aut poza bazą / fotele tych aut. Auto w serwisie w tym tygodniu albo na wyjeździe, zjeździe lub transferze nie wchodzi. Puste auto poza bazą wchodzi do miejsc."
+                    >
+                        <i class="bi bi-car-front weekly-logistics-metric__icon" aria-hidden="true"></i>
+                        <div class="weekly-logistics-metric__label">Auta</div>
+                        <div class="weekly-logistics-metric__value">{{ $vehicleOccupied }}/{{ $vehicleCapacity }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                        data-tip="Stan na {{ $benchDayLabel }} tego tygodnia. Pierwsza liczba: w bazie i mają rotację obejmującą ten dzień albo zaczynającą się do końca okna {{ $rotationWindow }}. Druga: w bazie bez takiej rotacji. Na projekcie i w drodze nie wchodzą."
+                    >
+                        <i class="bi bi-person-workspace weekly-logistics-metric__icon" aria-hidden="true"></i>
+                        <div class="weekly-logistics-metric__label">Ławka</div>
+                        <div class="weekly-logistics-metric__value">{{ $benchWithRotation }}/{{ $benchWithoutRotation }}</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div
+                        class="weekly-logistics-metric p-3 text-center h-100 w-100 d-flex flex-column align-items-center justify-content-center"
+                        data-tip="Popyt przyszłego tygodnia minus osoby, które wtedy nadal są na projekcie. Odpadają ci, których rotacja kończy się w oknie {{ $rotationWindow }} — także gdy przypisanie jeszcze ich obejmuje. Liczba ujemna to nadmiar."
+                    >
+                        <i class="bi bi-box-arrow-up-right weekly-logistics-metric__icon" aria-hidden="true"></i>
+                        <div class="weekly-logistics-metric__label">Do dosłania</div>
+                        <div class="weekly-logistics-metric__value">{{ $toSendCount }}</div>
+                        @if($toSendCount < 0)
+                            <div class="weekly-logistics-metric__hint">nadmiar</div>
+                        @endif
+                    </div>
+                </div>
             </div>
         </div>
 

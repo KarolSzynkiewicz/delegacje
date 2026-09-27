@@ -228,6 +228,8 @@ class ViewTest extends TestCase
         $response->assertSee('Kończą rotację', false);
         $response->assertSee('Wyjeżdża:', false);
         $response->assertSee('Zjeżdża:', false);
+        $response->assertSee('Ławka', false);
+        $response->assertSee('Do dosłania', false);
     }
 
     public function test_weekly_overview_counts_departure_passengers_who_already_have_a_project(): void
