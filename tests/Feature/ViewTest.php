@@ -2,17 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
+use App\Models\Location;
+use App\Models\LogisticsEvent;
+use App\Models\LogisticsEventParticipant;
 use App\Models\Project;
+use App\Models\ProjectAssignment;
 use App\Models\Role;
 use App\Models\Rotation;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
@@ -221,6 +228,47 @@ class ViewTest extends TestCase
         $response->assertSee('Kończą rotację', false);
         $response->assertSee('Wyjeżdża:', false);
         $response->assertSee('Zjeżdża:', false);
+    }
+
+    public function test_weekly_overview_counts_departure_passengers_who_already_have_a_project(): void
+    {
+        $weekStart = Carbon::now()->startOfWeek();
+        $employee = Employee::factory()->create();
+        $role = Role::factory()->create();
+        $project = Project::factory()->create();
+        $location = Location::factory()->create();
+
+        $departure = LogisticsEvent::create([
+            'type' => LogisticsEventType::DEPARTURE,
+            'event_date' => $weekStart->copy()->subDay(),
+            'end_date' => $weekStart->copy(),
+            'status' => LogisticsEventStatus::COMPLETED,
+            'from_location_id' => $location->id,
+            'to_location_id' => $location->id,
+            'created_by' => $this->user->id,
+        ]);
+
+        LogisticsEventParticipant::create([
+            'logistics_event_id' => $departure->id,
+            'employee_id' => $employee->id,
+            'status' => 'completed',
+        ]);
+
+        ProjectAssignment::factory()->create([
+            'project_id' => $project->id,
+            'employee_id' => $employee->id,
+            'role_id' => $role->id,
+            'logistics_event_id' => $departure->id,
+            'start_date' => $weekStart->copy(),
+            'end_date' => $weekStart->copy()->addWeeks(3),
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get(route('weekly-overview.index'));
+
+        $response->assertOk();
+        $response->assertSee('Wyjeżdża: 1 osoba', false);
+        $response->assertSee('/ 1 wyjazd', false);
     }
 
     /**

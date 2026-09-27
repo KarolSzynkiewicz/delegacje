@@ -77,9 +77,11 @@ class WeeklyOverviewController extends Controller
             ->orderBy('end_date')
             ->get();
 
-        // Filter departures to show only those with unassigned participants
-        // Now optimized - no N+1! projectAssignments are already loaded
+        // Filter departures to show only those with unassigned participants.
+        // Clone first: setRelation mutates the model, and $allDepartures still
+        // needs the full passenger list for the week summary.
         $departures = $allDepartures->map(function ($departure) {
+            $departure = clone $departure;
             // Filter participants who don't have a project assignment from this logistics event
             $filteredParticipants = $departure->participants->filter(function ($participant) use ($departure) {
                 if (! $participant->employee) {
