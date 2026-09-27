@@ -644,6 +644,7 @@ class Step3VehicleAssignments extends Component
         // Kreator transferu (tablica): pełna lista — inna logika floty.
         if ($this->forTransferBoard || $this->forTransfer) {
             $this->vehicles = Vehicle::where('type', 'company_vehicle')
+                ->operational()
                 ->orderBy('registration_number')
                 ->get()
                 ->toArray();
@@ -657,6 +658,7 @@ class Step3VehicleAssignments extends Component
         $tracking = app(LocationTrackingService::class);
 
         $eligibleIds = Vehicle::where('type', 'company_vehicle')
+            ->operational()
             ->orderBy('registration_number')
             ->get()
             ->filter(function (Vehicle $vehicle) use ($arrivalDate, $tracking) {

@@ -125,6 +125,7 @@ class ReturnTripPlanner extends Component
         $vehicleValidationService = app(VehicleValidationService::class);
 
         return Vehicle::where('type', 'company_vehicle')
+            ->operational()
             ->orderBy('registration_number')
             ->get()
             ->filter(function (Vehicle $vehicle) use ($returnDate, $effectiveEndDate, $locationTrackingService, $vehicleValidationService) {

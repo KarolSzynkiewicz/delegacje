@@ -38,6 +38,7 @@ class ReturnTripController extends Controller
     {
         // Employees will be loaded dynamically via Livewire based on selected date
         $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->operational()
             ->orderBy('registration_number')
             ->get();
 
@@ -285,6 +286,12 @@ class ReturnTripController extends Controller
         $employees = $this->assignmentQueryService->getEmployeesWithActiveAssignments(Carbon::now());
 
         $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->where(function ($q) use ($returnTrip) {
+                $q->whereNull('retired_at');
+                if ($returnTrip->vehicle_id) {
+                    $q->orWhere('id', $returnTrip->vehicle_id);
+                }
+            })
             ->orderBy('registration_number')
             ->get();
 

@@ -14452,3 +14452,59 @@ body:has(.xuiv2-tasks.is-edi-review) .ui-page-header:not(.ui-page-header--has-le
     color: var(--text-main);
     background: rgba(59, 130, 246, 0.1);
 }
+
+a.emp-rail__item { text-decoration: none; }
+.emp-hero__photo--plate {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+    text-align: center;
+    padding: 0.5rem;
+    line-height: 1.25;
+}
+.veh-page .emp-shell {
+    min-height: calc(100dvh - 11.5rem);
+}
+.veh-page .emp-body {
+    flex: 1 1 auto;
+    align-items: stretch;
+}
+.veh-page .emp-rail {
+    align-self: stretch;
+    position: static;
+    padding: 1.15rem 1rem !important;
+    gap: 0.35rem;
+}
+.veh-page .emp-rail__item {
+    padding: 0.55rem 0.7rem 0.55rem 0.85rem;
+}
+.veh-crew {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem 1rem;
+    margin: 0.85rem 0 0;
+}
+.veh-crew__person {
+    width: 5.4rem;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+}
+.veh-crew__role {
+    margin-top: 0.35rem;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    line-height: 1.2;
+}
+.veh-crew__name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+.veh-seat-empty {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto;
+    border-radius: 50%;
+    border: 1.5px dashed var(--glass-border);
+}

@@ -25,7 +25,12 @@
         />
     </td>
     <td>
-        <div class="fw-medium">{{ $vehicle->registration_number }}</div>
+        <div class="fw-medium">
+            {{ $vehicle->registration_number }}
+            @if($vehicle->isRetired())
+                <x-ui.badge variant="danger">Wycofany</x-ui.badge>
+            @endif
+        </div>
         <div class="d-md-none small text-muted mt-1">{{ trim(($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '')) }}</div>
     </td>
     <td class="d-none d-md-table-cell">{{ trim(($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '')) }}</td>

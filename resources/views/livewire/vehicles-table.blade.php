@@ -1,5 +1,5 @@
 <div>
-    <x-data-table :paginator="$vehicles" :has-filters="(bool) ($search || $conditionFilter || $statusFilter || $locationFilter || $statusDate)">
+    <x-data-table :paginator="$vehicles" :has-filters="(bool) ($search || $conditionFilter || $statusFilter || $locationFilter || $statusDate || $showRetired)">
         <x-slot:filters>
             <x-data-table-filters :count="$vehicles->total()">
                 @if($statusDate)
@@ -29,6 +29,10 @@
                     <option value="field">W terenie</option>
                     <option value="transit">W podróży</option>
                 </select>
+                <div class="form-check mb-0">
+                    <input type="checkbox" class="form-check-input" id="showRetired" wire:model.live="showRetired">
+                    <label class="form-check-label small" for="showRetired">Pokaż wycofane</label>
+                </div>
             </x-data-table-filters>
         </x-slot:filters>
 
@@ -54,6 +58,9 @@
                 <x-data-table-filter-chip label="Lokalizacja: w terenie" wire:click="$set('locationFilter', '')" />
             @elseif($locationFilter === 'transit')
                 <x-data-table-filter-chip label="Lokalizacja: w podróży" wire:click="$set('locationFilter', '')" />
+            @endif
+            @if($showRetired)
+                <x-data-table-filter-chip label="Wycofane: widoczne" wire:click="$set('showRetired', false)" />
             @endif
         </x-slot:activeFilters>
 
@@ -84,8 +91,8 @@
         <x-slot:empty>
             <x-ui.empty-state
                 icon="car-front"
-                :message="$search || $conditionFilter || $statusFilter || $locationFilter || $statusDate ? 'Brak pojazdów spełniających kryteria' : 'Brak pojazdów'"
-                :has-filters="(bool) ($search || $conditionFilter || $statusFilter || $locationFilter || $statusDate)"
+                :message="$search || $conditionFilter || $statusFilter || $locationFilter || $statusDate || $showRetired ? 'Brak pojazdów spełniających kryteria' : 'Brak pojazdów'"
+                :has-filters="(bool) ($search || $conditionFilter || $statusFilter || $locationFilter || $statusDate || $showRetired)"
                 clear-filters-action="wire:clearFilters"
             />
         </x-slot:empty>

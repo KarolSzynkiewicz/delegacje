@@ -451,6 +451,18 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('accommodation-assignments.index');
 
         // Vehicles, Accommodations, Companies (CRUD)
+        Route::post('vehicles/{vehicle}/placement-correction', [VehicleController::class, 'correctPlacement'])
+            ->name('vehicles.placement-correction')
+            ->defaults('permission_type', 'action')
+            ->defaults('resource', 'vehicles');
+        Route::post('vehicles/{vehicle}/retire', [VehicleController::class, 'retire'])
+            ->name('vehicles.retire')
+            ->defaults('permission_type', 'action')
+            ->defaults('resource', 'vehicles');
+        Route::post('vehicles/{vehicle}/reinstate', [VehicleController::class, 'reinstate'])
+            ->name('vehicles.reinstate')
+            ->defaults('permission_type', 'action')
+            ->defaults('resource', 'vehicles');
         Route::resource('vehicles', VehicleController::class);
         Route::resource('accommodations', AccommodationController::class);
         Route::resource('companies', CompanyController::class);

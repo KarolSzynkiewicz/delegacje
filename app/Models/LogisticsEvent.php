@@ -41,6 +41,7 @@ class LogisticsEvent extends Model
         'destination_stop_location',
         'has_reassignment',
         'related_departure_id',
+        'sets_outside_base',
     ];
 
     protected $casts = [
@@ -48,6 +49,7 @@ class LogisticsEvent extends Model
         'end_date' => 'datetime',
         'has_transport' => 'boolean',
         'has_reassignment' => 'boolean',
+        'sets_outside_base' => 'boolean',
         'type' => LogisticsEventType::class,
         'status' => LogisticsEventStatus::class,
         'route_distance' => 'decimal:2',

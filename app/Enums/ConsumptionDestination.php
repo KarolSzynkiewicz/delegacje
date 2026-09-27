@@ -175,6 +175,7 @@ enum ConsumptionDestination: string
     private function searchVehicles(string $like, int $limit): Collection
     {
         return Vehicle::query()
+            ->operational()
             ->where(function ($vehicles) use ($like) {
                 $vehicles->whereRaw('LOWER(registration_number) LIKE ?', [$like])
                     ->orWhereRaw('LOWER(COALESCE(brand, \'\')) LIKE ?', [$like])

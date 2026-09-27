@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\VehicleRetirementReason;
 use App\Enums\VehicleType;
 use App\Traits\HasComments;
 use App\Traits\HasEquipmentConsumptions;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -34,6 +36,9 @@ class Vehicle extends Model
         'current_location_id',
         'outside_base',
         'last_departure_id',
+        'retired_at',
+        'retirement_reason',
+        'retirement_note',
     ];
 
     /**
@@ -59,7 +64,30 @@ class Vehicle extends Model
         'ac_wazne_do' => 'date',
         'type' => VehicleType::class,
         'outside_base' => 'boolean',
+        'retired_at' => 'datetime',
+        'retirement_reason' => VehicleRetirementReason::class,
     ];
+
+    /**
+     * Append-only fleet history. Current state is retired_at.
+     */
+    public function lifecycleEvents(): HasMany
+    {
+        return $this->hasMany(VehicleLifecycleEvent::class)->orderBy('occurred_at')->orderBy('id');
+    }
+
+    public function isRetired(): bool
+    {
+        return $this->retired_at !== null;
+    }
+
+    /**
+     * Still in the planning pool. Retired vehicles keep their history.
+     */
+    public function scopeOperational(Builder $query): Builder
+    {
+        return $query->whereNull('retired_at');
+    }
 
     /**
      * Get all assignments for this vehicle.

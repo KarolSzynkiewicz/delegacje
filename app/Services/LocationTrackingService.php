@@ -239,19 +239,19 @@ class LocationTrackingService
      */
     public function getVehicleLocationStatus(Vehicle $vehicle, Carbon $date): array
     {
-        // 1. Sprawdź czy pojazd jest w podróży (podczas eventu logistycznego)
-        $inTransitEvent = $this->findVehicleInTransitEvent($vehicle, $date);
-        $inTransit = $inTransitEvent !== null;
-
-        // 2. Synchronizuj flagę outside_base (lazy evaluation)
-        $this->syncVehicleOutsideBaseFlag($vehicle, $date);
-        $outsideBase = $vehicle->outside_base;
+        $lastEvent = $this->findLastVehicleEvent($vehicle, $date);
+        [$outsideBase, $lastDepartureId] = $this->placementFromEvent($vehicle, $lastEvent, $date);
+        $inTransit = $lastEvent !== null && $this->vehicleEventIsInTransit($lastEvent, $date);
+        $this->persistVehiclePlacementCache($vehicle, $date, $outsideBase, $lastDepartureId);
+        $source = $this->placementSource($lastEvent);
 
         // 3. Jeśli w podróży, zwróć podstawowe informacje
         if ($inTransit) {
             return [
                 'in_transit' => true,
                 'outside_base' => $outsideBase,
+                'source_label' => $source['label'],
+                'source_url' => $source['url'],
                 'project_names' => collect(),
                 'accommodation_names' => collect(),
                 'driver_accommodation' => null,
@@ -335,6 +335,8 @@ class LocationTrackingService
         return [
             'in_transit' => false,
             'outside_base' => $outsideBase,
+            'source_label' => $source['label'],
+            'source_url' => $source['url'],
             'project_names' => $projectNames,
             'accommodation_names' => $accommodationNames,
             'driver_accommodation' => $driverAccommodationName,
@@ -347,22 +349,57 @@ class LocationTrackingService
     }
 
     /**
-     * Find if vehicle is in transit on a specific date.
+     * Vehicle ids whose latest placement event still covers $date as travel.
+     * A later correction with no end date clears an older open departure.
+     *
+     * @param  iterable<int>  $vehicleIds
+     * @return array<int, true>
      */
-    protected function findVehicleInTransitEvent(Vehicle $vehicle, Carbon $date): ?LogisticsEvent
+    public function inTransitVehicleIds(iterable $vehicleIds, Carbon $date): array
     {
-        return LogisticsEvent::forLocationTracking()
-            ->where('vehicle_id', $vehicle->id)
-            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN, LogisticsEventType::TRANSFER])
+        $ids = collect($vehicleIds)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $events = LogisticsEvent::forLocationTracking()
+            ->whereIn('vehicle_id', $ids)
+            ->whereIn('type', $this->vehiclePlacementEventTypes())
             ->where('status', '!=', LogisticsEventStatus::CANCELLED)
             ->where('event_date', '<=', $date)
-            ->where(function ($q) use ($date) {
-                $q->whereNull('end_date')
-                    ->orWhere('end_date', '>', $date);
-            })
-            ->orderBy('event_date', 'desc')
-            ->orderBy('id', 'desc')
-            ->first();
+            ->orderByDesc('event_date')
+            ->orderByDesc('id')
+            ->get(['id', 'vehicle_id', 'type', 'event_date', 'end_date']);
+
+        $lastByVehicle = [];
+        foreach ($events as $event) {
+            $vehicleId = (int) $event->vehicle_id;
+            if (! array_key_exists($vehicleId, $lastByVehicle)) {
+                $lastByVehicle[$vehicleId] = $event;
+            }
+        }
+
+        $inTransit = [];
+        foreach ($lastByVehicle as $vehicleId => $event) {
+            if ($this->vehicleEventIsInTransit($event, $date)) {
+                $inTransit[$vehicleId] = true;
+            }
+        }
+
+        return $inTransit;
+    }
+
+    /**
+     * @return list<LogisticsEventType>
+     */
+    protected function vehiclePlacementEventTypes(): array
+    {
+        return [
+            LogisticsEventType::DEPARTURE,
+            LogisticsEventType::RETURN,
+            LogisticsEventType::TRANSFER,
+            LogisticsEventType::PLACEMENT_CORRECTION,
+        ];
     }
 
     /**
@@ -372,7 +409,7 @@ class LocationTrackingService
     {
         return LogisticsEvent::forLocationTracking()
             ->where('vehicle_id', $vehicle->id)
-            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN, LogisticsEventType::TRANSFER])
+            ->whereIn('type', $this->vehiclePlacementEventTypes())
             ->where('status', '!=', LogisticsEventStatus::CANCELLED)
             ->where('event_date', '<=', $date)
             ->orderBy('event_date', 'desc')
@@ -381,47 +418,93 @@ class LocationTrackingService
     }
 
     /**
-     * Synchronize outside_base flag for vehicle (lazy evaluation).
+     * In transit only when the latest event itself still covers the day.
+     * A correction has no travel window, so it ends an older open trip for this vehicle.
      */
-    protected function syncVehicleOutsideBaseFlag(Vehicle $vehicle, Carbon $date): void
+    protected function vehicleEventIsInTransit(LogisticsEvent $event, Carbon $date): bool
     {
-        $lastEvent = $this->findLastVehicleEvent($vehicle, $date);
+        if ($event->type === LogisticsEventType::PLACEMENT_CORRECTION) {
+            return false;
+        }
 
-        $shouldBeOutside = false;
-        $lastDepartureId = null;
+        if ($event->event_date !== null && $event->event_date->greaterThan($date)) {
+            return false;
+        }
 
+        return $event->end_date === null || $event->end_date->greaterThan($date);
+    }
+
+    /**
+     * @return array{0: bool, 1: ?int}
+     */
+    protected function placementFromEvent(Vehicle $vehicle, ?LogisticsEvent $lastEvent, Carbon $date): array
+    {
         if ($lastEvent) {
             if ($lastEvent->type === LogisticsEventType::DEPARTURE) {
-                $shouldBeOutside = true;
-                $lastDepartureId = $lastEvent->id;
-            } elseif ($lastEvent->type === LogisticsEventType::RETURN) {
-                if ($lastEvent->end_date && $lastEvent->end_date <= $date) {
-                    $shouldBeOutside = false;
-                } else {
-                    $shouldBeOutside = true;
-                }
-            } elseif ($lastEvent->type === LogisticsEventType::TRANSFER) {
-                $shouldBeOutside = true;
+                return [true, $lastEvent->id];
+            }
+
+            if ($lastEvent->type === LogisticsEventType::RETURN) {
+                $stillOut = ! ($lastEvent->end_date && $lastEvent->end_date <= $date);
+
+                return [$stillOut, null];
+            }
+
+            if ($lastEvent->type === LogisticsEventType::TRANSFER) {
+                return [true, null];
+            }
+
+            if ($lastEvent->type === LogisticsEventType::PLACEMENT_CORRECTION) {
+                return [(bool) $lastEvent->sets_outside_base, null];
             }
         }
 
-        // Jeśli brak eventu, sprawdź aktywne przypisania
-        if (! $lastEvent) {
-            $hasActiveAssignments = VehicleAssignment::where('vehicle_id', $vehicle->id)
-                ->where('start_date', '<=', $date)
-                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
-                ->exists();
+        $hasActiveAssignments = VehicleAssignment::where('vehicle_id', $vehicle->id)
+            ->where('start_date', '<=', $date)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
+            ->exists();
 
-            $shouldBeOutside = $hasActiveAssignments;
+        return [$hasActiveAssignments, null];
+    }
+
+    /**
+     * Cache „na dziś” dla planera. Podgląd innego dnia liczy stan, ale go nie zapisuje.
+     */
+    protected function persistVehiclePlacementCache(Vehicle $vehicle, Carbon $date, bool $shouldBeOutside, ?int $lastDepartureId): void
+    {
+        if (! $date->isSameDay(now())) {
+            return;
         }
 
-        // Aktualizuj flagę tylko jeśli się zmieniła
-        if ($vehicle->outside_base !== $shouldBeOutside || $vehicle->last_departure_id !== $lastDepartureId) {
-            $vehicle->update([
-                'outside_base' => $shouldBeOutside,
-                'last_departure_id' => $lastDepartureId,
-            ]);
+        if ($vehicle->outside_base === $shouldBeOutside && $vehicle->last_departure_id === $lastDepartureId) {
+            return;
         }
+
+        $vehicle->update([
+            'outside_base' => $shouldBeOutside,
+            'last_departure_id' => $lastDepartureId,
+        ]);
+    }
+
+    /**
+     * @return array{label: ?string, url: ?string}
+     */
+    protected function placementSource(?LogisticsEvent $event): array
+    {
+        if (! $event) {
+            return ['label' => null, 'url' => null];
+        }
+
+        $label = $event->type->label().' '.$event->event_date->format('d.m.Y');
+
+        $url = match ($event->type) {
+            LogisticsEventType::DEPARTURE => route('departures.show', $event),
+            LogisticsEventType::RETURN => route('return-trips.show', $event),
+            LogisticsEventType::TRANSFER => route('transfers.show', $event),
+            default => null,
+        };
+
+        return ['label' => $label, 'url' => $url];
     }
 
     /**

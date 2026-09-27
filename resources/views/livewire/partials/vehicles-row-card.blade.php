@@ -18,6 +18,9 @@
         <div class="flex-grow-1 min-width-0">
             <div class="dt-card__title mb-0">
                 <a href="{{ route('vehicles.show', $vehicle) }}" class="stretched-link">{{ $vehicle->registration_number }}</a>
+                @if($vehicle->isRetired())
+                    <x-ui.badge variant="danger">Wycofany</x-ui.badge>
+                @endif
             </div>
             <div class="small text-muted">{{ trim(($vehicle->brand ?? '') . ' ' . ($vehicle->model ?? '')) }}</div>
         </div>

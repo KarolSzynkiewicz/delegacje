@@ -83,7 +83,7 @@ enum ProcedureSubjectType: string
     public function query(): Builder
     {
         return match ($this) {
-            self::Vehicle => Vehicle::query()->orderBy('registration_number'),
+            self::Vehicle => Vehicle::query()->operational()->orderBy('registration_number'),
             self::Accommodation => Accommodation::query()->orderBy('name'),
             self::Location => Location::query()->without(['purposes'])->orderBy('name'),
             self::Employee => Employee::query()->whereNull('terminated_at')->orderBy('last_name')->orderBy('first_name'),

@@ -25,6 +25,9 @@ class VehiclesTable extends Component
 
     public $statusDate = '';
 
+    /** When false (default), retired vehicles stay off the fleet list. */
+    public bool $showRetired = false;
+
     public $sortField = 'registration_number';
 
     public $sortDirection = 'asc';
@@ -35,6 +38,7 @@ class VehiclesTable extends Component
         'statusFilter' => ['except' => ''],
         'locationFilter' => ['except' => ''],
         'statusDate' => ['except' => ''],
+        'showRetired' => ['except' => false],
         'sortField' => ['except' => 'registration_number'],
         'sortDirection' => ['except' => 'asc'],
     ];
@@ -64,6 +68,11 @@ class VehiclesTable extends Component
         $this->resetPage();
     }
 
+    public function updatingShowRetired(): void
+    {
+        $this->resetPage();
+    }
+
     public function clearFilters(): void
     {
         $this->search = '';
@@ -71,6 +80,7 @@ class VehiclesTable extends Component
         $this->statusFilter = '';
         $this->locationFilter = '';
         $this->statusDate = '';
+        $this->showRetired = false;
         $this->sortField = 'registration_number';
         $this->sortDirection = 'asc';
         $this->resetPage();
@@ -89,6 +99,9 @@ class VehiclesTable extends Component
     public function render()
     {
         $query = Vehicle::query();
+        if (! $this->showRetired) {
+            $query->operational();
+        }
         $checkDate = $this->statusDate ? \Carbon\Carbon::parse($this->statusDate) : now();
 
         if ($this->search) {

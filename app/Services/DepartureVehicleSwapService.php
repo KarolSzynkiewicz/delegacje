@@ -69,6 +69,7 @@ class DepartureVehicleSwapService
         $travelEnd = ($departure->end_date ?? $departure->event_date)->copy()->startOfDay();
 
         return Vehicle::query()
+            ->operational()
             ->whereIn('type', [VehicleType::COMPANY_VEHICLE, VehicleType::RENTAL])
             ->where('id', '!=', $departure->vehicle_id)
             ->orderBy('registration_number')

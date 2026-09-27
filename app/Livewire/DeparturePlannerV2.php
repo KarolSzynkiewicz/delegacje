@@ -3,12 +3,10 @@
 namespace App\Livewire;
 
 use App\Enums\LocationPurposeType;
-use App\Enums\LogisticsEventStatus;
-use App\Enums\LogisticsEventType;
 use App\Models\Employee;
 use App\Models\Location;
-use App\Models\LogisticsEvent;
 use App\Models\Vehicle;
+use App\Services\LocationTrackingService;
 use App\Support\DepartureRoutePlan;
 use App\Support\PublicTransportTicketCosts;
 use Carbon\Carbon;
@@ -1221,21 +1219,18 @@ class DeparturePlannerV2 extends Component
         $departureDate = Carbon::parse($this->departureDate);
 
         $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->where(function ($q) {
+                $q->whereNull('retired_at');
+                if ($this->vehicleId) {
+                    $q->orWhere('id', $this->vehicleId);
+                }
+            })
             ->orderBy('registration_number')
             ->get();
 
-        // Jeden batch query zamiast N×getVehicleLocationStatus()
-        $inTransitVehicleIds = LogisticsEvent::forLocationTracking()
-            ->whereIn('vehicle_id', $vehicles->pluck('id'))
-            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN, LogisticsEventType::TRANSFER])
-            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
-            ->where('event_date', '<=', $departureDate)
-            ->where(function ($q) use ($departureDate) {
-                $q->whereNull('end_date')->orWhere('end_date', '>', $departureDate);
-            })
-            ->pluck('vehicle_id')
-            ->flip()
-            ->toArray();
+        // Ostatnie zdarzenie auta, nie dowolny otwarty wyjazd — korekta zdejmuje „w podróży”.
+        $inTransitVehicleIds = app(LocationTrackingService::class)
+            ->inTransitVehicleIds($vehicles->pluck('id'), $departureDate);
 
         return $vehicles->filter(
             fn ($v) => ! isset($inTransitVehicleIds[$v->id]) && ! $v->outside_base

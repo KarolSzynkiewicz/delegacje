@@ -272,6 +272,7 @@ final class WeeklyDashboardKpiService
             ->values();
 
         $vehicles = Vehicle::query()
+            ->operational()
             ->where('outside_base', true)
             ->when($inServiceIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $inServiceIds->all()))
             ->when($onLogisticsEventIds->isNotEmpty(), fn ($q) => $q->whereNotIn('id', $onLogisticsEventIds->all()))

@@ -262,6 +262,9 @@ class Comment extends Model implements TaskSubject
                 LogisticsEventType::DEPARTURE => route('departures.show', $morph),
                 LogisticsEventType::TRANSFER => route('transfers.show', $morph),
                 LogisticsEventType::RETURN => route('return-trips.show', $morph),
+                LogisticsEventType::PLACEMENT_CORRECTION => $morph->vehicle_id
+                    ? route('vehicles.show', $morph->vehicle_id)
+                    : null,
             },
             default => null,
         };

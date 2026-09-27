@@ -476,6 +476,7 @@ class TransferCreateBoard extends Component
         }
 
         $vehicles = Vehicle::where('type', 'company_vehicle')
+            ->operational()
             ->orderBy('registration_number')
             ->get();
 

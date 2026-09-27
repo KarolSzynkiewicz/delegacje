@@ -4,7 +4,6 @@ namespace App\Livewire\Steps;
 
 use App\Enums\Currency;
 use App\Enums\LocationPurposeType;
-use App\Enums\ProjectStatus;
 use App\Models\Accommodation;
 use App\Models\Employee;
 use App\Models\Location;
@@ -16,7 +15,6 @@ use App\Services\RoutePlanningService;
 use App\Support\PublicTransportTicketCosts;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Reactive;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -138,7 +136,6 @@ class Step4RoutePlanning extends Component
 
     public bool $postTransferOtherSectionCollapsed = false;
 
-
     // ――― Own transport modals (tryb własny samochód) ――――――――――――――――――――
     /** Modal: konfiguracja kierowcy i wynagrodzenia za transport własny. */
     public bool $showOwnTransferModal = false;
@@ -160,6 +157,7 @@ class Step4RoutePlanning extends Component
 
     /** Robocza waluta wynagrodzenia w modalu (własny transport). */
     public string $pendingOwnBonusCurrency = 'PLN';
+
     /** Karta „Lotnisko” — opcjonalne podsumowanie (UI); null = pusty stan */
     public ?string $airportHubLegKind = null;
 
@@ -1258,6 +1256,7 @@ class Step4RoutePlanning extends Component
         if ($this->transportMode === 'public') {
             return true;
         }
+
         return empty($this->vehicleId);
     }
 
@@ -1736,6 +1735,7 @@ class Step4RoutePlanning extends Component
         $locationTrackingService = app(LocationTrackingService::class);
 
         return Vehicle::where('type', 'company_vehicle')
+            ->operational()
             ->orderBy('registration_number')
             ->get()
             ->filter(function (Vehicle $vehicle) use ($arrivalDate, $locationTrackingService) {
@@ -1766,6 +1766,7 @@ class Step4RoutePlanning extends Component
         if (empty($this->vehicleId)) {
             return null;
         }
+
         return \App\Models\Vehicle::find($this->vehicleId);
     }
 
@@ -1774,6 +1775,7 @@ class Step4RoutePlanning extends Component
         if (empty($this->selectedEmployeeIds)) {
             return collect();
         }
+
         return Employee::whereIn('id', $this->selectedEmployeeIds)->orderBy('last_name')->get();
     }
 
@@ -1884,7 +1886,7 @@ class Step4RoutePlanning extends Component
         // Group assignment ranges by employee_id
         $projectRangesByEmployee = [];
         foreach ($this->assignmentRanges as $range) {
-            if (!is_array($range) || empty($range['employee_id'])) {
+            if (! is_array($range) || empty($range['employee_id'])) {
                 continue;
             }
             $empId = (int) $range['employee_id'];
@@ -1893,7 +1895,7 @@ class Step4RoutePlanning extends Component
 
         // Load project names
         $projectIds = collect($this->assignmentRanges)
-            ->filter(fn ($r) => is_array($r) && !empty($r['project_id']))
+            ->filter(fn ($r) => is_array($r) && ! empty($r['project_id']))
             ->pluck('project_id')
             ->unique()
             ->toArray();
@@ -1901,7 +1903,7 @@ class Step4RoutePlanning extends Component
 
         // Load vehicle names
         $vehicleIds = collect($this->vehicleAssignments)
-            ->filter(fn ($a) => is_array($a) && !empty($a['vehicle_id']))
+            ->filter(fn ($a) => is_array($a) && ! empty($a['vehicle_id']))
             ->pluck('vehicle_id')
             ->unique()
             ->toArray();
@@ -1911,7 +1913,7 @@ class Step4RoutePlanning extends Component
         foreach ($employeeIds as $empId) {
             $empId = (int) $empId;
             $employee = $employees->get($empId);
-            if (!$employee) {
+            if (! $employee) {
                 continue;
             }
 
@@ -1922,50 +1924,50 @@ class Step4RoutePlanning extends Component
             $seenProjects = [];
             foreach ($empRanges as $range) {
                 $pid = (int) ($range['project_id'] ?? 0);
-                if (!$pid || in_array($pid, $seenProjects, true)) {
+                if (! $pid || in_array($pid, $seenProjects, true)) {
                     continue;
                 }
                 $seenProjects[] = $pid;
                 $projectRows[] = [
-                    'project_name' => $projects->get($pid)?->name ?? ('Projekt #' . $pid),
-                    'start_date'   => $range['start_date'] ?? null,
-                    'end_date'     => $range['end_date'] ?? null,
+                    'project_name' => $projects->get($pid)?->name ?? ('Projekt #'.$pid),
+                    'start_date' => $range['start_date'] ?? null,
+                    'end_date' => $range['end_date'] ?? null,
                 ];
             }
 
             $vehicleRow = null;
-            if (is_array($empVehicle) && !empty($empVehicle['vehicle_id'])) {
+            if (is_array($empVehicle) && ! empty($empVehicle['vehicle_id'])) {
                 $vid = (int) $empVehicle['vehicle_id'];
                 $vehicleRow = [
-                    'registration' => $vehicles->get($vid)?->registration_number ?? ('Pojazd #' . $vid),
-                    'position'     => $empVehicle['position'] ?? null,
-                    'start_date'   => $empVehicle['start_date'] ?? null,
-                    'end_date'     => $empVehicle['end_date'] ?? null,
+                    'registration' => $vehicles->get($vid)?->registration_number ?? ('Pojazd #'.$vid),
+                    'position' => $empVehicle['position'] ?? null,
+                    'start_date' => $empVehicle['start_date'] ?? null,
+                    'end_date' => $empVehicle['end_date'] ?? null,
                 ];
             }
 
             $housingRow = null;
             $accRow = $this->accommodationAssignments[$empId] ?? null;
-            if (is_array($accRow) && !empty($accRow['accommodation_id'])) {
+            if (is_array($accRow) && ! empty($accRow['accommodation_id'])) {
                 $aid = (int) $accRow['accommodation_id'];
                 $acc = Accommodation::find($aid);
                 if ($acc) {
                     $housingRow = [
-                        'name'       => $acc->name,
-                        'address'    => $acc->address,
-                        'city'       => $acc->city,
+                        'name' => $acc->name,
+                        'address' => $acc->address,
+                        'city' => $acc->city,
                         'start_date' => $accRow['start_date'] ?? null,
-                        'end_date'   => $accRow['end_date'] ?? null,
+                        'end_date' => $accRow['end_date'] ?? null,
                     ];
                 }
             }
 
             $result[] = [
                 'employee_id' => $empId,
-                'full_name'   => $employee->full_name,
-                'projects'    => $projectRows,
-                'housing'     => $housingRow,
-                'vehicle'     => $vehicleRow,
+                'full_name' => $employee->full_name,
+                'projects' => $projectRows,
+                'housing' => $housingRow,
+                'vehicle' => $vehicleRow,
             ];
         }
 
@@ -2009,7 +2011,7 @@ class Step4RoutePlanning extends Component
 
             if ($p['type'] === 'loc') {
                 $loc = $locations->get($p['id']);
-                if (!$loc) {
+                if (! $loc) {
                     continue;
                 }
                 $typeLabel = null;
@@ -2047,34 +2049,34 @@ class Step4RoutePlanning extends Component
                         : 'Lokalizacja';
                 }
                 $tiles[] = [
-                    'index'        => $index,
-                    'key'          => $key,
-                    'id'           => (string) $p['id'],
-                    'type_label'   => $typeLabel,
-                    'name'         => $loc->name,
-                    'city'         => $loc->city ?? null,
-                    'address'      => $loc->address ?? null,
-                    'can_move_up'  => $index > 0,
+                    'index' => $index,
+                    'key' => $key,
+                    'id' => (string) $p['id'],
+                    'type_label' => $typeLabel,
+                    'name' => $loc->name,
+                    'city' => $loc->city ?? null,
+                    'address' => $loc->address ?? null,
+                    'can_move_up' => $index > 0,
                     'can_move_down' => $index < $n - 1,
                 ];
             } elseif ($p['type'] === 'acc') {
                 $acc = $accommodations->get($p['id']);
-                if (!$acc) {
+                if (! $acc) {
                     continue;
                 }
                 $employees = $this->getEmployeesForAccommodation($p['id']);
                 $empNames = $employees->pluck('full_name')->filter()->join(', ');
-                $typeLabel = 'Dom' . ($empNames ? ' — ' . $empNames : '');
+                $typeLabel = 'Dom'.($empNames ? ' — '.$empNames : '');
                 // acc: waypoints use 'acc:ID' as the notes key to avoid collisions
                 $tiles[] = [
-                    'index'        => $index,
-                    'key'          => $key,
-                    'id'           => 'acc_' . $p['id'],
-                    'type_label'   => $typeLabel,
-                    'name'         => $acc->name,
-                    'city'         => $acc->city ?? null,
-                    'address'      => $acc->address ?? null,
-                    'can_move_up'  => $index > 0,
+                    'index' => $index,
+                    'key' => $key,
+                    'id' => 'acc_'.$p['id'],
+                    'type_label' => $typeLabel,
+                    'name' => $acc->name,
+                    'city' => $acc->city ?? null,
+                    'address' => $acc->address ?? null,
+                    'can_move_up' => $index > 0,
                     'can_move_down' => $index < $n - 1,
                 ];
             }
@@ -2684,7 +2686,6 @@ class Step4RoutePlanning extends Component
         ]);
     }
 
-
     // ─── Own transport modal methods ──────────────────────────────────────────
 
     public function openOwnTransferModal(): void
@@ -2752,7 +2753,7 @@ class Step4RoutePlanning extends Component
         $this->normalizeOwnRouteWaypointsAccToLocations();
         $notes = $this->locationStopNotes;
 
-        $baseKey = $this->baseLocationId ? 'loc:' . $this->baseLocationId : null;
+        $baseKey = $this->baseLocationId ? 'loc:'.$this->baseLocationId : null;
         $canonicalTail = $this->buildCanonicalOwnRouteTailWaypointKeys();
 
         $merged = [];
@@ -2830,7 +2831,7 @@ class Step4RoutePlanning extends Component
             foreach ($accIds as $accId) {
                 $locId = (int) ($byAcc->get($accId) ?? 0);
                 if ($locId > 0) {
-                    $add('loc:' . $locId);
+                    $add('loc:'.$locId);
                 }
             }
         }
@@ -2847,7 +2848,7 @@ class Step4RoutePlanning extends Component
             foreach (Project::whereIn('id', $projectIds)->whereNotNull('location_id')->get(['id', 'name', 'location_id']) as $project) {
                 $locId = (int) $project->location_id;
                 if ($locId > 0) {
-                    $add('loc:' . $locId);
+                    $add('loc:'.$locId);
                 }
             }
         }
@@ -2887,8 +2888,8 @@ class Step4RoutePlanning extends Component
 
                 continue;
             }
-            $nk = 'loc:' . $locId;
-            $oldNoteKey = 'acc_' . $p['id'];
+            $nk = 'loc:'.$locId;
+            $oldNoteKey = 'acc_'.$p['id'];
             $oldNote = trim((string) ($notes[$oldNoteKey] ?? ''));
             if ($oldNote !== '' && trim((string) ($notes[(string) $locId] ?? '')) === '') {
                 $notes[(string) $locId] = $oldNote;
@@ -2930,15 +2931,15 @@ class Step4RoutePlanning extends Component
                 continue;
             }
             $emp = Employee::find((int) $employeeId);
-            $name = $emp?->full_name ?? ('#' . $employeeId);
+            $name = $emp?->full_name ?? ('#'.$employeeId);
             $accName = $acc?->name ?? 'mieszkanie';
-            $line = 'Docelowy dom (' . $accName . ') dla: ' . $name;
+            $line = 'Docelowy dom ('.$accName.') dla: '.$name;
             $key = (string) $locId;
             $cur = trim((string) ($notes[$key] ?? ''));
             if ($cur === '') {
                 $notes[$key] = $line;
             } elseif (stripos($cur, $name) === false) {
-                $notes[$key] = $cur . "\n" . $line;
+                $notes[$key] = $cur."\n".$line;
             }
         }
 
@@ -2961,14 +2962,14 @@ class Step4RoutePlanning extends Component
                 ->filter()
                 ->join(', ');
             $addition = $empNames !== ''
-                ? 'Projekt „' . $project->name . '": ' . $empNames
-                : 'Projekt „' . $project->name . '"';
+                ? 'Projekt „'.$project->name.'": '.$empNames
+                : 'Projekt „'.$project->name.'"';
             $key = (string) $locId;
             $cur = trim((string) ($notes[$key] ?? ''));
             if ($cur === '') {
                 $notes[$key] = $addition;
             } elseif (stripos($cur, $project->name) === false) {
-                $notes[$key] = $cur . "\n" . $addition;
+                $notes[$key] = $cur."\n".$addition;
             }
         }
     }
@@ -2982,14 +2983,14 @@ class Step4RoutePlanning extends Component
         if ($id <= 0) {
             return;
         }
-        $key = 'loc:' . $id;
+        $key = 'loc:'.$id;
         if (in_array($key, $this->routeWaypoints, true)) {
             $this->pendingWaypointLocationId = null;
 
             return;
         }
         $loc = Location::find($id);
-        if ($loc && !$loc->hasCoordinates()) {
+        if ($loc && ! $loc->hasCoordinates()) {
             $this->geocodingService->geocodeLocation($loc);
         }
         $this->routeWaypoints[] = $key;
