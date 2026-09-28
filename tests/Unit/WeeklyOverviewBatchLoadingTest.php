@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\ProjectStatus;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectDemand;
@@ -60,6 +61,52 @@ class WeeklyOverviewBatchLoadingTest extends TestCase
             50,
             $queryCount,
             "Expected batched week load under 50 queries, got {$queryCount}"
+        );
+    }
+
+    public function test_inactive_projects_stay_only_when_the_week_has_people_or_demand(): void
+    {
+        $weekStart = Carbon::now()->startOfWeek();
+        $weekEnd = $weekStart->copy()->endOfWeek();
+        $dates = [
+            'start_date' => $weekStart->copy()->subWeek(),
+            'end_date' => $weekEnd->copy()->addWeek(),
+        ];
+        $role = Role::factory()->create();
+
+        $activeEmpty = Project::factory()->create($dates + ['status' => ProjectStatus::ACTIVE, 'name' => 'Aktywny pusty']);
+        $cancelledEmpty = Project::factory()->create($dates + ['status' => ProjectStatus::CANCELLED, 'name' => 'Anulowany pusty']);
+        $onHoldWithPerson = Project::factory()->create($dates + ['status' => ProjectStatus::ON_HOLD, 'name' => 'Wstrzymany z osobą']);
+        $completedWithDemand = Project::factory()->create($dates + ['status' => ProjectStatus::COMPLETED, 'name' => 'Zakończony z popytem']);
+
+        ProjectAssignment::factory()->create([
+            'project_id' => $onHoldWithPerson->id,
+            'role_id' => $role->id,
+            'start_date' => $weekStart,
+            'end_date' => $weekEnd,
+        ]);
+        ProjectDemand::factory()->create([
+            'project_id' => $completedWithDemand->id,
+            'role_id' => $role->id,
+            'required_count' => 2,
+            'start_date' => $weekStart,
+            'end_date' => $weekEnd,
+        ]);
+        ProjectAssignment::factory()->create([
+            'project_id' => $cancelledEmpty->id,
+            'role_id' => $role->id,
+            'start_date' => $weekEnd->copy()->addWeek(),
+            'end_date' => $weekEnd->copy()->addWeeks(2),
+        ]);
+
+        $service = app(WeeklyOverviewService::class);
+        $names = collect($service->getProjectsWithWeeklyData($service->getWeeks($weekStart)))
+            ->map(fn (array $row) => $row['project']->name)
+            ->all();
+
+        $this->assertEqualsCanonicalizing(
+            [$activeEmpty->name, $onHoldWithPerson->name, $completedWithDemand->name],
+            $names
         );
     }
 

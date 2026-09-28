@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\LogisticsEventStatus;
 use App\Enums\LogisticsEventType;
+use App\Enums\ProjectStatus;
 use App\Enums\RoleSeniority;
 use App\Enums\VehiclePosition;
 use App\Models\Accommodation;
@@ -84,7 +85,31 @@ class WeeklyOverviewService
                 'project' => $project,
                 'weeks_data' => $weeksData,
             ];
-        })->toArray();
+        })->filter(fn (array $row) => $this->shouldListProjectOnWeek($row['project'], $row['weeks_data']))
+            ->values()
+            ->toArray();
+    }
+
+    /**
+     * Aktywny projekt zostaje nawet jako pusta karta.
+     * Wstrzymany, zakończony i anulowany zostają tylko, gdy w tym tygodniu
+     * jest przypisanie albo popyt — inaczej karta jest pusta i znika z listy.
+     *
+     * @param  list<array<string, mixed>>  $weeksData
+     */
+    protected function shouldListProjectOnWeek(Project $project, array $weeksData): bool
+    {
+        if ($project->status === null || $project->status === ProjectStatus::ACTIVE) {
+            return true;
+        }
+
+        foreach ($weeksData as $weekData) {
+            if (collect($weekData['demands'] ?? [])->isNotEmpty() || collect($weekData['assignments'] ?? [])->isNotEmpty()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
