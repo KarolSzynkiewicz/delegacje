@@ -7,6 +7,7 @@ use App\Enums\ProjectType;
 use App\Traits\HasComments;
 use App\Traits\HasDateRange;
 use App\Traits\HasEquipmentConsumptions;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -101,6 +102,38 @@ class Project extends Model
     public function variableCosts(): HasMany
     {
         return $this->hasMany(ProjectVariableCost::class);
+    }
+
+    /**
+     * Stawki godzinowe obowiązujące w kolejnych okresach. Najnowsza pierwsza.
+     */
+    public function hourlyRates(): HasMany
+    {
+        return $this->hasMany(ProjectHourlyRate::class)->orderByDesc('start_date')->orderByDesc('id');
+    }
+
+    /**
+     * Kwota za godzinę w danym dniu. Okres z tabeli wygrywa z kolumną,
+     * a kolumna zostaje zapasem dla projektów sprzed migracji okresów.
+     */
+    public function hourlyAmountOn(CarbonInterface|string $date): float
+    {
+        $day = \Carbon\Carbon::parse($date)->startOfDay();
+        $this->loadMissing('hourlyRates');
+
+        $rate = $this->hourlyRates->first(function (ProjectHourlyRate $rate) use ($day) {
+            if ($rate->start_date->copy()->startOfDay()->gt($day)) {
+                return false;
+            }
+
+            return $rate->end_date === null || $rate->end_date->copy()->startOfDay()->gte($day);
+        });
+
+        if ($rate) {
+            return (float) $rate->amount;
+        }
+
+        return (float) ($this->hourly_rate ?? 0);
     }
 
     /**

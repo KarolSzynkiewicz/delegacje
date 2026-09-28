@@ -19,6 +19,7 @@ use App\Models\LogisticsEventParticipant;
 use App\Models\ProcedureRun;
 use App\Models\ProcedureTemplate;
 use App\Models\ProjectAssignment;
+use App\Models\ProjectHourlyRate;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\Sprint;
@@ -97,6 +98,7 @@ class AppServiceProvider extends ServiceProvider
         LogisticsEvent::observe(AuditableModelObserver::class);
         VehicleAssignment::observe(AuditableModelObserver::class);
         ProjectAssignment::observe(AuditableModelObserver::class);
+        ProjectHourlyRate::observe(AuditableModelObserver::class);
         AccommodationAssignment::observe(AuditableModelObserver::class);
         TransportCost::observe(AuditableModelObserver::class);
         Adjustment::observe(AuditableModelObserver::class);

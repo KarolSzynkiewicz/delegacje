@@ -120,13 +120,11 @@
                         <div x-show="projectType === 'hourly'" x-transition class="mt-3">
                             <div class="row g-3">
                                 <div class="col-md-8">
-                            <x-ui.input 
-                                type="number" 
-                                name="hourly_rate" 
-                                label="Stawka za godzinę"
-                                value="{{ old('hourly_rate', $project->hourly_rate) }}"
-                                step="0.01"
-                                    />
+                                    <p class="small text-muted mb-0">
+                                        Bieżąca stawka:
+                                        <span class="fw-semibold">{{ $project->hourly_rate ? number_format($project->hourly_rate, 2, ',', ' ').' '.($project->currency ?? 'EUR').'/h' : 'brak' }}</span>.
+                                        Zmiana od wybranego dnia jest na karcie projektu, żeby wcześniejsze godziny zostały przy starej kwocie.
+                                    </p>
                                 </div>
                                 <div class="col-md-4">
                                     <x-ui.input 

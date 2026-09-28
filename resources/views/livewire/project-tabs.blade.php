@@ -39,8 +39,16 @@
                     @endphp
                     @if(!$isMineView)
                         @if($projectTypeValue === \App\Enums\ProjectType::HOURLY->value)
+                            @php
+                                $openRate = $project->hourlyRates->first(fn ($rate) => $rate->end_date === null);
+                            @endphp
                             <x-ui.detail-item label="Stawka za godzinę:">
-                                {{ $project->hourly_rate ? number_format($project->hourly_rate, 2) . ' ' . ($project->currency ?? 'PLN') : '-' }}
+                                @if($openRate)
+                                    {{ number_format($openRate->amount, 2, ',', ' ') }} {{ $openRate->currency }}/h
+                                    <span class="text-muted">od {{ $openRate->start_date->format('d.m.Y') }}</span>
+                                @else
+                                    {{ $project->hourly_rate ? number_format($project->hourly_rate, 2, ',', ' ').' '.($project->currency ?? 'PLN').'/h' : '-' }}
+                                @endif
                             </x-ui.detail-item>
                         @elseif($projectTypeValue === \App\Enums\ProjectType::CONTRACT->value)
                             <x-ui.detail-item label="Kwota kontraktu:">
@@ -57,6 +65,48 @@
                     @endif
                 </x-ui.detail-list>
             </x-ui.card>
+
+            @if(! $isMineView && $projectTypeValue === \App\Enums\ProjectType::HOURLY->value)
+                <x-ui.card label="Stawki godzinowe" class="mt-4">
+                    <p class="small text-muted mb-3">Nowa stawka obowiązuje od wybranego dnia. Poprzednia kończy się dzień wcześniej i zostaje przy godzinach z tamtego okresu.</p>
+                    @if($project->hourlyRates->isNotEmpty())
+                        <ul class="list-unstyled small mb-3">
+                            @foreach($project->hourlyRates as $rate)
+                                <li class="d-flex justify-content-between gap-2 py-1 border-bottom">
+                                    <span>
+                                        {{ number_format($rate->amount, 2, ',', ' ') }} {{ $rate->currency }}/h
+                                    </span>
+                                    <span class="text-muted font-mono">
+                                        {{ $rate->start_date->format('d.m.Y') }}
+                                        –
+                                        {{ $rate->end_date ? $rate->end_date->format('d.m.Y') : 'nadal' }}
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-3">Brak okresu stawki. Pierwsza kwota obowiązuje od podanego dnia, bez daty końca.</p>
+                    @endif
+                    @if(auth()->user()->hasPermission('projects.update'))
+                        <form method="POST" action="{{ route('projects.hourly-rates.update', $project) }}" class="row g-2 align-items-end">
+                            @csrf
+                            <div class="col-sm-4">
+                                <label class="form-label small mb-1" for="hourly_rate_amount">Nowa stawka</label>
+                                <input id="hourly_rate_amount" name="amount" type="number" step="0.01" min="0" required class="form-control form-control-sm @error('amount') is-invalid @enderror" value="{{ old('amount') }}">
+                                @error('amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label small mb-1" for="hourly_rate_start">Od dnia</label>
+                                <input id="hourly_rate_start" name="start_date" type="date" required class="form-control form-control-sm @error('start_date') is-invalid @enderror" value="{{ old('start_date') }}">
+                                @error('start_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                            <div class="col-sm-4">
+                                <button type="submit" class="btn btn-primary btn-sm">Ustaw od tego dnia</button>
+                            </div>
+                        </form>
+                    @endif
+                </x-ui.card>
+            @endif
 
             <x-project-site-leads-panel
                 :project="$project"

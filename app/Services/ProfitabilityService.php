@@ -152,6 +152,7 @@ class ProfitabilityService
             'variableCosts' => function ($q) use ($monthStartDate, $monthEndDate) {
                 $q->whereBetween('incurred_date', [$monthStartDate->toDateString(), $monthEndDate->toDateString()]);
             },
+            'hourlyRates',
         ])
             ->where(function (Builder $q) use ($monthStartDate, $monthEndDate) {
                 // 1) Projekt ma przypisanie (pracownika) nakładające się na miesiąc
@@ -562,11 +563,7 @@ class ProfitabilityService
             // Contract projects: fixed amount
             return (float) ($project->contract_amount ?? 0);
         } else {
-            // Hourly projects: hourly_rate * actual_hours
-            $actualHours = $this->calculateActualHours($assignments);
-            $hourlyRate = (float) ($project->hourly_rate ?? 0);
-
-            return $actualHours * $hourlyRate;
+            return $this->hourlyRevenueForLogs($project, $assignments->flatMap(fn ($assignment) => $assignment->timeLogs));
         }
     }
 
@@ -620,12 +617,38 @@ class ProfitabilityService
 
             return (float) ($project->contract_amount ?? 0) * $proportion;
         } else {
-            // Hourly projects: hourly_rate * actual_hours in the month
-            $actualHours = $this->calculateActualHoursForMonth($assignments, $monthStart, $monthEnd);
-            $hourlyRate = (float) ($project->hourly_rate ?? 0);
+            $monthStartCopy = $monthStart->copy()->startOfDay();
+            $monthEndCopy = $monthEnd->copy()->endOfDay();
+            $logs = $assignments->flatMap(fn ($assignment) => $assignment->timeLogs)
+                ->filter(function ($timeLog) use ($monthStartCopy, $monthEndCopy) {
+                    $logDate = Carbon::parse($timeLog->start_time);
 
-            return $actualHours * $hourlyRate;
+                    return $logDate->gte($monthStartCopy) && $logDate->lte($monthEndCopy);
+                });
+
+            return $this->hourlyRevenueForLogs($project, $logs);
         }
+    }
+
+    /**
+     * Przychód godzinowy: każda godzina razy stawka obowiązująca w dniu wpisu.
+     *
+     * @param  iterable<int, \App\Models\TimeLog>  $logs
+     */
+    protected function hourlyRevenueForLogs(Project $project, iterable $logs): float
+    {
+        $total = 0.0;
+
+        foreach ($logs as $timeLog) {
+            $hours = (float) $timeLog->hours_worked;
+            if ($hours <= 0) {
+                continue;
+            }
+
+            $total += $hours * $project->hourlyAmountOn($timeLog->start_time);
+        }
+
+        return round($total, 2);
     }
 
     /**

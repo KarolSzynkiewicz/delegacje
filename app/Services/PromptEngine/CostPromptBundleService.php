@@ -2,13 +2,11 @@
 
 namespace App\Services\PromptEngine;
 
-use App\Enums\PayrollStatus;
 use App\Models\AccommodationLease;
 use App\Models\Adjustment;
 use App\Models\Advance;
 use App\Models\EmployeeRate;
 use App\Models\FixedCostEntry;
-use App\Models\Payroll;
 use App\Models\Project;
 use App\Models\ProjectVariableCost;
 use App\Models\TimeLog;
@@ -16,7 +14,6 @@ use App\Models\TransportCost;
 use App\Models\VehicleRepair;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Collection;
 
 /**
  * Builds a self-contained JSON bundle of all cost data for a date range,
@@ -49,8 +46,8 @@ class CostPromptBundleService
     ];
 
     /**
-     * @param  list<int>            $projectIds  Empty = all
-     * @param  list<string>|null    $include     Null = all cost types
+     * @param  list<int>  $projectIds  Empty = all
+     * @param  list<string>|null  $include  Null = all cost types
      * @return array<string, mixed>
      */
     public function build(
@@ -70,23 +67,23 @@ class CostPromptBundleService
 
         $projectFilter = $projectIds !== [] ? $projectIds : null;
 
-        $fixedCosts        = in_array('fixed', $types, true)         ? $this->buildFixedCosts($start, $end)               : [];
-        $variableCosts     = in_array('variable', $types, true)      ? $this->buildVariableCosts($start, $end, $projectFilter) : [];
-        $transportCosts    = in_array('transport', $types, true)     ? $this->buildTransportCosts($start, $end)           : [];
-        $accommodation     = in_array('accommodation', $types, true) ? $this->buildAccommodationCosts($start, $end)       : [];
-        $laborCosts        = in_array('labor', $types, true)         ? $this->buildLaborCosts($start, $end, $projectFilter) : [];
-        $adjustments       = in_array('adjustments', $types, true)   ? $this->buildAdjustments($start, $end)              : [];
-        $advances          = in_array('advances', $types, true)      ? $this->buildAdvances($start, $end)                 : [];
-        $vehicleRepairs    = in_array('vehicle_repairs', $types, true) ? $this->buildVehicleRepairs($start, $end)         : [];
+        $fixedCosts = in_array('fixed', $types, true) ? $this->buildFixedCosts($start, $end) : [];
+        $variableCosts = in_array('variable', $types, true) ? $this->buildVariableCosts($start, $end, $projectFilter) : [];
+        $transportCosts = in_array('transport', $types, true) ? $this->buildTransportCosts($start, $end) : [];
+        $accommodation = in_array('accommodation', $types, true) ? $this->buildAccommodationCosts($start, $end) : [];
+        $laborCosts = in_array('labor', $types, true) ? $this->buildLaborCosts($start, $end, $projectFilter) : [];
+        $adjustments = in_array('adjustments', $types, true) ? $this->buildAdjustments($start, $end) : [];
+        $advances = in_array('advances', $types, true) ? $this->buildAdvances($start, $end) : [];
+        $vehicleRepairs = in_array('vehicle_repairs', $types, true) ? $this->buildVehicleRepairs($start, $end) : [];
 
         $summary = $this->buildSummary([
-            'fixed'           => $fixedCosts,
-            'variable'        => $variableCosts,
-            'transport'       => $transportCosts,
-            'accommodation'   => $accommodation,
-            'labor'           => $laborCosts,
-            'adjustments'     => $adjustments,
-            'advances'        => $advances,
+            'fixed' => $fixedCosts,
+            'variable' => $variableCosts,
+            'transport' => $transportCosts,
+            'accommodation' => $accommodation,
+            'labor' => $laborCosts,
+            'adjustments' => $adjustments,
+            'advances' => $advances,
             'vehicle_repairs' => $vehicleRepairs,
         ], $start, $end, $projectFilter);
 
@@ -334,10 +331,14 @@ class CostPromptBundleService
         $bucket = [];
         foreach ($timeLogs as $log) {
             $assignment = $log->projectAssignment;
-            if (!$assignment) continue;
+            if (! $assignment) {
+                continue;
+            }
 
             $hours = (float) $log->hours_worked;
-            if ($hours <= 0) continue;
+            if ($hours <= 0) {
+                continue;
+            }
 
             $workDate = Carbon::parse($log->start_time)->toDateString();
 
@@ -351,12 +352,14 @@ class CostPromptBundleService
                 ->orderByDesc('start_date')
                 ->first();
 
-            if (!$rate) continue;
+            if (! $rate) {
+                continue;
+            }
 
             $cost = round($hours * (float) $rate->amount, 2);
             $key = $assignment->employee_id.'|'.$assignment->project_id.'|'.$rate->currency;
 
-            if (!isset($bucket[$key])) {
+            if (! isset($bucket[$key])) {
                 $bucket[$key] = [
                     'employee' => $assignment->employee ? [
                         'id' => $assignment->employee->id,
@@ -485,7 +488,7 @@ class CostPromptBundleService
 
         $accumulator = function (string $bucket, string $currency, float $amount) use (&$byCurrencyType): void {
             $currency = strtoupper($currency ?: 'PLN');
-            if (!isset($byCurrencyType[$currency])) {
+            if (! isset($byCurrencyType[$currency])) {
                 $byCurrencyType[$currency] = [
                     'fixed' => 0.0,
                     'variable' => 0.0,
@@ -565,13 +568,23 @@ class CostPromptBundleService
         if ($projectIds !== null) {
             $projectsQuery->whereIn('id', $projectIds);
         }
-        $projects = $projectsQuery->orderBy('name')->get()->keyBy('id');
+        $projects = $projectsQuery->with('hourlyRates')->orderBy('name')->get()->keyBy('id');
+        $hoursLogsByProject = TimeLog::query()
+            ->whereBetween('start_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->whereHas('projectAssignment', function ($query) use ($projects) {
+                $query->whereIn('project_id', $projects->keys());
+            })
+            ->with('projectAssignment:id,project_id')
+            ->get(['id', 'project_assignment_id', 'start_time', 'hours_worked'])
+            ->groupBy(fn (TimeLog $log) => (int) $log->projectAssignment?->project_id);
 
         // Aggregate variable costs by project_id × currency
         $varByProject = [];
         foreach ($groups['variable'] as $row) {
             $pid = $row['project']['id'] ?? null;
-            if ($pid === null) continue;
+            if ($pid === null) {
+                continue;
+            }
             $cur = strtoupper($row['currency'] ?: 'PLN');
             $varByProject[$pid][$cur] = round(($varByProject[$pid][$cur] ?? 0.0) + (float) $row['amount'], 2);
         }
@@ -581,7 +594,9 @@ class CostPromptBundleService
         $hoursByProject = [];
         foreach ($groups['labor'] as $row) {
             $pid = $row['project']['id'] ?? null;
-            if ($pid === null) continue;
+            if ($pid === null) {
+                continue;
+            }
             $cur = strtoupper($row['currency'] ?: 'PLN');
             $laborByProject[$pid][$cur] = round(($laborByProject[$pid][$cur] ?? 0.0) + (float) $row['cost'], 2);
             $hoursByProject[$pid] = round(($hoursByProject[$pid] ?? 0.0) + (float) $row['hours'], 2);
@@ -602,7 +617,12 @@ class CostPromptBundleService
             }
 
             // Revenue (uproszczenie: pełna kwota kontraktu lub hourly_rate × hours w okresie)
-            $revenue = $this->revenueForProjectInPeriod($project, $hoursByProject[$project->id] ?? 0.0, $start, $end);
+            $revenue = $this->revenueForProjectInPeriod(
+                $project,
+                $start,
+                $end,
+                $hoursLogsByProject->get($project->id, collect())
+            );
 
             $result[] = [
                 'project_id' => $project->id,
@@ -640,18 +660,29 @@ class CostPromptBundleService
     }
 
     /**
+     * @param  iterable<int, TimeLog>|null  $logs
      * @return array<string, mixed>|null
      */
-    private function revenueForProjectInPeriod(Project $project, float $hoursInPeriod, Carbon $start, Carbon $end): ?array
+    private function revenueForProjectInPeriod(Project $project, Carbon $start, Carbon $end, $logs = null): ?array
     {
         if ($project->type?->value === 'hourly') {
-            if (!$project->hourly_rate || $hoursInPeriod <= 0) {
+            $amount = 0.0;
+            foreach ($logs ?? [] as $log) {
+                $hours = (float) $log->hours_worked;
+                if ($hours <= 0) {
+                    continue;
+                }
+                $amount += $hours * $project->hourlyAmountOn($log->start_time);
+            }
+            $amount = round($amount, 2);
+            if ($amount <= 0) {
                 return null;
             }
+
             return [
-                'amount' => round((float) $project->hourly_rate * $hoursInPeriod, 2),
+                'amount' => $amount,
                 'currency' => $project->currency,
-                'basis' => 'hourly_rate × hours_in_period',
+                'basis' => 'stawka obowiązująca w dniu wpisu × godziny',
             ];
         }
 
@@ -659,12 +690,14 @@ class CostPromptBundleService
         if ($project->type?->value === 'contract' && $project->contract_amount && $project->start_date) {
             $projectStart = Carbon::parse($project->start_date);
             $projectEnd = $project->end_date ? Carbon::parse($project->end_date) : null;
-            if (!$projectEnd) {
+            if (! $projectEnd) {
                 return null;
             }
             $totalDays = max(1, $projectStart->diffInDays($projectEnd) + 1);
             $overlap = $this->overlapDays($projectStart, $projectEnd, $start, $end);
-            if ($overlap <= 0) return null;
+            if ($overlap <= 0) {
+                return null;
+            }
 
             return [
                 'amount' => round((float) $project->contract_amount * $overlap / $totalDays, 2),
@@ -720,7 +753,10 @@ class CostPromptBundleService
     {
         $start = $aStart->gt($bStart) ? $aStart : $bStart;
         $end = $aEnd->lt($bEnd) ? $aEnd : $bEnd;
-        if ($start->gt($end)) return 0;
+        if ($start->gt($end)) {
+            return 0;
+        }
+
         return (int) $start->copy()->startOfDay()->diffInDays($end->copy()->endOfDay()) + 1;
     }
 }

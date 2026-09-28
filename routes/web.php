@@ -225,6 +225,8 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             Route::resource('projects.site-leads', \App\Http\Controllers\ProjectSiteLeadController::class)
                 ->except(['index', 'show'])
                 ->parameters(['site-leads' => 'siteLead']);
+            Route::post('projects/{project}/hourly-rates', [\App\Http\Controllers\ProjectHourlyRateController::class, 'update'])
+                ->name('projects.hourly-rates.update');
         });
 
         // Project tabs - usunięte, teraz przez Livewire ProjectTabs z query string

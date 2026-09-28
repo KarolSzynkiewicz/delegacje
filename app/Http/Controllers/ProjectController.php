@@ -6,6 +6,7 @@ use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Location;
 use App\Models\Project;
+use App\Services\ProjectHourlyRateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
@@ -36,7 +37,8 @@ class ProjectController extends Controller
      */
     public function store(StoreProjectRequest $request): RedirectResponse
     {
-        Project::create($request->validated());
+        $project = Project::create($request->validated());
+        app(ProjectHourlyRateService::class)->seedOpeningRate($project);
 
         // Wyczyść cache dla dropdowna projektów
         Cache::forget('active_projects_dropdown');
@@ -77,7 +79,9 @@ class ProjectController extends Controller
      */
     public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
-        $project->update($request->validated());
+        $data = $request->validated();
+        unset($data['hourly_rate']);
+        $project->update($data);
 
         // Wyczyść cache dla dropdowna projektów (może zmienić się status lub nazwa)
         Cache::forget('active_projects_dropdown');
