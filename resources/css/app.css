@@ -13676,6 +13676,24 @@ a.rc-chip:hover {
 .task-show-meta .dt-card__row {
     grid-template-columns: 7.75rem 1fr;
 }
+/* W wąskiej karcie (spotkanie, oddzwonienie) dwie połówki md-6 ściskają tytuł
+   do kilku znaków w pionie. Poniżej 52rem układamy szczegóły i opis jeden pod drugim. */
+.task-show-qe {
+    container-type: inline-size;
+}
+.task-show-meta .tg-facet__value {
+    flex: 1 1 auto;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+@container (max-width: 52rem) {
+    .task-show-qe__split > [class*="col-"] {
+        flex: 0 0 100%;
+        width: 100%;
+        max-width: 100%;
+    }
+}
 
 /* Ikony meta (kategoria, sprint, puste stany) = ten sam gabaryt co avatar 28px */
 .task-meta-icon {

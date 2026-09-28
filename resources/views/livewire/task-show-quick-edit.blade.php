@@ -11,7 +11,7 @@
         : null;
 @endphp
 
-<div wire:key="task-show-qe-{{ $task->id }}">
+<div class="task-show-qe" wire:key="task-show-qe-{{ $task->id }}">
     <style>
         .task-show-meta .tg-facet {
             display: inline-flex;
@@ -195,7 +195,7 @@
         </div>
     @endif
 
-    <div class="row g-4 align-items-start">
+    <div class="row g-4 align-items-start task-show-qe__split">
         {{-- Lewa połowa: szczegóły jak wiersze return-trips --}}
         <div class="col-md-6 task-show-meta">
             <div class="dt-card__title mb-1">Szczegóły</div>
@@ -206,7 +206,7 @@
                     <div class="tg-facet">
                         @if($canEdit)
                             <button type="button"
-                                    class="tg-facet__value text-break"
+                                    class="tg-facet__value"
                                     title="Edytuj tytuł"
                                     x-data
                                     @click.prevent.stop="$wire.openQuickEdit({{ $task->id }}, 'name', $event.clientX, $event.clientY)">
