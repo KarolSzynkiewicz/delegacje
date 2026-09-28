@@ -34,6 +34,36 @@
             </div>
         </div>
     </div>
+    @if(! empty($recordNav ?? null))
+        <nav class="rp-record-nav"
+             aria-label="Nawigacja po liście"
+             x-data="{ prev: @js($recordNav['prev']), next: @js($recordNav['next']) }"
+             @keydown.window="
+                const el = $event.target;
+                if (el && el.closest && el.closest('input, textarea, select, [contenteditable=true]')) return;
+                if ($event.altKey || $event.ctrlKey || $event.metaKey || $event.shiftKey) return;
+                if ($event.key === 'ArrowLeft' && prev) { $event.preventDefault(); $wire.openListNeighbor('prev'); }
+                if ($event.key === 'ArrowRight' && next) { $event.preventDefault(); $wire.openListNeighbor('next'); }
+             ">
+            <button type="button"
+                    class="rp-record-nav__btn {{ $recordNav['prev'] ? '' : 'is-disabled' }}"
+                    @disabled(! $recordNav['prev'])
+                    wire:click="openListNeighbor('prev')"
+                    title="Poprzedni z filtra">
+                <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                <span class="rp-record-nav__label">Poprzednie</span>
+            </button>
+            <span class="rp-record-nav__meta font-mono">{{ $recordNav['index'] }} / {{ $recordNav['total'] }}</span>
+            <button type="button"
+                    class="rp-record-nav__btn {{ $recordNav['next'] ? '' : 'is-disabled' }}"
+                    @disabled(! $recordNav['next'])
+                    wire:click="openListNeighbor('next')"
+                    title="Następny z filtra">
+                <span class="rp-record-nav__label">Następne</span>
+                <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            </button>
+        </nav>
+    @endif
     <div class="rp-identity-bar__chips">
         @foreach($candidate->roles as $candidateRole)
             <span class="badge badge-info" style="font-size:.65rem;">{{ $candidateRole->name }}</span>

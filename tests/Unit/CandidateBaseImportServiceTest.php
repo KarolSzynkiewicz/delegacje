@@ -21,7 +21,7 @@ class CandidateBaseImportServiceTest extends TestCase
 
     private function service(): CandidateBaseImportService
     {
-        return new CandidateBaseImportService();
+        return new CandidateBaseImportService;
     }
 
     /** Builds a single-row CSV string; $overrides fill in CandidateBaseImportService::EXPECTED_HEADERS. */
@@ -314,8 +314,8 @@ class CandidateBaseImportServiceTest extends TestCase
         $process = $candidate->processes()->first();
         $this->assertSame(RecruitmentStatus::Zaakceptowany, $process->status);
         $this->assertTrue(
-            $process->comments()->where('body', 'like', '%brak dopasowania po telefonie%')->exists(),
-            'Expected a process comment flagging the unmatched "Aktualny pracownik" case.'
+            $candidate->comments()->where('body', 'like', '%brak dopasowania po telefonie%')->exists(),
+            'Expected a candidate comment flagging the unmatched "Aktualny pracownik" case.'
         );
     }
 

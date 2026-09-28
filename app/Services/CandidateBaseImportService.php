@@ -745,15 +745,12 @@ class CandidateBaseImportService
         $this->recordContactAttempt($process, $row, $statusInfo);
 
         if ($statusInfo['process_comment']) {
-            $alreadyCommented = $process->relationLoaded('comments')
-                ? $process->comments->contains(fn ($c) => $c->body === $statusInfo['process_comment'])
-                : $process->comments()->where('body', $statusInfo['process_comment'])->exists();
+            $alreadyCommented = $candidate->relationLoaded('comments')
+                ? $candidate->comments->contains(fn ($c) => $c->body === $statusInfo['process_comment'])
+                : $candidate->comments()->where('body', $statusInfo['process_comment'])->exists();
 
             if (! $alreadyCommented) {
-                $comment = $process->addComment($statusInfo['process_comment'], auth()->user());
-                if ($process->relationLoaded('comments')) {
-                    $process->setRelation('comments', $process->comments->prepend($comment));
-                }
+                $candidate->addComment($statusInfo['process_comment'], auth()->user());
             }
         }
 

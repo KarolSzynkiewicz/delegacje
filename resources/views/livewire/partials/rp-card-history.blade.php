@@ -1,4 +1,4 @@
-{{-- Zawsze na dole karty: historia procesu i komentarze procesu --}}
+{{-- Zawsze na dole karty: historia procesu --}}
 <div class="rp-doc-section rp-doc-section--history">
         <div>
             <div class="d-flex align-items-center justify-content-between mb-2">
@@ -45,10 +45,4 @@
             </div>
         </div>
 
-        <div class="mt-4">
-            <x-comments
-                :commentable="$selected"
-                label="Komentarze procesu"
-            />
-        </div>
 </div>

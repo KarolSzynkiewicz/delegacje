@@ -20,6 +20,9 @@ class CommentController extends Controller
     {
         // Resolve type safely - don't trust the request
         $type = CommentableType::from($request->input('commentable_type'));
+        if ($type === CommentableType::RECRUITMENT_PROCESS) {
+            abort(404);
+        }
         $modelClass = $type->modelClass();
 
         // Find the commentable model

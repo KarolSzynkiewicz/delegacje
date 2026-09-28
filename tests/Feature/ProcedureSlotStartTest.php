@@ -307,7 +307,7 @@ class ProcedureSlotStartTest extends TestCase
             ->assertSee('Stawka (zbyt niska/wysoka)')
             ->assertSee('Za niska na ten projekt')
             ->assertSee('Historia procesu')
-            ->assertSee('Komentarze procesu')
+            ->assertDontSee('Komentarze procesu')
             ->assertDontSeeHtml('rp-doc-section--candidate')
             ->assertDontSeeHtml('rp-doc-section--slot');
     }

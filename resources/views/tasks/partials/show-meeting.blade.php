@@ -69,15 +69,15 @@
         @if($process)
             <x-ui.card label="Notatka na karcie kandydata" class="mt-4">
                 <p class="small text-muted mb-3">
-                    Wpis pojawi się w komentarzach procesu rekrutacji
+                    Wpis pojawi się w komentarzach o kandydacie
                     @if($story['contextUrl'] ?? null)
                         (<a href="{{ $story['contextUrl'] }}">{{ $story['candidate'] }}</a>).
                     @endif
                 </p>
                 <form action="{{ route('comments.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
-                    <input type="hidden" name="commentable_type" value="{{ \App\Enums\CommentableType::RECRUITMENT_PROCESS->value }}">
-                    <input type="hidden" name="commentable_id" value="{{ $process->id }}">
+                    <input type="hidden" name="commentable_type" value="{{ \App\Enums\CommentableType::RECRUITMENT_CANDIDATE->value }}">
+                    <input type="hidden" name="commentable_id" value="{{ $process->candidate_id }}">
 
                     <div class="mb-3">
                         <textarea

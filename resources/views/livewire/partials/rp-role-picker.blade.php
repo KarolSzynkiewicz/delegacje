@@ -3,10 +3,11 @@
     $live = $live ?? true;
     $keyPrefix = $keyPrefix ?? 'role';
     $missing = $missing ?? false;
+    $startOpen = $startOpen ?? $missing;
     $selectedIds = collect($selected ?? [])->map(fn ($id) => (int) $id);
 @endphp
 <div class="rp-roles {{ $missing ? 'is-empty' : '' }}"
-     x-data="{ open: {{ $missing ? 'true' : 'false' }}, q: '' }"
+     x-data="{ open: {{ $startOpen ? 'true' : 'false' }}, q: '' }"
      wire:ignore.self>
     <div class="rp-roles__bar">
         <div class="rp-field-label {{ $missing ? 'is-empty' : '' }}">

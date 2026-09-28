@@ -6301,6 +6301,51 @@ body:has(.rp-modal--page) main {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.rp-record-nav {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.rp-record-nav__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    min-height: 32px;
+    padding: .2rem .65rem;
+    border-radius: 999px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, .03);
+    color: var(--text-main);
+    font: inherit;
+    font-size: .75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.rp-record-nav__btn:hover {
+    color: #fff;
+    border-color: rgba(96, 165, 250, .45);
+    background: rgba(59, 130, 246, .12);
+}
+.rp-record-nav__btn.is-disabled {
+    opacity: .35;
+    pointer-events: none;
+    cursor: default;
+}
+.rp-record-nav__meta {
+    min-width: 3.5rem;
+    text-align: center;
+    font-size: .75rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.rp-record-nav + .rp-identity-bar__chips {
+    margin-left: .75rem;
+}
+.rp-meta-pop {
+    position: relative;
+}
 .rp-identity-bar__chips {
     display: flex;
     flex-wrap: wrap;
@@ -6486,6 +6531,12 @@ body:has(.rp-modal--page) main {
 @media (max-width: 767.98px) {
     .rp-identity-bar {
         flex-wrap: wrap;
+    }
+    .rp-record-nav {
+        margin-left: 0;
+    }
+    .rp-record-nav__label {
+        display: none;
     }
     .rp-identity-bar__chips {
         flex-shrink: 1;
@@ -6805,6 +6856,31 @@ a.rp-profile__phone:hover {
 .rp-attr__value--ok {
     color: #6ee7b7;
 }
+.rp-attr-wrap {
+    position: relative;
+    flex: 0 1 auto;
+    min-width: 10.25rem;
+    max-width: 100%;
+}
+.rp-attr-pop {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + .35rem);
+    left: 0;
+    width: max-content;
+    min-width: 12rem;
+    max-width: min(18rem, calc(100vw - 2rem));
+    padding: .75rem;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(30, 41, 59, 0.96);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .45);
+}
+.rp-attr-pop--wide {
+    width: min(22rem, calc(100vw - 2rem));
+    max-height: 18rem;
+    overflow: auto;
+}
 .rp-profile__aside {
     display: flex;
     flex-direction: column;
@@ -6998,6 +7074,175 @@ a.rp-profile__phone:hover {
     letter-spacing: .04em;
     text-transform: uppercase;
     color: #6ee7b7;
+}
+.rp-tasks__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .85rem;
+}
+.rp-tasks__head .rp-field-label {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    margin-bottom: 0;
+}
+.rp-tasks__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 .4rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+}
+.rp-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+}
+.rp-task {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    padding: .75rem .85rem;
+    border: 1px solid var(--glass-border);
+    border-left: 3px solid rgba(168, 85, 247, 0.85);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+.rp-task--callback {
+    border-left-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.07);
+}
+.rp-task--meeting {
+    border-left-color: var(--primary);
+    background: rgba(59, 130, 246, 0.08);
+}
+.rp-task__check {
+    flex-shrink: 0;
+    width: 1.7rem;
+    height: 1.7rem;
+    margin-top: .05rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 2px solid rgba(241, 245, 249, 0.72);
+    background: rgba(7, 10, 19, 0.35);
+    color: transparent;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+.rp-task__check i {
+    font-size: 1rem;
+    font-weight: 700;
+    color: transparent;
+}
+.rp-task.is-done .rp-task__check i {
+    color: #052e16;
+}
+.rp-task__check:hover,
+.rp-task__check:focus-visible {
+    border-color: #fff;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.28);
+    outline: none;
+}
+.rp-task__body {
+    min-width: 0;
+    flex: 1;
+}
+.rp-task__name {
+    display: block;
+    color: var(--text-main);
+    font-weight: 650;
+    font-size: .92rem;
+    line-height: 1.3;
+    text-decoration: none;
+}
+.rp-task__name:hover {
+    color: var(--primary);
+}
+.rp-task__desc {
+    margin: .2rem 0 0;
+    color: var(--text-muted);
+    font-size: .82rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.rp-task__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .4rem .55rem;
+    margin-top: .4rem;
+    color: var(--text-muted);
+    font-size: .75rem;
+}
+.rp-task__when {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-variant-numeric: tabular-nums;
+}
+.rp-task__kind {
+    display: inline-flex;
+    align-items: center;
+    gap: .28rem;
+    padding: .08rem .45rem;
+    border-radius: 999px;
+    font-size: .68rem;
+    font-weight: 650;
+    letter-spacing: .02em;
+    color: #e9d5ff;
+    background: rgba(168, 85, 247, 0.18);
+}
+.rp-task--callback .rp-task__kind {
+    color: #fde68a;
+    background: rgba(245, 158, 11, 0.18);
+}
+.rp-task--meeting .rp-task__kind {
+    color: #bfdbfe;
+    background: rgba(59, 130, 246, 0.2);
+}
+.rp-task__who {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .08rem .45rem .08rem .35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-main);
+}
+.rp-task__who::before {
+    content: "";
+    width: .35rem;
+    height: .35rem;
+    border-radius: 50%;
+    background: var(--text-muted);
+}
+.rp-task.is-done {
+    background: rgba(255, 255, 255, 0.02);
+}
+.rp-task.is-done .rp-task__check {
+    border-color: #34d399;
+    background: #34d399;
+    color: #052e16;
+}
+.rp-task.is-done .rp-task__name {
+    color: var(--text-muted);
+    text-decoration: line-through;
 }
 .meeting-where {
     overflow-wrap: anywhere;
@@ -7631,7 +7876,8 @@ a.rp-profile__phone:hover {
     .rp-attr-grid {
         gap: .75rem 1.35rem;
     }
-    .rp-attr {
+    .rp-attr,
+    .rp-attr-wrap {
         flex: 1 1 calc(50% - .7rem);
         min-width: 9.5rem;
     }

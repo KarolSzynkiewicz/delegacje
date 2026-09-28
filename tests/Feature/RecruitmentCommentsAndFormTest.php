@@ -4,8 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\RecruitmentContactOutcome;
 use App\Enums\RecruitmentStatus;
+use App\Enums\TaskStatus;
+use App\Enums\WorkItemType;
 use App\Livewire\RecruitmentForm;
 use App\Livewire\RecruitmentProcessesTable;
+use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
 use App\Models\RecruitmentContactAttempt;
 use App\Models\RecruitmentLead;
@@ -137,7 +140,138 @@ class RecruitmentCommentsAndFormTest extends TestCase
             ->call('setDrivingLicense', false)
             ->assertDontSee('Prawko')
             ->call('setDrivingLicense', true)
-            ->assertSee('Kat. B');
+            ->assertSee('Kat. B')
+            ->assertDontSee('Komentarze procesu')
+            ->assertSeeHtml('rp-attr-pop');
+    }
+
+    public function test_quick_language_edit_saves_without_opening_the_identity_form(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+        $process = $this->createProcess();
+
+        Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $process->id])
+            ->assertSet('editingCandidateIdentity', false)
+            ->call('saveLanguages', true, false, true)
+            ->assertSet('editingCandidateIdentity', false);
+
+        $candidate = $process->candidate->fresh();
+        $this->assertTrue($candidate->speaks_english);
+        $this->assertFalse($candidate->speaks_french);
+        $this->assertTrue($candidate->speaks_german);
+    }
+
+    public function test_process_comments_can_no_longer_be_created(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+        $process = $this->createProcess();
+
+        $this->actingAs($admin)
+            ->post(route('comments.store'), [
+                'commentable_type' => 'recruitment_process',
+                'commentable_id' => $process->id,
+                'body' => 'To już nie powinno powstać.',
+            ])
+            ->assertNotFound();
+
+        $this->assertSame(0, $process->comments()->count());
+    }
+
+    public function test_previous_and_next_follow_the_current_filter(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+
+        $older = $this->createProcess();
+        $older->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $older->candidate->forceFill(['created_at' => now()->subDays(3)])->save();
+
+        $skipped = $this->createProcess();
+        $skipped->candidate->forceFill(['created_at' => now()->subDays(2)])->save();
+
+        $newer = $this->createProcess();
+        $newer->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $newer->candidate->forceFill(['created_at' => now()->subDay()])->save();
+
+        Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $older->id])
+            ->set('status', RecruitmentStatus::WTrakcieKontaktu->value)
+            ->assertSee('2 / 2')
+            ->assertSee('Poprzednie')
+            ->assertSee('Następne')
+            ->assertSeeHtml('id="rp-quick-email"')
+            ->assertSeeHtml('id="rp-quick-city"')
+            ->call('openListNeighbor', 'prev')
+            ->assertRedirect(route('recruitment-processes.show', [
+                'recruitmentProcess' => $newer,
+                'status' => RecruitmentStatus::WTrakcieKontaktu->value,
+            ]));
+    }
+
+    public function test_tasks_sit_above_contact_history_and_distinguish_callbacks_and_meetings(): void
+    {
+        $admin = User::factory()->create(['name' => 'cursor']);
+        $admin->assignRole('administrator');
+        $process = $this->createProcess();
+
+        ProjectTask::createIntended(WorkItemType::Callback, [
+            'name' => 'Oddzwonić do Jan',
+            'description' => 'Ustalić zjazd.',
+            'category' => 'Rekrutacja',
+            'status' => TaskStatus::PENDING,
+            'due_date' => '2026-09-29',
+            'assigned_to' => $admin->id,
+            'created_by' => $admin->id,
+            'recruitment_process_id' => $process->id,
+        ]);
+        ProjectTask::createIntended(WorkItemType::Meeting, [
+            'name' => 'Spotkanie z Jan',
+            'description' => 'Rozmowa na miejscu.',
+            'category' => 'Rekrutacja',
+            'status' => TaskStatus::PENDING,
+            'starts_at' => '2026-09-30 10:00:00',
+            'assigned_to' => $admin->id,
+            'created_by' => $admin->id,
+            'recruitment_process_id' => $process->id,
+        ]);
+        $plain = ProjectTask::createIntended(WorkItemType::Task, [
+            'name' => 'Sprawdzić dokumenty',
+            'description' => 'Paszport i prawo jazdy.',
+            'category' => 'Rekrutacja',
+            'status' => TaskStatus::PENDING,
+            'due_date' => '2026-10-01',
+            'assigned_to' => $admin->id,
+            'created_by' => $admin->id,
+            'recruitment_process_id' => $process->id,
+        ]);
+
+        $html = Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $process->id])
+            ->assertSee('Oddzwonienie')
+            ->assertSee('Spotkanie')
+            ->assertSee('Ustalić zjazd.')
+            ->assertSee('Rozmowa na miejscu.')
+            ->assertSee('Paszport i prawo jazdy.')
+            ->assertSeeHtml('rp-task--callback')
+            ->assertSeeHtml('rp-task--meeting')
+            ->assertSeeHtml('rp-task--task')
+            ->assertSeeHtml('rp-task__check')
+            ->html();
+
+        $this->assertLessThan(
+            strpos($html, 'Historia kontaktu'),
+            strpos($html, 'rp-doc-section--tasks'),
+        );
+
+        Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $process->id])
+            ->call('toggleTaskDone', $plain->id)
+            ->assertSeeHtml('rp-task--task is-done');
+
+        $this->assertSame(TaskStatus::COMPLETED, $plain->fresh()->status);
     }
 
     private function createProcess(): RecruitmentProcess

@@ -1,6 +1,7 @@
-window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
+window.commentBodyAutocomplete = function commentBodyAutocomplete(payload, options) {
     const allUsers = payload.users || [];
     const subtasks = payload.subtasks || [];
+    const submitOnEnter = !!(options && options.submitOnEnter);
     const tokenRe = /@([\p{L}\p{N}_.@-]+)([!?])?|(?<!\w)#(\d+)\b/gu;
     const maxFiles = 15;
     const maxBytes = 15360 * 1024;
@@ -36,6 +37,7 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
         mentionMode: null,
         mentionSuffix: '',
         isEmpty: true,
+        submitOnEnter,
 
         boot() {
             this.renderFromText(this.$refs.body?.value || '');
@@ -434,6 +436,17 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             this.onInput();
         },
 
+        submitComment() {
+            this.tryCommitMention();
+            this.tryCommitSubtask();
+            this.syncBody();
+            const body = (this.$refs.body?.value || '').trim();
+            if (body === '' && this.files.length === 0) {
+                return;
+            }
+            this.$el.closest('form')?.requestSubmit();
+        },
+
         onKeydown(event) {
             if (event.key === 'Escape') {
                 this.close();
@@ -458,10 +471,12 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload) {
             }
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                 event.preventDefault();
-                this.tryCommitMention();
-                this.tryCommitSubtask();
-                this.syncBody();
-                this.$el.closest('form')?.requestSubmit();
+                this.submitComment();
+                return;
+            }
+            if (event.key === 'Enter' && !event.shiftKey && this.submitOnEnter) {
+                event.preventDefault();
+                this.submitComment();
                 return;
             }
             if (event.key === 'Enter') {

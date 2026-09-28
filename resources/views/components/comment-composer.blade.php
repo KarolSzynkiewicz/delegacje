@@ -5,6 +5,7 @@
     'submitTitle' => 'Wyślij',
     'fileInputId' => null,
     'value' => '',
+    'submitOnEnter' => false,
 ])
 
 @php
@@ -12,7 +13,7 @@
     $accept = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.zip,application/pdf,image/*';
 @endphp
 
-<div class="comments-composer" x-data="commentBodyAutocomplete(@js($autocompletePayload))" x-init="boot()">
+<div class="comments-composer" wire:ignore wire:key="composer-{{ $fileInputId }}" x-data="commentBodyAutocomplete(@js($autocompletePayload), @js(['submitOnEnter' => (bool) $submitOnEnter]))" x-init="boot()">
     <input type="hidden" name="body" x-ref="body" value="{{ $value }}">
     <div
         class="comments-composer-input comments-composer-editor"
@@ -82,7 +83,7 @@
             x-ref="files"
             @change="onFiles($event)"
         >
-        <button type="submit" class="comments-icon-btn comments-send-btn" title="{{ $submitTitle }} (Ctrl+Enter)" aria-label="{{ $submitTitle }}">
+        <button type="submit" class="comments-icon-btn comments-send-btn" title="{{ $submitTitle }} ({{ $submitOnEnter ? 'Enter' : 'Ctrl+Enter' }})" aria-label="{{ $submitTitle }}">
             <i class="bi bi-arrow-return-left"></i>
         </button>
         {{ $toolbar ?? '' }}

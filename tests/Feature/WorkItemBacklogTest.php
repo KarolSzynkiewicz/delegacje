@@ -324,15 +324,16 @@ class WorkItemBacklogTest extends TestCase
 
         $this->from(route('tasks.show', $task))
             ->post(route('comments.store'), [
-                'commentable_type' => 'recruitment_process',
-                'commentable_id' => $process->id,
+                'commentable_type' => 'recruitment_candidate',
+                'commentable_id' => $candidate->id,
                 'body' => 'Oddzwoniłem, oddzwoni jutro.',
             ])
             ->assertRedirect();
 
         $this->assertSame(0, $task->comments()->count());
-        $this->assertSame(1, $process->comments()->count());
-        $this->assertSame('Oddzwoniłem, oddzwoni jutro.', $process->comments()->first()->body);
+        $this->assertSame(0, $process->comments()->count());
+        $this->assertSame(1, $candidate->comments()->count());
+        $this->assertSame('Oddzwoniłem, oddzwoni jutro.', $candidate->comments()->first()->body);
 
         $this->from(route('tasks.show', $task))
             ->post(route('tasks.toggle-done', $task))

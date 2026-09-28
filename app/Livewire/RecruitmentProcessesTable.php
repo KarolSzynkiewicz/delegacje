@@ -1226,16 +1226,11 @@ class RecruitmentProcessesTable extends Component
      */
     protected function filteredCandidatesQuery(array $filters): Builder
     {
-        $status = (string) ($filters['status'] ?? '');
         $flag = (string) ($filters['flag'] ?? '');
-        $mine = (bool) ($filters['mine'] ?? false);
         $employment = (string) ($filters['employment'] ?? '');
         if ($employment === '' && ($filters['former_employee'] ?? false)) {
             $employment = 'former';
         }
-        $recruiter = (string) ($filters['recruiter'] ?? '');
-        $referralSource = (string) ($filters['referral_source'] ?? '');
-        $rejectionFilter = (string) ($filters['rejection_filter'] ?? '');
         $rateMin = (string) ($filters['rate_min'] ?? '');
         $rateMax = (string) ($filters['rate_max'] ?? '');
         $shipyardExperience = (string) ($filters['shipyard_experience'] ?? '');
@@ -1246,12 +1241,9 @@ class RecruitmentProcessesTable extends Component
         $skillGerman = (bool) ($filters['skill_german'] ?? false);
         $skillDriving = (bool) ($filters['skill_driving'] ?? false);
         $minProcesses = ($filters['min_processes'] ?? '') !== '' ? (int) $filters['min_processes'] : 0;
-        $hasTask = (bool) ($filters['has_task'] ?? false);
-        $backlog = RecruitmentBacklog::sanitizeFilterKey((string) ($filters['backlog'] ?? ''));
         $lastContact = $this->sanitizeLastContact((string) ($filters['last_contact'] ?? ''));
         $role = $this->sanitizeRole((string) ($filters['role'] ?? ''));
         $search = (string) ($filters['search'] ?? '');
-        $userId = auth()->id();
 
         $searchDigits = preg_replace('/\D+/', '', $search);
         $phoneSearch = strlen($searchDigits) >= 3
@@ -1260,20 +1252,8 @@ class RecruitmentProcessesTable extends Component
 
         $query = RecruitmentCandidate::query()
             ->withCount('processes')
-            ->whereHas('processes', function ($q) use ($status, $mine, $userId, $recruiter, $referralSource, $rejectionFilter, $hasTask, $backlog) {
-                $q->when($status, fn ($q) => $q->where('status', $status))
-                    ->when($mine && $userId, fn ($q) => $q->where('assigned_recruiter_id', $userId))
-                    ->when($recruiter === 'unassigned', fn ($q) => $q->whereNull('assigned_recruiter_id'))
-                    ->when($recruiter !== '' && $recruiter !== 'unassigned', fn ($q) => $q->where('assigned_recruiter_id', (int) $recruiter))
-                    ->when($rejectionFilter === 'none', fn ($q) => $q->whereNull('rejection_reason'))
-                    ->when($rejectionFilter !== '' && $rejectionFilter !== 'none', fn ($q) => $q->where('rejection_reason', $rejectionFilter))
-                    ->when($hasTask, fn ($q) => $q->whereHas('tasks'));
-
-                if ($backlog !== '') {
-                    RecruitmentBacklog::constrain($q, $backlog);
-                }
-
-                $this->applyReferralSourceFilter($q, $referralSource);
+            ->whereHas('processes', function ($q) use ($filters) {
+                $this->applyProcessListFilters($q, $filters);
             })
             ->when($flag, fn ($q) => $q->where('recruitment_candidates.rating', $flag))
             ->when($rateMin !== '', fn ($q) => $q->where('recruitment_candidates.expected_rate_eur', '>=', (float) $rateMin))
@@ -1327,6 +1307,121 @@ class RecruitmentProcessesTable extends Component
         }
 
         $this->redirect($this->processUrl($id), navigate: false);
+    }
+
+    public function openListNeighbor(string $direction): void
+    {
+        $nav = $this->listRecordNav();
+        $id = $direction === 'prev' ? ($nav['prev'] ?? null) : ($nav['next'] ?? null);
+
+        if (! $id || $id === $this->selectedId) {
+            return;
+        }
+
+        $this->redirect($this->processUrl($id), navigate: false);
+    }
+
+    /**
+     * Position of the open candidate in the current filter, plus the process to open on either side.
+     *
+     * @return array{index: int, total: int, prev: ?int, next: ?int}|null
+     */
+    public function listRecordNav(): ?array
+    {
+        $process = $this->getSelectedProcess();
+        if (! $process) {
+            return null;
+        }
+
+        $ids = $this->orderedFilteredCandidatesQuery()
+            ->pluck('recruitment_candidates.id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $index = $ids->search($process->candidate_id, true);
+        if ($index === false) {
+            return null;
+        }
+
+        $prevCandidate = $ids[$index - 1] ?? null;
+        $nextCandidate = $ids[$index + 1] ?? null;
+
+        return [
+            'index' => $index + 1,
+            'total' => $ids->count(),
+            'prev' => $prevCandidate ? $this->matchingProcessId((int) $prevCandidate) : null,
+            'next' => $nextCandidate ? $this->matchingProcessId((int) $nextCandidate) : null,
+        ];
+    }
+
+    /**
+     * @param  Builder<RecruitmentProcess>  $query
+     * @param  array<string, mixed>  $filters
+     */
+    protected function applyProcessListFilters(Builder $query, array $filters): void
+    {
+        $status = (string) ($filters['status'] ?? '');
+        $mine = (bool) ($filters['mine'] ?? false);
+        $recruiter = (string) ($filters['recruiter'] ?? '');
+        $referralSource = (string) ($filters['referral_source'] ?? '');
+        $rejectionFilter = (string) ($filters['rejection_filter'] ?? '');
+        $hasTask = (bool) ($filters['has_task'] ?? false);
+        $backlog = RecruitmentBacklog::sanitizeFilterKey((string) ($filters['backlog'] ?? ''));
+        $userId = auth()->id();
+
+        $query->when($status, fn ($q) => $q->where('status', $status))
+            ->when($mine && $userId, fn ($q) => $q->where('assigned_recruiter_id', $userId))
+            ->when($recruiter === 'unassigned', fn ($q) => $q->whereNull('assigned_recruiter_id'))
+            ->when($recruiter !== '' && $recruiter !== 'unassigned', fn ($q) => $q->where('assigned_recruiter_id', (int) $recruiter))
+            ->when($rejectionFilter === 'none', fn ($q) => $q->whereNull('rejection_reason'))
+            ->when($rejectionFilter !== '' && $rejectionFilter !== 'none', fn ($q) => $q->where('rejection_reason', $rejectionFilter))
+            ->when($hasTask, fn ($q) => $q->whereHas('tasks'));
+
+        if ($backlog !== '') {
+            RecruitmentBacklog::constrain($query, $backlog);
+        }
+
+        $this->applyReferralSourceFilter($query, $referralSource);
+    }
+
+    /**
+     * @return Builder<RecruitmentCandidate>
+     */
+    protected function orderedFilteredCandidatesQuery(): Builder
+    {
+        $sortColumn = match ($this->sortField) {
+            'last_contact_at' => 'last_candidate_contact_at',
+            'created_at' => 'recruitment_candidates.created_at',
+            'expected_rate_eur' => 'recruitment_candidates.expected_rate_eur',
+            default => 'recruitment_candidates.last_name',
+        };
+        $direction = $this->sortDirection === 'asc' ? 'asc' : 'desc';
+
+        $query = $this->filteredCandidatesQuery($this->currentListFilters());
+
+        if ($this->sortField === 'last_contact_at') {
+            $query->addSelect(DB::raw(
+                '(SELECT MAX(rca.created_at)'
+                .' FROM recruitment_contact_attempts rca'
+                .' JOIN recruitment_processes rp2 ON rp2.id = rca.recruitment_process_id'
+                .' WHERE rp2.candidate_id = recruitment_candidates.id) as last_candidate_contact_at'
+            ));
+        }
+
+        return $query
+            ->orderBy($sortColumn, $direction)
+            ->orderBy('recruitment_candidates.last_name')
+            ->orderBy('recruitment_candidates.id');
+    }
+
+    protected function matchingProcessId(int $candidateId): ?int
+    {
+        $query = RecruitmentProcess::query()->where('candidate_id', $candidateId);
+        $this->applyProcessListFilters($query, $this->currentListFilters());
+
+        $id = $query->orderByDesc('created_at')->orderByDesc('id')->value('id');
+
+        return $id ? (int) $id : null;
     }
 
     protected function loadCandidateEditFields(): void
@@ -1611,6 +1706,14 @@ class RecruitmentProcessesTable extends Component
         $process->candidate->roles()->sync($this->editRoles);
 
         $this->skillsetSaved = true;
+    }
+
+    public function saveLanguages(bool $english, bool $french, bool $german): void
+    {
+        $this->editSpeaksEnglish = $english;
+        $this->editSpeaksFrench = $french;
+        $this->editSpeaksGerman = $german;
+        $this->saveSkillset();
     }
 
     public function setDrivingLicense(bool $hasLicense): void
@@ -1976,6 +2079,7 @@ class RecruitmentProcessesTable extends Component
             'assignmentHistory.toRecruiter',
             'assignmentHistory.changedBy',
             'tasks.assignedTo',
+            'tasks.workItem',
         ])->find($this->selectedId);
     }
 
@@ -2043,13 +2147,6 @@ class RecruitmentProcessesTable extends Component
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        $lastCandidateContactSubquery = DB::raw(
-            '(SELECT MAX(rca.created_at)'
-            .' FROM recruitment_contact_attempts rca'
-            .' JOIN recruitment_processes rp2 ON rp2.id = rca.recruitment_process_id'
-            .' WHERE rp2.candidate_id = recruitment_candidates.id) as last_candidate_contact_at'
-        );
-
         $flagCounts = RecruitmentCandidate::query()
             ->whereHas('processes', fn ($q) => $q->when($this->status, fn ($q) => $q->where('status', $this->status)))
             ->whereNotNull('rating')
@@ -2066,18 +2163,10 @@ class RecruitmentProcessesTable extends Component
                 ->count()
             : 0;
 
-        $sortColumn = match ($this->sortField) {
-            'last_contact_at' => 'last_candidate_contact_at',
-            'created_at' => 'recruitment_candidates.created_at',
-            'expected_rate_eur' => 'recruitment_candidates.expected_rate_eur',
-            default => 'recruitment_candidates.last_name',
-        };
-
         // Each row in the main table = one candidate. Their processes are sub-rows.
         // Status / mine filters only decide which candidates appear; all of their
         // processes are loaded so sibling pipelines stay visible informatively.
-        $applications = $this->filteredCandidatesQuery($this->currentListFilters())
-            ->addSelect($lastCandidateContactSubquery)
+        $applications = $this->orderedFilteredCandidatesQuery()
             ->with([
                 'roles',
                 'processes' => function ($q) {
@@ -2090,8 +2179,6 @@ class RecruitmentProcessesTable extends Component
                         ->orderBy('created_at', 'desc');
                 },
             ])
-            ->orderBy($sortColumn, $this->sortDirection)
-            ->orderBy('recruitment_candidates.last_name')
             ->paginate(20);
 
         $recruiters = User::orderBy('name')->get();
@@ -2157,6 +2244,7 @@ class RecruitmentProcessesTable extends Component
 
         return view('livewire.recruitment-processes-table', [
             'applications' => $applications,
+            'recordNav' => $selected ? $this->listRecordNav() : null,
             'listCandidates' => $listCandidates,
             'pinnedCandidate' => $pinnedCandidate,
             'counts' => $counts,

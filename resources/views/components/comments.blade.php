@@ -4,6 +4,7 @@
     'inputLabel' => null,
     'buttonText' => null,
     'embedded' => false,
+    'submitOnEnter' => false,
 ])
 
 @php
@@ -57,6 +58,7 @@
             :autocomplete-payload="$commentAutocompletePayload"
             :submit-title="$buttonTextValue"
             :file-input-id="'comment-files-'.$commentableType->value.'-'.$commentable->id"
+            :submit-on-enter="$submitOnEnter"
         />
     </form>
 

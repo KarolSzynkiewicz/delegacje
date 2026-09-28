@@ -367,7 +367,10 @@
                                         aria-label="Lista kandydatów">
                                     <i class="bi" :class="listOpen ? 'bi-x-lg' : 'bi-list'"></i>
                                 </button>
-                                @include('livewire.partials.rp-candidate-identity-bar', ['candidate' => $candidate])
+                                @include('livewire.partials.rp-candidate-identity-bar', [
+                                    'candidate' => $candidate,
+                                    'recordNav' => $recordNav,
+                                ])
                             </div>
                         @endif
 
@@ -566,14 +569,30 @@
                                                     </div>
                                                 </div>
                                                 <div class="rp-profile__meta">
-                                                    <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-profile__meta-item', 'is-empty' => ! $selected->email])>
-                                                        <i class="bi bi-envelope" aria-hidden="true"></i>
-                                                        <span>{{ $selected->email ?: 'uzupełnij' }}</span>
-                                                    </button>
-                                                    <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-profile__meta-item', 'is-empty' => ! $selected->city])>
-                                                        <i class="bi bi-geo-alt" aria-hidden="true"></i>
-                                                        <span>{{ $selected->city ?: 'uzupełnij' }}</span>
-                                                    </button>
+                                                    <div class="rp-meta-pop" x-data="{ open: false }" @click.outside="open = false">
+                                                        <button type="button" @click="open = !open" @class(['rp-profile__meta-item', 'is-empty' => ! $selected->email])>
+                                                            <i class="bi bi-envelope" aria-hidden="true"></i>
+                                                            <span>{{ $selected->email ?: 'uzupełnij' }}</span>
+                                                        </button>
+                                                        <div class="rp-attr-pop" x-show="open" x-cloak @click.stop>
+                                                            <label class="rp-field-label" for="rp-quick-email">E-mail</label>
+                                                            <input id="rp-quick-email" type="email" wire:model="editEmail" class="form-control form-control-sm" placeholder="jan@example.com">
+                                                            @error('editEmail') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                                                            <button type="button" wire:click="saveCandidateIdentity" class="btn btn-primary btn-sm mt-2">Zapisz</button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="rp-meta-pop" x-data="{ open: false }" @click.outside="open = false">
+                                                        <button type="button" @click="open = !open" @class(['rp-profile__meta-item', 'is-empty' => ! $selected->city])>
+                                                            <i class="bi bi-geo-alt" aria-hidden="true"></i>
+                                                            <span>{{ $selected->city ?: 'uzupełnij' }}</span>
+                                                        </button>
+                                                        <div class="rp-attr-pop" x-show="open" x-cloak @click.stop>
+                                                            <label class="rp-field-label" for="rp-quick-city">Lokalizacja</label>
+                                                            <input id="rp-quick-city" type="text" wire:model="editCity" class="form-control form-control-sm" placeholder="Miasto zamieszkania…">
+                                                            @error('editCity') <div class="small mt-1" style="color:var(--danger);">{{ $message }}</div> @enderror
+                                                            <button type="button" wire:click="saveCandidateIdentity" class="btn btn-primary btn-sm mt-2">Zapisz</button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -582,50 +601,108 @@
                                         <div class="mt-2" style="font-size:.82rem;color:var(--danger);"><i class="bi bi-exclamation-triangle me-1"></i>{{ $candidate->rating_note }}</div>
                                     @endif
                                     <div class="rp-attr-grid">
-                                        <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-attr', 'is-empty' => ! $candidate?->shipyard_experience])>
-                                            <span class="rp-attr__icon"><i class="bi bi-tools"></i></span>
-                                            <div class="rp-attr__copy">
-                                                <div class="rp-attr__label">Doświadczenie</div>
-                                                <div class="rp-attr__value">{{ $candidate?->shipyard_experience?->label() ?? 'uzupełnij' }}</div>
-                                            </div>
-                                        </button>
-                                        <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-attr', 'is-empty' => ! $candidate?->available_from])>
-                                            <span class="rp-attr__icon"><i class="bi bi-calendar-check"></i></span>
-                                            <div class="rp-attr__copy">
-                                                <div class="rp-attr__label">Dostępność</div>
-                                                <div class="rp-attr__value {{ $candidate?->available_from ? 'rp-attr__value--ok' : '' }}">{{ $candidate?->available_from ? 'Od '.$candidate->available_from->format('d.m.Y') : 'uzupełnij' }}</div>
-                                            </div>
-                                        </button>
-                                        @if($candidate?->has_driving_license_b !== false)
-                                            <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-attr', 'is-empty' => $candidate?->has_driving_license_b === null])>
-                                                <span class="rp-attr__icon"><i class="bi bi-car-front"></i></span>
+                                        <div class="rp-attr-wrap" x-data="{ open: false }" @click.outside="open = false">
+                                            <button type="button" @click="open = !open" @class(['rp-attr', 'is-empty' => ! $candidate?->shipyard_experience])>
+                                                <span class="rp-attr__icon"><i class="bi bi-tools"></i></span>
                                                 <div class="rp-attr__copy">
-                                                    <div class="rp-attr__label">Prawko</div>
-                                                    <div class="rp-attr__value">{{ $candidate?->has_driving_license_b ? 'Kat. B' : 'uzupełnij' }}</div>
+                                                    <div class="rp-attr__label">Doświadczenie</div>
+                                                    <div class="rp-attr__value">{{ $candidate?->shipyard_experience?->label() ?? 'uzupełnij' }}</div>
                                                 </div>
                                             </button>
+                                            <div class="rp-attr-pop" x-show="open" x-cloak @click.stop>
+                                                <div class="rp-exp-picker">
+                                                    @foreach(\App\Enums\RecruitmentShipyardExperience::cases() as $exp)
+                                                        <button type="button"
+                                                                wire:click="$set('editShipyardExperience', '{{ $editShipyardExperience === $exp->value ? '' : $exp->value }}')"
+                                                                class="rp-exp-btn {{ $editShipyardExperience === $exp->value ? 'rp-exp-active' : '' }}">
+                                                            {{ $exp->label() }}
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="rp-attr-wrap" wire:ignore.self x-data="{ open: false }" @click.outside="open = false">
+                                            <button type="button" @click="open = !open" @class(['rp-attr', 'is-empty' => ! $candidate?->available_from])>
+                                                <span class="rp-attr__icon"><i class="bi bi-calendar-check"></i></span>
+                                                <div class="rp-attr__copy">
+                                                    <div class="rp-attr__label">Dostępność</div>
+                                                    <div class="rp-attr__value {{ $candidate?->available_from ? 'rp-attr__value--ok' : '' }}">{{ $candidate?->available_from ? 'Od '.$candidate->available_from->format('d.m.Y') : 'uzupełnij' }}</div>
+                                                </div>
+                                            </button>
+                                            <div class="rp-attr-pop" x-show="open" x-cloak @click.stop>
+                                                <label class="rp-field-label" for="rp-quick-available">Dostępny od</label>
+                                                <input id="rp-quick-available" type="date" wire:model.live="editAvailableFrom" class="form-control form-control-sm">
+                                            </div>
+                                        </div>
+                                        @if($candidate?->has_driving_license_b !== false)
+                                            <div class="rp-attr-wrap" x-data="{ open: false }" @click.outside="open = false">
+                                                <button type="button" @click="open = !open" @class(['rp-attr', 'is-empty' => $candidate?->has_driving_license_b === null])>
+                                                    <span class="rp-attr__icon"><i class="bi bi-car-front"></i></span>
+                                                    <div class="rp-attr__copy">
+                                                        <div class="rp-attr__label">Prawko</div>
+                                                        <div class="rp-attr__value">{{ $candidate?->has_driving_license_b ? 'Kat. B' : 'uzupełnij' }}</div>
+                                                    </div>
+                                                </button>
+                                                <div class="rp-attr-pop" x-show="open" x-cloak @click.stop>
+                                                    <div class="rp-exp-picker">
+                                                        <button type="button" wire:click="setDrivingLicense(true)" class="rp-exp-btn {{ $editDrivingLicense === true ? 'rp-exp-active' : '' }}">Ma kat. B</button>
+                                                        <button type="button" wire:click="setDrivingLicense(false)" class="rp-exp-btn {{ $editDrivingLicense === false ? 'rp-exp-active' : '' }}">Nie ma</button>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         @endif
-                                        <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-attr', 'is-empty' => $candidate?->expected_rate_eur === null])>
-                                            <span class="rp-attr__icon"><i class="bi bi-cash-coin"></i></span>
-                                            <div class="rp-attr__copy">
-                                                <div class="rp-attr__label">Stawka</div>
-                                                <div class="rp-attr__value font-mono">{{ $candidate?->expected_rate_eur !== null ? number_format((float) $candidate->expected_rate_eur, 2).' €/h' : 'uzupełnij' }}</div>
+                                        <div class="rp-attr-wrap" wire:ignore.self x-data="{ open: false }" @click.outside="open = false">
+                                            <button type="button" @click="open = !open" @class(['rp-attr', 'is-empty' => $candidate?->expected_rate_eur === null])>
+                                                <span class="rp-attr__icon"><i class="bi bi-cash-coin"></i></span>
+                                                <div class="rp-attr__copy">
+                                                    <div class="rp-attr__label">Stawka</div>
+                                                    <div class="rp-attr__value font-mono">{{ $candidate?->expected_rate_eur !== null ? number_format((float) $candidate->expected_rate_eur, 2).' €/h' : 'uzupełnij' }}</div>
+                                                </div>
+                                            </button>
+                                            <div class="rp-attr-pop" x-show="open" x-cloak @click.stop>
+                                                <label class="rp-field-label" for="rp-quick-rate">Stawka oczekiwana</label>
+                                                <div class="input-group input-group-sm">
+                                                    <input id="rp-quick-rate" type="number" step="0.01" min="0" wire:model.live.debounce.400ms="editRate" class="form-control" placeholder="0.00">
+                                                    <span class="input-group-text">€/h</span>
+                                                </div>
                                             </div>
-                                        </button>
-                                        <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-attr', 'is-empty' => $langBits->isEmpty()])>
-                                            <span class="rp-attr__icon"><i class="bi bi-translate"></i></span>
-                                            <div class="rp-attr__copy">
-                                                <div class="rp-attr__label">Języki</div>
-                                                <div class="rp-attr__value">{{ $langBits->isNotEmpty() ? $langBits->implode('  ') : 'uzupełnij' }}</div>
+                                        </div>
+                                        <div class="rp-attr-wrap" wire:ignore.self x-data="{ open: false }" @click.outside="open = false">
+                                            <button type="button" @click="open = !open" @class(['rp-attr', 'is-empty' => $langBits->isEmpty()])>
+                                                <span class="rp-attr__icon"><i class="bi bi-translate"></i></span>
+                                                <div class="rp-attr__copy">
+                                                    <div class="rp-attr__label">Języki</div>
+                                                    <div class="rp-attr__value">{{ $langBits->isNotEmpty() ? $langBits->implode('  ') : 'uzupełnij' }}</div>
+                                                </div>
+                                            </button>
+                                            <div class="rp-attr-pop" x-show="open" x-cloak @click.stop>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    <button type="button" wire:click="$toggle('editSpeaksEnglish')" class="btn btn-sm {{ $editSpeaksEnglish ? 'btn-primary' : 'btn-outline-secondary' }}">🇬🇧 EN</button>
+                                                    <button type="button" wire:click="$toggle('editSpeaksFrench')" class="btn btn-sm {{ $editSpeaksFrench ? 'btn-primary' : 'btn-outline-secondary' }}">🇫🇷 FR</button>
+                                                    <button type="button" wire:click="$toggle('editSpeaksGerman')" class="btn btn-sm {{ $editSpeaksGerman ? 'btn-primary' : 'btn-outline-secondary' }}">🇩🇪 DE</button>
+                                                </div>
                                             </div>
-                                        </button>
-                                        <button type="button" wire:click="toggleCandidateIdentityEdit" @class(['rp-attr', 'is-empty' => ! $candidate?->roles?->isNotEmpty()])>
-                                            <span class="rp-attr__icon"><i class="bi bi-briefcase"></i></span>
-                                            <div class="rp-attr__copy">
-                                                <div class="rp-attr__label">Role</div>
-                                                <div class="rp-attr__value" title="{{ $candidate?->roles?->pluck('name')->implode(', ') }}">{{ $candidate?->roles?->isNotEmpty() ? $candidate->roles->pluck('name')->implode(', ') : 'uzupełnij' }}</div>
+                                        </div>
+                                        <div class="rp-attr-wrap" wire:ignore.self x-data="{ open: false }" @click.outside="open = false">
+                                            <button type="button" @click="open = !open" @class(['rp-attr', 'is-empty' => ! $candidate?->roles?->isNotEmpty()])>
+                                                <span class="rp-attr__icon"><i class="bi bi-briefcase"></i></span>
+                                                <div class="rp-attr__copy">
+                                                    <div class="rp-attr__label">Role</div>
+                                                    <div class="rp-attr__value" title="{{ $candidate?->roles?->pluck('name')->implode(', ') }}">{{ $candidate?->roles?->isNotEmpty() ? $candidate->roles->pluck('name')->implode(', ') : 'uzupełnij' }}</div>
+                                                </div>
+                                            </button>
+                                            <div class="rp-attr-pop rp-attr-pop--wide" x-show="open" x-cloak @click.stop>
+                                                @include('livewire.partials.rp-role-picker', [
+                                                    'roles' => $roles,
+                                                    'selected' => $editRoles,
+                                                    'wireModel' => 'editRoles',
+                                                    'live' => true,
+                                                    'keyPrefix' => 'quick-role',
+                                                    'missing' => empty($editRoles),
+                                                    'startOpen' => true,
+                                                ])
                                             </div>
-                                        </button>
+                                        </div>
                                     </div>
                                 @endif
                                 </div>{{-- /info --}}
@@ -683,6 +760,7 @@
                                             label="Komentarze o kandydacie"
                                             input-label="Dodaj komentarz"
                                             button-text="Dodaj komentarz"
+                                            submit-on-enter
                                         />
                                     </div>
                                 @endif
@@ -704,6 +782,8 @@
                                 </div>
                             </div>
                         </div>
+
+                        @include('livewire.partials.rp-process-tasks', ['selected' => $selected])
 
                         @php
                             $allAttempts = $candidate
@@ -851,37 +931,9 @@
                             </div>
                         @endif
 
-                        <div class="rp-doc-section rp-doc-section--tasks">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                                <div class="rp-field-label mb-0">
-                                    <i class="bi bi-check2-square me-1"></i>Zadania
-                                    <span class="rp-plain-tag" style="cursor:default;">{{ $selected->tasks->count() }}</span>
-                                </div>
-                                <button type="button" wire:click="openTaskModalManual" class="btn btn-sm btn-outline-secondary">
-                                    <i class="bi bi-plus me-1"></i>Dodaj
-                                </button>
-                            </div>
-                            @forelse($selected->tasks as $task)
-                                <div class="d-flex justify-content-between align-items-start gap-2" wire:key="task-{{ $task->id }}" style="font-size:.88rem;padding:.65rem 0;border-top:1px solid rgba(255,255,255,.05);">
-                                    <div class="min-width-0">
-                                        <div style="{{ $task->status === \App\Enums\TaskStatus::COMPLETED ? 'text-decoration:line-through;color:var(--text-muted);' : '' }}">{{ $task->name }}</div>
-                                        <div style="color:var(--text-muted);font-size:.78rem;margin-top:.15rem;">
-                                            @if($task->isMeeting())
-                                                <i class="bi bi-calendar-event me-1"></i>{{ $task->meetingSlotLabel() }}
-                                            @elseif($task->due_date)
-                                                <i class="bi bi-calendar-event me-1"></i>{{ $task->due_date->format('d.m.Y') }}
-                                            @endif
-                                            @if($task->assignedTo) · {{ $task->assignedTo->name }} @endif
-                                        </div>
-                                    </div>
-                                    <button type="button" wire:click="toggleTaskDone({{ $task->id }})" class="btn btn-sm btn-outline-secondary flex-shrink-0" style="padding:2px 9px;font-size:.75rem;" title="{{ $task->isMeeting() ? ($task->status === \App\Enums\TaskStatus::COMPLETED ? 'Cofnij odbycie' : 'Odbyło się') : '' }}">
-                                        <i class="bi bi-check2{{ $task->status === \App\Enums\TaskStatus::COMPLETED ? '-square-fill' : '-square' }}"></i>
-                                    </button>
-                                </div>
-                            @empty
-                                <p style="color:var(--text-muted);font-size:.85rem;margin:0;">Brak zaplanowanych zadań.</p>
-                            @endforelse
-                        </div>
+                        @unless($showContactStage)
+                            @include('livewire.partials.rp-process-tasks', ['selected' => $selected])
+                        @endunless
 
                         <div class="rp-doc-section">
                             <div class="d-flex align-items-center justify-content-between mb-2">
@@ -926,13 +978,6 @@
                                     <p style="color:var(--text-muted);font-size:.82rem;margin:0;">Brak historii — wpisy pojawią się po zmianie statusu lub przypisania.</p>
                                 @endforelse
                             </div>
-                        </div>
-
-                        <div class="rp-doc-section">
-                            <x-comments
-                                :commentable="$selected"
-                                label="Komentarze procesu"
-                            />
                         </div>
 
                         {{-- Inne procesy tego kandydata (bez bieżącego) --}}
