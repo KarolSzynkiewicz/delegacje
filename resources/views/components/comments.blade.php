@@ -4,7 +4,7 @@
     'inputLabel' => null,
     'buttonText' => null,
     'embedded' => false,
-    'submitOnEnter' => false,
+    'submitOnEnter' => true,
 ])
 
 @php

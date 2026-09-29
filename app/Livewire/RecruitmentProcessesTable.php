@@ -184,6 +184,9 @@ class RecruitmentProcessesTable extends Component
 
     public ?int $selectedId = null;
 
+    /** @var \Illuminate\Support\Collection<int, int>|null */
+    protected $orderedFilteredCandidateIdsCache = null;
+
     /** Set from the show page (`/recruitment-processes/{id}`). */
     public ?int $processId = null;
 
@@ -417,6 +420,15 @@ class RecruitmentProcessesTable extends Component
         $this->resetPage();
     }
 
+    public function resetPage($pageName = 'page')
+    {
+        $this->setPage(1, $pageName);
+
+        if ($pageName === 'page') {
+            $this->setPage(1, 'listPage');
+        }
+    }
+
     public function mount(): void
     {
         $this->backlog = RecruitmentBacklog::sanitizeFilterKey($this->backlog);
@@ -445,6 +457,10 @@ class RecruitmentProcessesTable extends Component
         $query = [];
 
         foreach ($this->queryString as $property => $config) {
+            if (str_starts_with((string) $property, 'paginators')) {
+                continue;
+            }
+
             $as = $config['as'] ?? $property;
             $except = $config['except'] ?? null;
             $value = $this->{$property};
@@ -1324,7 +1340,10 @@ class RecruitmentProcessesTable extends Component
     /**
      * Position of the open candidate in the current filter, plus the process to open on either side.
      *
-     * @return array{index: int, total: int, prev: ?int, next: ?int}|null
+     * When the open candidate no longer matches the filter, the bar stays: prev/next are the
+     * filtered records that sort immediately before and after them.
+     *
+     * @return array{index: int|null, total: int, prev: ?int, next: ?int, outside: bool}|null
      */
     public function listRecordNav(): ?array
     {
@@ -1333,14 +1352,23 @@ class RecruitmentProcessesTable extends Component
             return null;
         }
 
-        $ids = $this->orderedFilteredCandidatesQuery()
-            ->pluck('recruitment_candidates.id')
-            ->map(fn ($id) => (int) $id)
-            ->values();
+        $candidateId = (int) $process->candidate_id;
+        $ids = $this->orderedFilteredCandidateIds();
 
-        $index = $ids->search($process->candidate_id, true);
+        $index = $ids->search($candidateId, true);
         if ($index === false) {
-            return null;
+            $ids = $this->orderedIdsIncludingCandidate($ids, $candidateId);
+            $index = $ids->search($candidateId, true);
+            $prevCandidate = $index === false ? null : ($ids[$index - 1] ?? null);
+            $nextCandidate = $index === false ? null : ($ids[$index + 1] ?? null);
+
+            return [
+                'index' => null,
+                'total' => $ids->count() - ($index === false ? 0 : 1),
+                'outside' => true,
+                'prev' => $prevCandidate ? $this->matchingProcessId((int) $prevCandidate) : null,
+                'next' => $nextCandidate ? $this->matchingProcessId((int) $nextCandidate) : null,
+            ];
         }
 
         $prevCandidate = $ids[$index - 1] ?? null;
@@ -1349,9 +1377,34 @@ class RecruitmentProcessesTable extends Component
         return [
             'index' => $index + 1,
             'total' => $ids->count(),
+            'outside' => false,
             'prev' => $prevCandidate ? $this->matchingProcessId((int) $prevCandidate) : null,
             'next' => $nextCandidate ? $this->matchingProcessId((int) $nextCandidate) : null,
         ];
+    }
+
+    /**
+     * Filtered ids with the open candidate inserted at the same sort position.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $filteredIds
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    protected function orderedIdsIncludingCandidate(\Illuminate\Support\Collection $filteredIds, int $candidateId): \Illuminate\Support\Collection
+    {
+        $query = RecruitmentCandidate::query()
+            ->where(function ($q) use ($filteredIds, $candidateId) {
+                if ($filteredIds->isNotEmpty()) {
+                    $q->whereIn('recruitment_candidates.id', $filteredIds->all());
+                } else {
+                    $q->whereRaw('0 = 1');
+                }
+                $q->orWhere('recruitment_candidates.id', $candidateId);
+            });
+
+        return $this->applyCandidateListOrder($query)
+            ->pluck('recruitment_candidates.id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
     }
 
     /**
@@ -1389,6 +1442,105 @@ class RecruitmentProcessesTable extends Component
      */
     protected function orderedFilteredCandidatesQuery(): Builder
     {
+        return $this->applyCandidateListOrder(
+            $this->filteredCandidatesQuery($this->currentListFilters())
+        );
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    protected function orderedFilteredCandidateIds(): \Illuminate\Support\Collection
+    {
+        return $this->orderedFilteredCandidateIdsCache ??= $this->orderedFilteredCandidatesQuery()
+            ->pluck('recruitment_candidates.id')
+            ->map(fn ($id) => (int) $id)
+            ->values();
+    }
+
+    /**
+     * How many filtered candidates sit strictly before the open one in the current sort.
+     * When the open candidate is in the filter, the offset lands just after them.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $filteredIds
+     */
+    protected function followingOffset(\Illuminate\Support\Collection $filteredIds, int $candidateId): int
+    {
+        $index = $filteredIds->search($candidateId, true);
+        if ($index !== false) {
+            return $index + 1;
+        }
+
+        $combined = $this->orderedIdsIncludingCandidate($filteredIds, $candidateId);
+        $index = $combined->search($candidateId, true);
+
+        return $index === false ? 0 : (int) $index;
+    }
+
+    /**
+     * @return Builder<RecruitmentCandidate>
+     */
+    protected function candidateRowsQuery(): Builder
+    {
+        return $this->orderedFilteredCandidatesQuery()
+            ->with([
+                'roles',
+                'processes' => function ($q) {
+                    $q->select(['recruitment_processes.*',
+                        DB::raw('(SELECT outcome FROM recruitment_contact_attempts rca WHERE rca.recruitment_process_id = recruitment_processes.id ORDER BY rca.created_at DESC LIMIT 1) as last_contact_outcome'),
+                    ])
+                        ->withMax('contactAttempts as last_contact_at', 'created_at')
+                        ->withCount('contactAttempts')
+                        ->with(['lead', 'assignedRecruiter'])
+                        ->orderBy('created_at', 'desc');
+                },
+            ]);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, int>  $ids
+     * @return \Illuminate\Support\Collection<int, RecruitmentCandidate>
+     */
+    protected function loadCandidateRows(\Illuminate\Support\Collection $ids): \Illuminate\Support\Collection
+    {
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $order = $ids->values()->map(fn ($id) => (int) $id);
+
+        return $this->candidateRowsQuery()
+            ->whereIn('recruitment_candidates.id', $order->all())
+            ->get()
+            ->sortBy(fn (RecruitmentCandidate $candidate) => $order->search((int) $candidate->id))
+            ->values();
+    }
+
+    protected function candidatesFollowingOpen(int $candidateId): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $perPage = 20;
+        $filteredIds = $this->orderedFilteredCandidateIds();
+        $skip = $this->followingOffset($filteredIds, $candidateId);
+        $total = max(0, $filteredIds->count() - $skip);
+        $listPage = max(1, (int) $this->getPage('listPage'));
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $listPage = min($listPage, $lastPage);
+        $sliceIds = $filteredIds->slice($skip + ($listPage - 1) * $perPage, $perPage)->values();
+
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $this->loadCandidateRows($sliceIds),
+            $total,
+            $perPage,
+            $listPage,
+        );
+    }
+
+    /**
+     * @param  Builder<RecruitmentCandidate>  $query
+     * @return Builder<RecruitmentCandidate>
+     */
+    protected function applyCandidateListOrder(Builder $query): Builder
+    {
         $sortColumn = match ($this->sortField) {
             'last_contact_at' => 'last_candidate_contact_at',
             'created_at' => 'recruitment_candidates.created_at',
@@ -1396,8 +1548,6 @@ class RecruitmentProcessesTable extends Component
             default => 'recruitment_candidates.last_name',
         };
         $direction = $this->sortDirection === 'asc' ? 'asc' : 'desc';
-
-        $query = $this->filteredCandidatesQuery($this->currentListFilters());
 
         if ($this->sortField === 'last_contact_at') {
             $query->addSelect(DB::raw(
@@ -2166,24 +2316,12 @@ class RecruitmentProcessesTable extends Component
         // Each row in the main table = one candidate. Their processes are sub-rows.
         // Status / mine filters only decide which candidates appear; all of their
         // processes are loaded so sibling pipelines stay visible informatively.
-        $applications = $this->orderedFilteredCandidatesQuery()
-            ->with([
-                'roles',
-                'processes' => function ($q) {
-                    $q->select(['recruitment_processes.*',
-                        DB::raw('(SELECT outcome FROM recruitment_contact_attempts rca WHERE rca.recruitment_process_id = recruitment_processes.id ORDER BY rca.created_at DESC LIMIT 1) as last_contact_outcome'),
-                    ])
-                        ->withMax('contactAttempts as last_contact_at', 'created_at')
-                        ->withCount('contactAttempts')
-                        ->with(['lead', 'assignedRecruiter'])
-                        ->orderBy('created_at', 'desc');
-                },
-            ])
-            ->paginate(20);
-
         $recruiters = User::orderBy('name')->get();
         $roles = Role::orderBy('name')->get();
         $selected = $this->getSelectedProcess();
+        $applications = $selected
+            ? $this->candidatesFollowingOpen((int) $selected->candidate_id)
+            : $this->candidateRowsQuery()->paginate(20);
 
         $recruiterCounts = [
             'unassigned' => $this->countProcessesForFilter(fn ($q) => $q->whereNull('assigned_recruiter_id')),
@@ -2221,9 +2359,8 @@ class RecruitmentProcessesTable extends Component
             );
         }
 
-        // Left drawer list must mirror the main table page (same filters/sort/page).
-        // The open lead's candidate is lifted out of the list and rendered above it,
-        // so scrolling the list never hides the record being worked on.
+        // The open candidate stays pinned. The rows under them are the next matches
+        // in the current filter, so rejecting #250 still shows #251 onward.
         $listCandidates = $applications->getCollection()->values();
         $pinnedCandidate = null;
 

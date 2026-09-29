@@ -5,7 +5,7 @@
     'submitTitle' => 'Wyślij',
     'fileInputId' => null,
     'value' => '',
-    'submitOnEnter' => false,
+    'submitOnEnter' => true,
 ])
 
 @php
@@ -83,7 +83,7 @@
             x-ref="files"
             @change="onFiles($event)"
         >
-        <button type="submit" class="comments-icon-btn comments-send-btn" title="{{ $submitTitle }} ({{ $submitOnEnter ? 'Enter' : 'Ctrl+Enter' }})" aria-label="{{ $submitTitle }}">
+        <button type="submit" class="comments-icon-btn comments-send-btn" title="{{ $submitTitle }} ({{ $submitOnEnter ? 'Enter · Shift+Enter nowa linia' : 'Ctrl+Enter' }})" aria-label="{{ $submitTitle }}">
             <i class="bi bi-arrow-return-left"></i>
         </button>
         {{ $toolbar ?? '' }}

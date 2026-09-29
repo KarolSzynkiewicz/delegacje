@@ -211,6 +211,134 @@ class RecruitmentCommentsAndFormTest extends TestCase
             ]));
     }
 
+    public function test_neighbors_stay_when_the_open_record_falls_out_of_the_filter(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+
+        $before = $this->createProcess();
+        $before->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $before->candidate->forceFill(['created_at' => now()->subDays(3)])->save();
+
+        $shown = $this->createProcess();
+        $shown->candidate->forceFill(['created_at' => now()->subDays(2)])->save();
+
+        $after = $this->createProcess();
+        $after->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $after->candidate->forceFill(['created_at' => now()->subDay()])->save();
+
+        Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $shown->id])
+            ->set('status', RecruitmentStatus::WTrakcieKontaktu->value)
+            ->assertSee('poza filtrem')
+            ->assertSee('Poprzednie')
+            ->assertSee('Następne')
+            ->call('openListNeighbor', 'prev')
+            ->assertRedirect(route('recruitment-processes.show', [
+                'recruitmentProcess' => $after,
+                'status' => RecruitmentStatus::WTrakcieKontaktu->value,
+            ]));
+
+        Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $shown->id])
+            ->set('status', RecruitmentStatus::WTrakcieKontaktu->value)
+            ->call('openListNeighbor', 'next')
+            ->assertRedirect(route('recruitment-processes.show', [
+                'recruitmentProcess' => $before,
+                'status' => RecruitmentStatus::WTrakcieKontaktu->value,
+            ]));
+    }
+
+    public function test_left_list_continues_with_the_candidates_after_the_open_one(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+
+        $earlier = $this->createProcess();
+        $earlier->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $earlier->candidate->forceFill([
+            'first_name' => 'Anna',
+            'last_name' => 'Wczesna',
+            'created_at' => now(),
+        ])->save();
+
+        $open = $this->createProcess();
+        $open->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $open->candidate->forceFill([
+            'first_name' => 'Beata',
+            'last_name' => 'Srodkowa',
+            'created_at' => now()->subDay(),
+        ])->save();
+
+        $later = $this->createProcess();
+        $later->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $later->candidate->forceFill([
+            'first_name' => 'Celina',
+            'last_name' => 'Pozniejsza',
+            'created_at' => now()->subDays(2),
+        ])->save();
+
+        $html = Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $open->id])
+            ->set('status', RecruitmentStatus::WTrakcieKontaktu->value)
+            ->html();
+
+        $list = $this->leftListHtml($html);
+        $this->assertStringContainsString('Beata', $list);
+        $this->assertStringContainsString('Celina', $list);
+        $this->assertStringNotContainsString('Anna', $list);
+        $this->assertLessThan(strpos($list, 'Celina'), strpos($list, 'Beata'));
+    }
+
+    public function test_left_list_continues_after_an_open_record_that_left_the_filter(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('administrator');
+
+        $earlier = $this->createProcess();
+        $earlier->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $earlier->candidate->forceFill([
+            'first_name' => 'Anna',
+            'last_name' => 'Wczesna',
+            'created_at' => now(),
+        ])->save();
+
+        $open = $this->createProcess();
+        $open->candidate->forceFill([
+            'first_name' => 'Beata',
+            'last_name' => 'Odrzucona',
+            'created_at' => now()->subDay(),
+        ])->save();
+
+        $later = $this->createProcess();
+        $later->update(['status' => RecruitmentStatus::WTrakcieKontaktu]);
+        $later->candidate->forceFill([
+            'first_name' => 'Celina',
+            'last_name' => 'Pozniejsza',
+            'created_at' => now()->subDays(2),
+        ])->save();
+
+        $html = Livewire::actingAs($admin)
+            ->test(RecruitmentProcessesTable::class, ['processId' => $open->id])
+            ->set('status', RecruitmentStatus::WTrakcieKontaktu->value)
+            ->html();
+
+        $list = $this->leftListHtml($html);
+        $this->assertStringContainsString('Beata', $list);
+        $this->assertStringContainsString('Celina', $list);
+        $this->assertStringNotContainsString('Anna', $list);
+    }
+
+    private function leftListHtml(string $html): string
+    {
+        $start = strpos($html, 'rp-modal-left__list');
+        $end = strpos($html, 'rp-modal-left__pager');
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($end);
+
+        return substr($html, $start, $end - $start);
+    }
+
     public function test_tasks_sit_above_contact_history_and_distinguish_callbacks_and_meetings(): void
     {
         $admin = User::factory()->create(['name' => 'cursor']);

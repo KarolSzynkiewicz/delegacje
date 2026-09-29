@@ -53,7 +53,13 @@
                 <i class="bi bi-chevron-left" aria-hidden="true"></i>
                 <span class="rp-record-nav__label">Poprzednie</span>
             </button>
-            <span class="rp-record-nav__meta font-mono">{{ $recordNav['index'] }} / {{ $recordNav['total'] }}</span>
+            <span class="rp-record-nav__meta font-mono">
+                @if($recordNav['outside'] ?? false)
+                    poza filtrem
+                @else
+                    {{ $recordNav['index'] }} / {{ $recordNav['total'] }}
+                @endif
+            </span>
             <button type="button"
                     class="rp-record-nav__btn {{ $recordNav['next'] ? '' : 'is-disabled' }}"
                     @disabled(! $recordNav['next'])

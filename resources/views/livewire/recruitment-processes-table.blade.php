@@ -310,16 +310,16 @@
                         <div class="rp-modal-left__pager">
                             @if($applications->hasPages())
                                 <button type="button" class="btn btn-sm btn-outline-secondary" style="padding:2px 8px;"
-                                        wire:click="previousPage" @disabled($applications->onFirstPage()) title="Poprzednia strona">
+                                        wire:click="previousPage('listPage')" @disabled($applications->onFirstPage()) title="Wcześniej na liście">
                                     <i class="bi bi-chevron-left"></i>
                                 </button>
                             @endif
                             <span class="rp-modal-left__count">
-                                Wyświetlam {{ $applications->count() }} z {{ $applications->total() }} kandydatów
+                                Wyświetlam {{ $applications->count() }} z {{ $applications->total() }} dalej na liście
                             </span>
                             @if($applications->hasPages())
                                 <button type="button" class="btn btn-sm btn-outline-secondary" style="padding:2px 8px;"
-                                        wire:click="nextPage" @disabled(! $applications->hasMorePages()) title="Następna strona">
+                                        wire:click="nextPage('listPage')" @disabled(! $applications->hasMorePages()) title="Dalej na liście">
                                     <i class="bi bi-chevron-right"></i>
                                 </button>
                             @endif

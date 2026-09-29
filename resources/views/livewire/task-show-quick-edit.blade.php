@@ -478,19 +478,18 @@
                         class="comments-composer-input @error('descriptionDraft') is-invalid @enderror"
                         rows="6"
                         wire:model.defer="descriptionDraft"
-                        placeholder="Opisz zadanie… Ctrl+Enter zapisuje"
-                        @keydown.ctrl.enter.prevent="$wire.saveDescription()"
-                        @keydown.meta.enter.prevent="$wire.saveDescription()"
+                        placeholder="Opisz zadanie… Enter zapisuje, Shift+Enter nowa linia"
+                        @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); $wire.saveDescription() }"
                     ></textarea>
                     <div class="comments-composer-toolbar">
                         <span class="comments-composer-files text-muted">
                             @if($task->description)
-                                Edytuj i zapisz Enterem
+                                Enter zapisuje · Shift+Enter nowa linia
                             @else
                                 Dodaj opis
                             @endif
                         </span>
-                        <button type="submit" class="comments-icon-btn comments-send-btn" title="Zapisz opis (Ctrl+Enter)" aria-label="Zapisz opis">
+                        <button type="submit" class="comments-icon-btn comments-send-btn" title="Zapisz opis (Enter)" aria-label="Zapisz opis">
                             <i class="bi bi-arrow-return-left"></i>
                         </button>
                     </div>

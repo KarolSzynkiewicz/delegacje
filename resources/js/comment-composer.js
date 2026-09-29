@@ -463,7 +463,7 @@ window.commentBodyAutocomplete = function commentBodyAutocomplete(payload, optio
                     this.moveActive(-1);
                     return;
                 }
-                if (event.key === 'Enter' || event.key === 'Tab') {
+                if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
                     event.preventDefault();
                     this.pickActive();
                     return;

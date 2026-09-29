@@ -29,8 +29,9 @@
                     <textarea wire:model="editingValue"
                               class="form-control form-control-sm"
                               rows="5"
-                              placeholder="Opis zadania…"
+                              placeholder="Opis zadania… Enter zapisuje, Shift+Enter nowa linia"
                               wire:keydown.escape="cancelEdit"
+                              @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); $wire.saveEdit() }"
                               x-data x-init="$el.focus()"></textarea>
                     <div class="d-flex gap-1 mt-2">
                         <button wire:click="saveEdit" class="btn btn-sm btn-primary">
