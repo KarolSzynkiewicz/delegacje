@@ -93,6 +93,10 @@
                                     ];
                                 });
                             $uniqueEmployeeCount = $uniqueEmployees->count();
+                            $canRemoveParticipant = in_array($returnTrip->status, [
+                                \App\Enums\LogisticsEventStatus::PLANNED,
+                                \App\Enums\LogisticsEventStatus::COMPLETED,
+                            ], true) && $uniqueEmployeeCount > 1;
                         @endphp
                         <h5 class="fw-bold text-dark mb-4">Uczestnicy ({{ $uniqueEmployeeCount }} {{ $uniqueEmployeeCount == 1 ? 'osoba' : 'osób' }})</h5>
                         @if($returnTrip->status === \App\Enums\LogisticsEventStatus::CANCELLED)
@@ -107,6 +111,9 @@
                                         <tr>
                                             <th class="text-start">Pracownik</th>
                                             <th class="text-start">Przypisania</th>
+                                            @if($canRemoveParticipant)
+                                                <th class="text-end">Akcje</th>
+                                            @endif
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -136,6 +143,26 @@
                                                         @endforeach
                                                     </div>
                                                 </td>
+                                                @if($canRemoveParticipant)
+                                                    <td class="text-end">
+                                                        @if($employeeData['employee'])
+                                                            <form method="POST"
+                                                                  action="{{ route('return-trips.participants.remove', [$returnTrip, $employeeData['employee']]) }}"
+                                                                  class="d-inline"
+                                                                  onsubmit="return confirm('Wypisać {{ addslashes($employeeData['employee']->full_name ?? 'uczestnika') }} z tego zjazdu? Skrócone przypisania tej osoby wrócą do dat sprzed zjazdu. Koszt biletu zostanie.');">
+                                                                @csrf
+                                                                <x-ui.button
+                                                                    variant="danger"
+                                                                    type="submit"
+                                                                    class="btn-sm"
+                                                                    routeName="return-trips.participants.remove"
+                                                                >
+                                                                    Wypisz
+                                                                </x-ui.button>
+                                                            </form>
+                                                        @endif
+                                                    </td>
+                                                @endif
                                             </tr>
                                         @endforeach
                                     </tbody>

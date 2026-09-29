@@ -12,10 +12,12 @@ use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\Role;
 use App\Models\Rotation;
+use App\Models\TransportCost;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Services\ReturnTripService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class ReturnTripServiceTest extends TestCase
@@ -177,5 +179,189 @@ class ReturnTripServiceTest extends TestCase
             $originalRotationEnd->format('Y-m-d'),
             $rotation->end_date->format('Y-m-d')
         );
+    }
+
+    /** @test */
+    public function it_unregisters_one_employee_and_restores_only_their_shortened_assignments(): void
+    {
+        $leaving = Employee::factory()->create();
+        $staying = Employee::factory()->create();
+        $project = Project::factory()->create();
+        $role = Role::factory()->create();
+
+        $returnDate = now()->startOfDay();
+        $originalEnd = $returnDate->copy()->addDays(8);
+
+        $leavingAssignment = ProjectAssignment::create([
+            'employee_id' => $leaving->id,
+            'project_id' => $project->id,
+            'role_id' => $role->id,
+            'start_date' => $returnDate->copy()->subDays(4),
+            'end_date' => $originalEnd,
+        ]);
+        $stayingAssignment = ProjectAssignment::create([
+            'employee_id' => $staying->id,
+            'project_id' => $project->id,
+            'role_id' => $role->id,
+            'start_date' => $returnDate->copy()->subDays(4),
+            'end_date' => $originalEnd,
+        ]);
+
+        $event = $this->service->createReturn(
+            [$leaving->id, $staying->id],
+            $returnDate,
+            null,
+            'Zjazd – wypis jednej osoby'
+        );
+
+        $ticket = TransportCost::create([
+            'logistics_event_id' => $event->id,
+            'cost_type' => 'ticket',
+            'amount' => 120,
+            'currency' => 'PLN',
+            'cost_date' => $returnDate->toDateString(),
+            'notes' => 'Bilet powrotny – '.$leaving->full_name,
+            'created_by' => auth()->id(),
+        ]);
+
+        $result = $this->service->removeParticipant($event, $leaving->id);
+
+        $leavingAssignment->refresh();
+        $stayingAssignment->refresh();
+
+        $this->assertSame($originalEnd->format('Y-m-d'), $leavingAssignment->end_date->format('Y-m-d'));
+        $this->assertSame($returnDate->format('Y-m-d'), $stayingAssignment->end_date->format('Y-m-d'));
+        $this->assertFalse($event->participants()->where('employee_id', $leaving->id)->exists());
+        $this->assertTrue($event->participants()->where('employee_id', $staying->id)->exists());
+        $this->assertDatabaseHas('transport_costs', [
+            'id' => $ticket->id,
+            'logistics_event_id' => $event->id,
+            'cost_type' => 'ticket',
+        ]);
+        $this->assertGreaterThan(0, $result['assignments_restored']);
+        $this->assertSame(LogisticsEventType::RETURN, $event->fresh()->type);
+        $this->assertNotSame(\App\Enums\LogisticsEventStatus::CANCELLED, $event->fresh()->status);
+    }
+
+    /** @test */
+    public function it_restores_open_ended_assignment_when_unregistering_one_person(): void
+    {
+        $leaving = Employee::factory()->create();
+        $staying = Employee::factory()->create();
+        $project = Project::factory()->create();
+        $role = Role::factory()->create();
+        $returnDate = now()->startOfDay();
+
+        $openAssignment = ProjectAssignment::create([
+            'employee_id' => $leaving->id,
+            'project_id' => $project->id,
+            'role_id' => $role->id,
+            'start_date' => $returnDate->copy()->subDays(2),
+            'end_date' => null,
+        ]);
+        ProjectAssignment::create([
+            'employee_id' => $staying->id,
+            'project_id' => $project->id,
+            'role_id' => $role->id,
+            'start_date' => $returnDate->copy()->subDays(2),
+            'end_date' => $returnDate->copy()->addDays(6),
+        ]);
+
+        $event = $this->service->createReturn([$leaving->id, $staying->id], $returnDate, null, 'bezterminowe');
+
+        $openAssignment->refresh();
+        $this->assertSame($returnDate->format('Y-m-d'), $openAssignment->end_date->format('Y-m-d'));
+
+        $this->service->removeParticipant($event, $leaving->id);
+
+        $openAssignment->refresh();
+        $this->assertNull($openAssignment->end_date);
+    }
+
+    /** @test */
+    public function it_refuses_to_unregister_the_last_return_trip_participant(): void
+    {
+        $employee = Employee::factory()->create();
+        $returnDate = now()->startOfDay();
+
+        Rotation::factory()->create([
+            'employee_id' => $employee->id,
+            'start_date' => $returnDate->copy()->subDays(3),
+            'end_date' => $returnDate->copy()->addDays(9),
+        ]);
+
+        $event = $this->service->createReturn([$employee->id], $returnDate, null, 'sam');
+
+        try {
+            $this->service->removeParticipant($event, $employee->id);
+            $this->fail('Wypisanie ostatniego uczestnika powinno zostać odrzucone.');
+        } catch (ValidationException $e) {
+            $message = collect($e->errors())->flatten()->first();
+            $this->assertStringContainsString('ostatniego uczestnika', (string) $message);
+        }
+
+        $this->assertTrue($event->participants()->where('employee_id', $employee->id)->exists());
+    }
+
+    /** @test */
+    public function show_page_lets_an_admin_unregister_one_person_and_keep_the_ticket(): void
+    {
+        $admin = \App\Models\User::factory()->create();
+        \Spatie\Permission\Models\Role::findOrCreate('administrator', 'web');
+        $admin->assignRole('administrator');
+        $this->actingAs($admin);
+
+        $leaving = Employee::factory()->create();
+        $staying = Employee::factory()->create();
+        $project = Project::factory()->create();
+        $role = Role::factory()->create();
+        $returnDate = now()->startOfDay();
+        $originalEnd = $returnDate->copy()->addDays(5);
+
+        $leavingAssignment = ProjectAssignment::create([
+            'employee_id' => $leaving->id,
+            'project_id' => $project->id,
+            'role_id' => $role->id,
+            'start_date' => $returnDate->copy()->subDays(2),
+            'end_date' => $originalEnd,
+        ]);
+        ProjectAssignment::create([
+            'employee_id' => $staying->id,
+            'project_id' => $project->id,
+            'role_id' => $role->id,
+            'start_date' => $returnDate->copy()->subDays(2),
+            'end_date' => $originalEnd,
+        ]);
+
+        $event = $this->service->createReturn([$leaving->id, $staying->id], $returnDate, null, 'http');
+
+        TransportCost::create([
+            'logistics_event_id' => $event->id,
+            'cost_type' => 'ticket',
+            'amount' => 80,
+            'currency' => 'PLN',
+            'cost_date' => $returnDate->toDateString(),
+            'notes' => 'Bilet powrotny – '.$leaving->full_name,
+            'created_by' => $admin->id,
+        ]);
+
+        $this->get(route('return-trips.show', $event))
+            ->assertOk()
+            ->assertSee('Wypisz')
+            ->assertSee('Koszt biletu zostanie', false);
+
+        $this->post(route('return-trips.participants.remove', [$event, $leaving]))
+            ->assertRedirect(route('return-trips.show', $event))
+            ->assertSessionHas('success');
+
+        $leavingAssignment->refresh();
+        $this->assertSame($originalEnd->format('Y-m-d'), $leavingAssignment->end_date->format('Y-m-d'));
+        $this->assertFalse($event->participants()->where('employee_id', $leaving->id)->exists());
+        $this->assertTrue($event->participants()->where('employee_id', $staying->id)->exists());
+        $this->assertDatabaseHas('transport_costs', [
+            'logistics_event_id' => $event->id,
+            'cost_type' => 'ticket',
+            'amount' => 80,
+        ]);
     }
 }

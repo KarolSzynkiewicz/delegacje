@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PrepareReturnTripRequest;
 use App\Http\Requests\StoreReturnTripRequest;
 use App\Http\Requests\UpdateReturnTripRequest;
+use App\Models\Employee;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
 use App\Models\Vehicle;
@@ -14,6 +15,8 @@ use App\Support\VehicleDocumentExpiry;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ReturnTripController extends Controller
@@ -384,6 +387,47 @@ class ReturnTripController extends Controller
             return redirect()
                 ->route('return-trips.show', $returnTrip)
                 ->with('error', 'Wystąpił błąd podczas anulowania zjazdu: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Wypisz jedną osobę ze zjazdu i cofnij tylko jej skrócone przypisania.
+     * Koszty biletów zostają.
+     */
+    public function removeParticipant(LogisticsEvent $returnTrip, Employee $employee): RedirectResponse
+    {
+        if ($returnTrip->type !== \App\Enums\LogisticsEventType::RETURN) {
+            abort(404);
+        }
+
+        try {
+            $result = $this->returnTripService->removeParticipant($returnTrip, (int) $employee->id);
+
+            $message = 'Wypisano uczestnika: '.$employee->full_name.'.';
+            if ($result['assignments_restored'] > 0) {
+                $message .= ' Przywrócono '.$result['assignments_restored'].' przypisań do dat sprzed zjazdu.';
+            }
+            if ($returnTrip->transportCosts()->where('cost_type', 'ticket')->exists()) {
+                $message .= ' Koszty biletów pozostały.';
+            }
+
+            return redirect()
+                ->route('return-trips.show', $returnTrip)
+                ->with('success', $message);
+        } catch (ValidationException $e) {
+            return redirect()
+                ->route('return-trips.show', $returnTrip)
+                ->with('error', collect($e->errors())->flatten()->first() ?: $e->getMessage());
+        } catch (\Exception $e) {
+            Log::error('Error removing return trip participant', [
+                'return_trip_id' => $returnTrip->id,
+                'employee_id' => $employee->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('return-trips.show', $returnTrip)
+                ->with('error', 'Wystąpił błąd podczas wypisywania uczestnika: '.$e->getMessage());
         }
     }
 

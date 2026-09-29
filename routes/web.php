@@ -126,6 +126,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('return-trips/{returnTrip}/cancel', [\App\Http\Controllers\ReturnTripController::class, 'cancel'])
             ->name('return-trips.cancel')
             ->defaults('resource', 'return-trips');
+        Route::post('return-trips/{returnTrip}/participants/{employee}/remove', [\App\Http\Controllers\ReturnTripController::class, 'removeParticipant'])
+            ->name('return-trips.participants.remove')
+            ->defaults('resource', 'return-trips');
         Route::post('departures/{departure}/cancel', [\App\Http\Controllers\DepartureController::class, 'cancel'])
             ->name('departures.cancel')
             ->defaults('resource', 'departures');

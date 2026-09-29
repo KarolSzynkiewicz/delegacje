@@ -469,6 +469,8 @@ class ReturnTripService
      * 2. Deletes legacy return trip vehicle assignments (is_return_trip = true), jeśli istnieją
      * 3. Deletes all participants
      *
+     * Koszty transportu (w tym bilety) zostają — anulowanie zjazdu ich nie kasuje.
+     *
      * @param  LogisticsEvent  $returnTrip  The return trip to reverse
      */
     public function reverseZjazd(LogisticsEvent $returnTrip): void
@@ -478,35 +480,107 @@ class ReturnTripService
         }
 
         DB::transaction(function () use ($returnTrip) {
-            // Get all participants with their assignments and original_end_date
             $participants = $returnTrip->participants()->with('assignment')->get();
 
-            // Restore original end_date for all shortened assignments
             foreach ($participants as $participant) {
-                // Skip return trip vehicle assignments (they will be deleted)
-                if ($participant->assignment_type === 'vehicle_assignment' && $participant->assignment) {
-                    $vehicleAssignment = $participant->assignment;
-                    if ($vehicleAssignment->is_return_trip) {
-                        $vehicleAssignment->delete();
-
-                        continue;
-                    }
-                }
-
-                // Restore original end_date if it was stored
-                if ($participant->assignment && $participant->original_end_date !== null) {
-                    $assignment = $participant->assignment;
-
-                    // Restore original end_date (null in database means it was indefinite)
-                    $assignment->update([
-                        'end_date' => $participant->original_end_date,
-                    ]);
-                }
+                $this->restoreShortenedAssignment($participant);
             }
 
-            // Delete all participants (they will be recreated with new data)
             $returnTrip->participants()->delete();
         });
+    }
+
+    /**
+     * Wypisuje jedną osobę ze zjazdu i cofa tylko jej skrócone przypisania.
+     *
+     * Bilety i pozostałe koszty transportu zostają — zakupiony bilet już przepadł.
+     * Ostatniego uczestnika nie da się wypisać: wtedy trzeba anulować cały zjazd.
+     *
+     * @return array{
+     *     assignments_restored: int,
+     *     return_assignments_deleted: int,
+     *     participants_removed: int,
+     * }
+     */
+    public function removeParticipant(LogisticsEvent $returnTrip, int $employeeId): array
+    {
+        if ($returnTrip->type !== LogisticsEventType::RETURN) {
+            throw new \InvalidArgumentException('Zdarzenie nie jest zjazdem.');
+        }
+
+        if (! in_array($returnTrip->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true)) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Można wypisać uczestnika tylko z aktywnego zjazdu.',
+            ]);
+        }
+
+        $participants = $returnTrip->participants()->where('employee_id', $employeeId)->with('assignment')->get();
+        if ($participants->isEmpty()) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Ta osoba nie jest uczestnikiem tego zjazdu.',
+            ]);
+        }
+
+        $hasOtherParticipants = $returnTrip->participants()
+            ->where('employee_id', '!=', $employeeId)
+            ->exists();
+
+        if (! $hasOtherParticipants) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Nie można wypisać ostatniego uczestnika — anuluj cały zjazd.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($participants) {
+            $result = [
+                'assignments_restored' => 0,
+                'return_assignments_deleted' => 0,
+                'participants_removed' => 0,
+            ];
+
+            foreach ($participants as $participant) {
+                $outcome = $this->restoreShortenedAssignment($participant);
+                if ($outcome === 'restored') {
+                    $result['assignments_restored']++;
+                } elseif ($outcome === 'deleted_return_leg') {
+                    $result['return_assignments_deleted']++;
+                }
+
+                $participant->delete();
+                $result['participants_removed']++;
+            }
+
+            return $result;
+        });
+    }
+
+    /**
+     * Cofa skrócenie zapisane na jednym uczestniku zjazdu.
+     *
+     * null w original_end_date oznacza, że przypisanie było bezterminowe.
+     *
+     * @return 'restored'|'deleted_return_leg'|'skipped'
+     */
+    protected function restoreShortenedAssignment(LogisticsEventParticipant $participant): string
+    {
+        if ($participant->assignment_type === 'vehicle_assignment' && $participant->assignment) {
+            $vehicleAssignment = $participant->assignment;
+            if ($vehicleAssignment->is_return_trip) {
+                $vehicleAssignment->delete();
+
+                return 'deleted_return_leg';
+            }
+        }
+
+        if ($participant->assignment) {
+            $participant->assignment->update([
+                'end_date' => $participant->original_end_date,
+            ]);
+
+            return 'restored';
+        }
+
+        return 'skipped';
     }
 
     /**
