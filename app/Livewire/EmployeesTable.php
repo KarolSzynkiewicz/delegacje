@@ -205,58 +205,40 @@ class EmployeesTable extends Component
         // Determine date for status check
         $checkDate = $this->statusDate ? \Carbon\Carbon::parse($this->statusDate) : now();
 
-        // Get base query results (without location/rotation filters)
-        if ($this->locationFilter || $this->rotationFilter) {
-            // For these filters, we need to get all employees first, then filter
-            $allEmployees = $query->get();
+        if ($this->locationFilter) {
             $locationTracker = app(\App\Services\LocationTrackingService::class);
+            $notInBase = $locationTracker->employeeIdsNotInBaseOn($checkDate);
+            $outside = $locationTracker->employeeIdsOutsideBaseOn($checkDate);
+            $locationIds = match ($this->locationFilter) {
+                'field' => $outside,
+                'transit' => array_values(array_diff($notInBase, $outside)),
+                default => null,
+            };
 
-            $filteredEmployees = $allEmployees->filter(function ($employee) use ($locationTracker, $checkDate) {
-                if ($this->locationFilter) {
-                    $status = $locationTracker->getLocationStatus($employee, $checkDate);
+            if ($this->locationFilter === 'base') {
+                if ($notInBase !== []) {
+                    $query->whereNotIn('id', $notInBase);
+                }
+            } else {
+                $query->whereIn('id', $locationIds ?? []);
+            }
+        }
 
-                    $locationMatch = false;
-                    if ($this->locationFilter === 'base') {
-                        $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::IN_BASE;
-                    } elseif ($this->locationFilter === 'transit') {
-                        $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT;
-                    } elseif ($this->locationFilter === 'field') {
-                        $locationMatch = $status['state'] === \App\Enums\EmployeeLocationState::OUTSIDE_BASE;
-                    }
+        if ($this->rotationFilter) {
+            $allEmployees = $query->get();
 
-                    if (! $locationMatch) {
+            $filteredEmployees = $allEmployees->filter(function ($employee) use ($checkDate) {
+                $hasActiveRotation = $employee->rotations->contains(function ($rotation) use ($checkDate) {
+                    $startDate = $rotation->start_date ? \Carbon\Carbon::parse($rotation->start_date) : null;
+                    if (! $startDate || $startDate->gt($checkDate)) {
                         return false;
                     }
-                }
+                    $endDate = $rotation->end_date ? \Carbon\Carbon::parse($rotation->end_date) : null;
 
-                // Rotation filter
-                if ($this->rotationFilter) {
-                    // Check loaded rotations collection for active rotation
-                    $hasActiveRotation = $employee->rotations->filter(function ($rotation) use ($checkDate) {
-                        $startDate = $rotation->start_date ? \Carbon\Carbon::parse($rotation->start_date) : null;
-                        $endDate = $rotation->end_date ? \Carbon\Carbon::parse($rotation->end_date) : null;
+                    return $endDate === null || $endDate->gte($checkDate);
+                });
 
-                        if (! $startDate) {
-                            return false;
-                        }
-
-                        return $startDate->lte($checkDate)
-                            && ($endDate === null || $endDate->gte($checkDate));
-                    })->isNotEmpty();
-
-                    $rotationMatch = false;
-                    if ($this->rotationFilter === 'active' && $hasActiveRotation) {
-                        $rotationMatch = true;
-                    } elseif ($this->rotationFilter === 'inactive' && ! $hasActiveRotation) {
-                        $rotationMatch = true;
-                    }
-
-                    if (! $rotationMatch) {
-                        return false;
-                    }
-                }
-
-                return true;
+                return $this->rotationFilter === 'active' ? $hasActiveRotation : ! $hasActiveRotation;
             });
 
             // Paginate manually

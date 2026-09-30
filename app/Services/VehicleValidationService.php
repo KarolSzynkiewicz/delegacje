@@ -135,6 +135,38 @@ class VehicleValidationService
     }
 
     /**
+     * Pojazdy zajęte innym wyjazdem/zjazdem w okresie — ten sam warunek co checkVehicleLogisticsEvents().
+     *
+     * @param  list<int>  $vehicleIds
+     * @return list<int>
+     */
+    public function vehicleIdsConflictingWithLogisticsEvent(
+        array $vehicleIds,
+        Carbon $startDate,
+        Carbon $endDate,
+        ?int $excludeEventId = null
+    ): array {
+        if ($vehicleIds === []) {
+            return [];
+        }
+
+        $query = LogisticsEvent::forLocationTracking()
+            ->whereIn('vehicle_id', $vehicleIds)
+            ->where('status', '!=', LogisticsEventStatus::CANCELLED->value)
+            ->where('event_date', '<', $endDate)
+            ->whereRaw('COALESCE(end_date, event_date) > ?', [$startDate]);
+
+        if ($excludeEventId) {
+            $query->where('id', '!=', $excludeEventId);
+        }
+
+        return $query->distinct()
+            ->pluck('vehicle_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
      * Check if vehicle has driver conflicts.
      */
     protected function checkDriverConflicts(

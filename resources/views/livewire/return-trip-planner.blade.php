@@ -27,6 +27,35 @@
         @endteleport
     @endif
 
+    @if($showMissingTicketsModal)
+        @teleport('body')
+            <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true"
+                 style="background-color: rgba(0,0,0,0.55); z-index: 1055;">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-secondary" style="background: var(--bg-card, #1e293b); color: #e2e8f0;">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title"><i class="bi bi-ticket-perforated text-warning me-2"></i>Brak biletów</h5>
+                            <button type="button" class="btn-close btn-close-white" wire:click="cancelSaveWithoutTickets" aria-label="Zamknij"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-0">Zjazd zostanie zapisany bez uzupełnionych biletów. Uzupełnione bilety zostaną zachowane, brakujące dodasz później.</p>
+                            <p class="fw-semibold mt-3 mb-0">Zapisać zjazd?</p>
+                        </div>
+                        <div class="modal-footer border-secondary gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-light" wire:click="cancelSaveWithoutTickets">Anuluj</button>
+                            <button type="button" class="btn btn-primary" wire:click="confirmSaveWithoutTickets" wire:loading.attr="disabled">
+                                <span wire:loading.remove wire:target="confirmSaveWithoutTickets">Zapisz zjazd — bilety dodam później</span>
+                                <span wire:loading wire:target="confirmSaveWithoutTickets">
+                                    <span class="spinner-border spinner-border-sm me-2"></span> Zapisuję...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endteleport
+    @endif
+
     <style>
         .rtp-glass { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(12px); }
         .rtp-section { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 1.25rem; }
@@ -50,8 +79,9 @@
     @endif
 
     @php
+        $headerVehicles = $transportMode === 'own' ? $this->availableVehicles : collect();
         $tripPanelVehicle = $transportMode === 'own' && ! empty($vehicleId)
-            ? $this->availableVehicles->firstWhere('id', (int) $vehicleId)
+            ? $headerVehicles->firstWhere('id', (int) $vehicleId)
             : null;
     @endphp
     <x-logistics.trip-details-panel
@@ -68,7 +98,7 @@
         :public-transport-hub-kind="$publicTransportHubKind"
         :shared-start-airport-location-id="$sharedStartAirportLocationId"
         :shared-end-airport-location-id="$sharedEndAirportLocationId"
-        :available-vehicles="$this->availableVehicles"
+        :available-vehicles="$headerVehicles"
         :available-public-transport-hubs="$this->availablePublicTransportHubs"
         :transport-mode="$transportMode"
         :vehicle-id="$vehicleId"
@@ -111,7 +141,7 @@
                 <div class="mb-3">
                     <div class="position-relative">
                         <i class="bi bi-search position-absolute text-muted" style="left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none;"></i>
-                        <input type="text" wire:model.live="employeeSearch" class="form-control ps-5"
+                        <input type="text" wire:model.live.debounce.400ms="employeeSearch" class="form-control ps-5"
                                placeholder="Szukaj pracownika...">
                     </div>
                     @if($returnDate)

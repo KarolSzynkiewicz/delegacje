@@ -15,9 +15,13 @@ use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class LocationTrackingService
 {
+    /** @var array<string, array{0: list<int>, 1: list<int>, 2: list<int>}> */
+    private array $employeeLocationCohorts = [];
+
     /**
      * Czy pracownik może być uczestnikiem transferu (poza lokalizacją bazy lub w podróży).
      */
@@ -91,7 +95,42 @@ class LocationTrackingService
      */
     public function employeeIdsNotInBaseOn(Carbon $date): array
     {
+        [$withProject, $inTransit, $outsideByLastEvent] = $this->employeeLocationCohortsOn($date);
+
+        return array_values(array_unique(array_merge($withProject, $inTransit, $outsideByLastEvent)));
+    }
+
+    /**
+     * ID pracowników poza bazą, ale nie w trakcie podróży.
+     * Zgodne z getLocationStatus() === OUTSIDE_BASE, bez zapytania na osobę.
+     *
+     * @return list<int>
+     */
+    public function employeeIdsOutsideBaseOn(Carbon $date): array
+    {
+        [$withProject, $inTransit, $outsideByLastEvent] = $this->employeeLocationCohortsOn($date);
+
+        $inTransitSet = array_fill_keys($inTransit, true);
+        $outside = [];
+        foreach (array_merge($withProject, $outsideByLastEvent) as $id) {
+            if (! isset($inTransitSet[$id])) {
+                $outside[$id] = true;
+            }
+        }
+
+        return array_map('intval', array_keys($outside));
+    }
+
+    /**
+     * @return array{0: list<int>, 1: list<int>, 2: list<int>}
+     */
+    protected function employeeLocationCohortsOn(Carbon $date): array
+    {
         $dateDay = $date->copy()->startOfDay();
+        $cacheKey = $dateDay->toDateString();
+        if (isset($this->employeeLocationCohorts[$cacheKey])) {
+            return $this->employeeLocationCohorts[$cacheKey];
+        }
 
         $withProject = ProjectAssignment::query()
             ->where('start_date', '<=', $dateDay)
@@ -100,45 +139,139 @@ class LocationTrackingService
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        $inTransit = LogisticsEvent::query()
-            ->forLocationTracking()
-            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN, LogisticsEventType::TRANSFER])
-            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
-            ->where('event_date', '<=', $dateDay)
-            ->where('end_date', '>', $dateDay)
-            ->with(['participants:id,logistics_event_id,employee_id'])
-            ->get()
-            ->flatMap(fn (LogisticsEvent $e) => $e->participants->pluck('employee_id'))
+        $inTransit = DB::table('logistics_events as e')
+            ->join('logistics_event_participants as p', 'p.logistics_event_id', '=', 'e.id')
+            ->where(function ($q) {
+                $q->where('e.type', '!=', LogisticsEventType::TRANSFER->value)
+                    ->orWhere('e.has_reassignment', true);
+            })
+            ->whereIn('e.type', [
+                LogisticsEventType::DEPARTURE->value,
+                LogisticsEventType::RETURN->value,
+                LogisticsEventType::TRANSFER->value,
+            ])
+            ->whereIn('e.status', [
+                LogisticsEventStatus::PLANNED->value,
+                LogisticsEventStatus::COMPLETED->value,
+            ])
+            ->where('e.event_date', '<=', $dateDay)
+            ->where('e.end_date', '>', $dateDay)
+            ->distinct()
+            ->pluck('p.employee_id')
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        $events = LogisticsEvent::query()
-            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN])
-            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
-            ->where('event_date', '<=', $dateDay)
-            ->with(['participants:id,logistics_event_id,employee_id'])
-            ->orderByDesc('event_date')
-            ->orderByDesc('id')
-            ->get();
-
-        $lastByEmployee = [];
-        foreach ($events as $event) {
-            foreach ($event->participants as $participant) {
-                $empId = (int) $participant->employee_id;
-                if ($empId > 0 && ! isset($lastByEmployee[$empId])) {
-                    $lastByEmployee[$empId] = $event;
-                }
-            }
-        }
+        $ranked = DB::table('logistics_event_participants as p')
+            ->join('logistics_events as e', 'e.id', '=', 'p.logistics_event_id')
+            ->whereIn('e.type', [
+                LogisticsEventType::DEPARTURE->value,
+                LogisticsEventType::RETURN->value,
+            ])
+            ->whereIn('e.status', [
+                LogisticsEventStatus::PLANNED->value,
+                LogisticsEventStatus::COMPLETED->value,
+            ])
+            ->where('e.event_date', '<=', $dateDay)
+            ->select([
+                'p.employee_id',
+                'e.type',
+                'e.end_date',
+                'e.event_date',
+            ])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY p.employee_id ORDER BY e.event_date DESC, e.id DESC) as rn');
 
         $outsideByLastEvent = [];
-        foreach ($lastByEmployee as $empId => $event) {
+        foreach (DB::query()->fromSub($ranked, 'ranked')->where('rn', 1)->get() as $row) {
+            $event = new LogisticsEvent([
+                'type' => $row->type,
+                'end_date' => $row->end_date,
+                'event_date' => $row->event_date,
+            ]);
             if ($this->deriveStateFromEvent($event, $dateDay) !== EmployeeLocationState::IN_BASE) {
-                $outsideByLastEvent[] = (int) $empId;
+                $outsideByLastEvent[] = (int) $row->employee_id;
             }
         }
 
-        return array_values(array_unique(array_merge($withProject, $inTransit, $outsideByLastEvent)));
+        return $this->employeeLocationCohorts[$cacheKey] = [$withProject, $inTransit, $outsideByLastEvent];
+    }
+
+    /**
+     * Pojazdy poza bazą na dany dzień — ten sam werdykt co getVehicleLocationStatus()['outside_base'],
+     * bez liczenia załogi i bez zapisu cache.
+     *
+     * @param  iterable<int>  $vehicleIds
+     * @return list<int>
+     */
+    public function vehicleIdsOutsideBaseOn(iterable $vehicleIds, Carbon $date): array
+    {
+        $ids = collect($vehicleIds)->filter()->map(fn ($id) => (int) $id)->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $placementTypes = array_map(
+            fn (LogisticsEventType $type) => $type->value,
+            $this->vehiclePlacementEventTypes()
+        );
+
+        $ranked = DB::table('logistics_events as e')
+            ->whereIn('e.vehicle_id', $ids)
+            ->where('e.status', '!=', LogisticsEventStatus::CANCELLED->value)
+            ->where('e.event_date', '<=', $date)
+            ->whereIn('e.type', $placementTypes)
+            ->where(function ($q) {
+                $q->where('e.type', '!=', LogisticsEventType::TRANSFER->value)
+                    ->orWhere('e.has_reassignment', true);
+            })
+            ->select([
+                'e.vehicle_id',
+                'e.id',
+                'e.type',
+                'e.end_date',
+                'e.event_date',
+                'e.sets_outside_base',
+            ])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY e.vehicle_id ORDER BY e.event_date DESC, e.id DESC) as rn');
+
+        $lastByVehicle = [];
+        foreach (DB::query()->fromSub($ranked, 'ranked')->where('rn', 1)->get() as $row) {
+            $lastByVehicle[(int) $row->vehicle_id] = new LogisticsEvent([
+                'type' => $row->type,
+                'end_date' => $row->end_date,
+                'event_date' => $row->event_date,
+                'sets_outside_base' => (bool) $row->sets_outside_base,
+            ]);
+        }
+
+        $outside = [];
+        $noEvent = [];
+        foreach ($ids as $vehicleId) {
+            $lastEvent = $lastByVehicle[$vehicleId] ?? null;
+            if ($lastEvent === null) {
+                $noEvent[] = $vehicleId;
+
+                continue;
+            }
+
+            $placed = $this->placedByEvent($lastEvent, $date);
+            if ($placed !== null && $placed[0]) {
+                $outside[] = $vehicleId;
+            }
+        }
+
+        if ($noEvent !== []) {
+            $withAssignment = VehicleAssignment::query()
+                ->whereIn('vehicle_id', $noEvent)
+                ->where('start_date', '<=', $date)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
+                ->distinct()
+                ->pluck('vehicle_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $outside = array_merge($outside, $withAssignment);
+        }
+
+        return array_values(array_unique($outside));
     }
 
     public function getEmployeeLocation(Employee $employee): ?Location
@@ -435,28 +568,26 @@ class LocationTrackingService
     }
 
     /**
+     * @return array{0: bool, 1: ?int}|null
+     */
+    protected function placedByEvent(LogisticsEvent $event, Carbon $date): ?array
+    {
+        return match ($event->type) {
+            LogisticsEventType::DEPARTURE => [true, $event->id],
+            LogisticsEventType::RETURN => [! ($event->end_date && $event->end_date <= $date), null],
+            LogisticsEventType::TRANSFER => [true, null],
+            LogisticsEventType::PLACEMENT_CORRECTION => [(bool) $event->sets_outside_base, null],
+            default => null,
+        };
+    }
+
+    /**
      * @return array{0: bool, 1: ?int}
      */
     protected function placementFromEvent(Vehicle $vehicle, ?LogisticsEvent $lastEvent, Carbon $date): array
     {
-        if ($lastEvent) {
-            if ($lastEvent->type === LogisticsEventType::DEPARTURE) {
-                return [true, $lastEvent->id];
-            }
-
-            if ($lastEvent->type === LogisticsEventType::RETURN) {
-                $stillOut = ! ($lastEvent->end_date && $lastEvent->end_date <= $date);
-
-                return [$stillOut, null];
-            }
-
-            if ($lastEvent->type === LogisticsEventType::TRANSFER) {
-                return [true, null];
-            }
-
-            if ($lastEvent->type === LogisticsEventType::PLACEMENT_CORRECTION) {
-                return [(bool) $lastEvent->sets_outside_base, null];
-            }
+        if ($lastEvent && ($placed = $this->placedByEvent($lastEvent, $date)) !== null) {
+            return $placed;
         }
 
         $hasActiveAssignments = VehicleAssignment::where('vehicle_id', $vehicle->id)

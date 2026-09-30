@@ -1734,31 +1734,26 @@ class Step4RoutePlanning extends Component
         $arrivalDate = $this->endDate ? \Carbon\Carbon::parse($this->endDate) : now();
         $locationTrackingService = app(LocationTrackingService::class);
 
-        return Vehicle::where('type', 'company_vehicle')
-            ->operational()
-            ->orderBy('registration_number')
-            ->get()
-            ->filter(function (Vehicle $vehicle) use ($arrivalDate, $locationTrackingService) {
-                $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $arrivalDate);
+        $candidates = Vehicle::where('type', 'company_vehicle')->operational()->pluck('id');
+        $outside = $locationTrackingService->vehicleIdsOutsideBaseOn($candidates, $arrivalDate);
+        $inTransit = $locationTrackingService->inTransitVehicleIds($outside, $arrivalDate);
 
-                // Transfer vehicle should be outside base on arrival date
-                return ! $status['in_transit'] && $status['outside_base'];
-            });
+        return Vehicle::query()
+            ->whereIn('id', array_values(array_diff($outside, array_keys($inTransit))))
+            ->orderBy('registration_number')
+            ->get();
     }
 
     public function getAvailableEmployeesProperty()
     {
         $arrivalDate = $this->endDate ? \Carbon\Carbon::parse($this->endDate) : now();
-        $locationTrackingService = app(LocationTrackingService::class);
+        $ids = app(LocationTrackingService::class)->employeeIdsOutsideBaseOn($arrivalDate);
 
-        return Employee::orderBy('last_name')
+        return Employee::query()
+            ->whereIn('id', $ids)
+            ->orderBy('last_name')
             ->orderBy('first_name')
-            ->get()
-            ->filter(function (Employee $employee) use ($arrivalDate, $locationTrackingService) {
-                $status = $locationTrackingService->getLocationStatus($employee, $arrivalDate);
-
-                return $status['state'] === \App\Enums\EmployeeLocationState::OUTSIDE_BASE;
-            });
+            ->get();
     }
 
     public function getOwnVehicleProperty(): ?\App\Models\Vehicle

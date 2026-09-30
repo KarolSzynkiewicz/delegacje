@@ -3,7 +3,6 @@
 namespace App\Livewire;
 
 use App\Enums\Currency;
-use App\Enums\EmployeeLocationState;
 use App\Enums\LocationPurposeType;
 use App\Models\Employee;
 use App\Models\Location;
@@ -37,6 +36,8 @@ class ReturnTripPlanner extends Component
     public ?string $transportMode = null;
 
     public bool $showTransportSwitchModal = false;
+
+    public bool $showMissingTicketsModal = false;
 
     /** @var 'public'|'own'|null */
     public ?string $pendingTransportMode = null;
@@ -81,27 +82,28 @@ class ReturnTripPlanner extends Component
             return [];
         }
 
-        $locationTrackingService = app(LocationTrackingService::class);
-        $date = Carbon::parse($this->returnDate);
-        $search = mb_strtolower(trim($this->employeeSearch));
+        $ids = app(LocationTrackingService::class)->employeeIdsOutsideBaseOn(Carbon::parse($this->returnDate));
+        if ($ids === []) {
+            return [];
+        }
 
-        return Employee::with(['roles', 'assignments.project', 'accommodationAssignments.accommodation'])
+        $search = trim($this->employeeSearch);
+
+        $query = Employee::with('roles')
+            ->whereIn('id', $ids)
             ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get()
-            ->filter(function (Employee $employee) use ($locationTrackingService, $date) {
-                $status = $locationTrackingService->getLocationStatus($employee, $date);
+            ->orderBy('first_name');
 
-                return $status['state'] === EmployeeLocationState::OUTSIDE_BASE;
-            })
-            ->filter(function (Employee $employee) use ($search) {
-                if ($search === '') {
-                    return true;
-                }
+        if ($search !== '') {
+            $like = '%'.addcslashes($search, '%_\\').'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('first_name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like)
+                    ->orWhereRaw("CONCAT(first_name, ' ', last_name) like ?", [$like]);
+            });
+        }
 
-                return str_contains(mb_strtolower($employee->full_name), $search);
-            })
-            ->values()
+        return $query->get()
             ->map(fn (Employee $e) => [
                 'id' => $e->id,
                 'full_name' => $e->full_name,
@@ -121,29 +123,23 @@ class ReturnTripPlanner extends Component
 
         $returnDate = Carbon::parse($this->returnDate);
         $effectiveEndDate = $this->endDate ? Carbon::parse($this->endDate) : $returnDate;
-        $locationTrackingService = app(LocationTrackingService::class);
-        $vehicleValidationService = app(VehicleValidationService::class);
+        $candidates = Vehicle::query()->where('type', 'company_vehicle')->operational()->pluck('id');
+        $outside = app(LocationTrackingService::class)->vehicleIdsOutsideBaseOn($candidates, $returnDate);
+        $blocked = app(VehicleValidationService::class)->vehicleIdsConflictingWithLogisticsEvent(
+            $outside,
+            $returnDate,
+            $effectiveEndDate
+        );
+        $ids = array_values(array_diff($outside, $blocked));
 
-        return Vehicle::where('type', 'company_vehicle')
-            ->operational()
+        if ($ids === []) {
+            return collect();
+        }
+
+        return Vehicle::query()
+            ->whereIn('id', $ids)
             ->orderBy('registration_number')
-            ->get()
-            ->filter(function (Vehicle $vehicle) use ($returnDate, $effectiveEndDate, $locationTrackingService, $vehicleValidationService) {
-                $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $returnDate);
-                if (! $status['outside_base']) {
-                    return false;
-                }
-
-                $result = $vehicleValidationService->validateForLogisticsEvent(
-                    $vehicle,
-                    $returnDate,
-                    $effectiveEndDate,
-                    null,
-                    true
-                );
-
-                return $result['valid'];
-            });
+            ->get();
     }
 
     /**
@@ -439,6 +435,7 @@ class ReturnTripPlanner extends Component
         $this->showPreview = false;
         $this->previewData = [];
         $this->acceptReturnConsequences = false;
+        $this->showMissingTicketsModal = false;
     }
 
     public function updatedEndDate(): void
@@ -446,6 +443,7 @@ class ReturnTripPlanner extends Component
         $this->showPreview = false;
         $this->previewData = [];
         $this->acceptReturnConsequences = false;
+        $this->showMissingTicketsModal = false;
     }
 
     public function updatedReturnDate(): void
@@ -453,6 +451,7 @@ class ReturnTripPlanner extends Component
         $this->showPreview = false;
         $this->previewData = [];
         $this->acceptReturnConsequences = false;
+        $this->showMissingTicketsModal = false;
         // Reset endDate if before returnDate
         if (! empty($this->returnDate) && ! empty($this->endDate) && $this->endDate < $this->returnDate) {
             $this->endDate = $this->returnDate;
@@ -464,6 +463,7 @@ class ReturnTripPlanner extends Component
         $this->showPreview = false;
         $this->previewData = [];
         $this->acceptReturnConsequences = false;
+        $this->showMissingTicketsModal = false;
 
         if (! empty($value)) {
             $this->transportMode = 'own';
@@ -512,6 +512,7 @@ class ReturnTripPlanner extends Component
         $this->showPreview = false;
         $this->previewData = [];
         $this->acceptReturnConsequences = false;
+        $this->showMissingTicketsModal = false;
     }
 
     public function prepareReturn(): void
@@ -635,67 +636,95 @@ class ReturnTripPlanner extends Component
             return;
         }
 
-        // Validate ticket costs for public transport
+        if (! $this->validatePublicTransportHubs()) {
+            return;
+        }
+
+        if ($this->isPublicTransport && $this->headerTicketsIncomplete) {
+            $this->showMissingTicketsModal = true;
+
+            return;
+        }
+
+        $this->storeReturnTrip(skipIncompleteTickets: false);
+    }
+
+    public function confirmSaveWithoutTickets(): void
+    {
+        $this->showMissingTicketsModal = false;
+        $this->errorMessage = '';
+
+        if (! $this->validatePublicTransportHubs()) {
+            return;
+        }
+
+        $this->storeReturnTrip(skipIncompleteTickets: true);
+    }
+
+    public function cancelSaveWithoutTickets(): void
+    {
+        $this->showMissingTicketsModal = false;
+    }
+
+    protected function validatePublicTransportHubs(): bool
+    {
+        if (! $this->isPublicTransport) {
+            return true;
+        }
+
+        if ($this->publicTransportHubKind === null) {
+            $this->addError('publicTransportHubKind', 'Wybierz typ punktu: lotnisko lub dworzec.');
+
+            return false;
+        }
+
+        $hubPurpose = $this->publicTransportHubKind === 'station'
+            ? LocationPurposeType::STATION
+            : LocationPurposeType::AIRPORT;
+
+        if (
+            empty($this->sharedStartAirportLocationId)
+            || ! Location::matchesPurpose((int) $this->sharedStartAirportLocationId, $hubPurpose)
+        ) {
+            $this->addError(
+                'sharedStartAirportLocationId',
+                $hubPurpose === LocationPurposeType::STATION
+                    ? 'Wybierz dworzec startowy z listy.'
+                    : 'Wybierz lotnisko startowe z listy.'
+            );
+
+            return false;
+        }
+
+        if (
+            empty($this->sharedEndAirportLocationId)
+            || ! Location::matchesPurpose((int) $this->sharedEndAirportLocationId, $hubPurpose)
+        ) {
+            $this->addError(
+                'sharedEndAirportLocationId',
+                $hubPurpose === LocationPurposeType::STATION
+                    ? 'Wybierz dworzec docelowy z listy.'
+                    : 'Wybierz lotnisko docelowe z listy.'
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function storeReturnTrip(bool $skipIncompleteTickets): void
+    {
+        $ticketCostsToSave = [];
         if ($this->isPublicTransport) {
-            if ($this->publicTransportHubKind === null) {
-                $this->addError('publicTransportHubKind', 'Wybierz typ punktu: lotnisko lub dworzec.');
-
-                return;
-            }
-
-            $hubPurpose = $this->publicTransportHubKind === 'station'
-                ? LocationPurposeType::STATION
-                : LocationPurposeType::AIRPORT;
-
-            if (
-                empty($this->sharedStartAirportLocationId)
-                || ! Location::matchesPurpose((int) $this->sharedStartAirportLocationId, $hubPurpose)
-            ) {
-                $this->addError(
-                    'sharedStartAirportLocationId',
-                    $hubPurpose === LocationPurposeType::STATION
-                        ? 'Wybierz dworzec startowy z listy.'
-                        : 'Wybierz lotnisko startowe z listy.'
-                );
-
-                return;
-            }
-
-            if (
-                empty($this->sharedEndAirportLocationId)
-                || ! Location::matchesPurpose((int) $this->sharedEndAirportLocationId, $hubPurpose)
-            ) {
-                $this->addError(
-                    'sharedEndAirportLocationId',
-                    $hubPurpose === LocationPurposeType::STATION
-                        ? 'Wybierz dworzec docelowy z listy.'
-                        : 'Wybierz lotnisko docelowe z listy.'
-                );
-
-                return;
-            }
-
             foreach ($this->selectedEmployeeIds as $empId) {
                 $cost = $this->ticketCostsByEmployee[$empId] ?? [];
-                $amount = $cost['amount'] ?? null;
-                if ($amount === null || $amount === '' || ! is_numeric($amount) || (float) $amount <= 0) {
+                if (PublicTransportTicketCosts::isRowIncomplete($cost, true)) {
+                    if ($skipIncompleteTickets) {
+                        continue;
+                    }
+
                     $this->addError('ticketCostsByEmployee.'.$empId.'.amount', 'Uzupełnij koszt biletu.');
-
-                    return;
-                }
-                $currency = strtoupper(trim((string) ($cost['currency'] ?? 'PLN')));
-                if (strlen($currency) !== 3) {
-                    $this->addError('ticketCostsByEmployee.'.$empId.'.currency', 'Waluta musi mieć dokładnie 3 znaki (np. PLN, EUR).');
-
-                    return;
-                }
-
-                $path = $cost['attachment_path'] ?? null;
-                $hasPath = is_string($path) && trim($path) !== '';
-                $attachment = $cost['attachment'] ?? null;
-
-                if (! $hasPath && ! $this->isTicketFileUpload($attachment) && empty($attachment)) {
-                    $this->addError('ticketCostsByEmployee.'.$empId.'.attachment', 'Dodaj załącznik biletu.');
 
                     return;
                 }
@@ -704,15 +733,9 @@ class ReturnTripPlanner extends Component
                 if ($this->getErrorBag()->isNotEmpty()) {
                     return;
                 }
-            }
-        }
 
-        $ticketCostsToSave = [];
-        if ($this->isPublicTransport) {
-            foreach ($this->selectedEmployeeIds as $empId) {
-                $cost = $this->ticketCostsByEmployee[$empId] ?? [];
                 $amount = $cost['amount'] ?? null;
-                $currency = strtoupper(trim((string) ($cost['currency'] ?? 'PLN')));
+                $currency = PublicTransportTicketCosts::normalizeCurrency($cost['currency'] ?? null);
                 $attachment = $cost['attachment'] ?? null;
                 $attachmentPath = $cost['attachment_path'] ?? null;
                 if ($this->isTicketFileUpload($attachment)) {
