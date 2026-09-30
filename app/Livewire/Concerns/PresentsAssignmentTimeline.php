@@ -20,6 +20,14 @@ trait PresentsAssignmentTimeline
 
     public ?string $error = null;
 
+    public ?array $selection = null;
+
+    public ?float $menuX = null;
+
+    public ?float $menuY = null;
+
+    public bool $menuAbove = true;
+
     public function shift(int $weeks): void
     {
         $this->cancel();
@@ -31,11 +39,19 @@ trait PresentsAssignmentTimeline
 
     public function cancel(): void
     {
+        $this->selection = null;
         $this->proposal = null;
         $this->options = [];
         $this->choice = null;
         $this->seat = 'passenger';
         $this->error = null;
+    }
+
+    protected function placeMenu(mixed $x, mixed $y, bool $above): void
+    {
+        $this->menuX = is_numeric($x) ? (float) $x : null;
+        $this->menuY = is_numeric($y) ? (float) $y : null;
+        $this->menuAbove = $above;
     }
 
     /**

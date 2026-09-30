@@ -14777,7 +14777,7 @@ a.emp-rail__item { text-decoration: none; }
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
 }
 #employeeTabsContent,
 #projectTabsContent {
@@ -14984,6 +14984,48 @@ a.emp-rail__item { text-decoration: none; }
     border: 1px solid var(--glass-border);
     background: rgba(13, 18, 30, 0.72);
 }
+.atl .atl-popover.atl-menu {
+    position: absolute;
+    z-index: 50;
+    margin: 0;
+    width: max-content;
+    min-width: 22rem;
+    max-width: min(40rem, calc(100vw - 1.5rem));
+    padding: 0.75rem 0.85rem;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+.atl .atl-menu .atl-popover__dates {
+    margin-bottom: 0.35rem;
+    white-space: nowrap;
+}
+.atl .atl-menu__actions {
+    margin-top: 0.55rem;
+}
+.atl .atl-menu .atl-options {
+    max-height: min(28rem, 62vh);
+    overflow: auto;
+}
+.atl .atl-menu .atl-option {
+    align-items: flex-start;
+    white-space: normal;
+    gap: 0.75rem;
+}
+.atl .atl-menu .atl-option span:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.35;
+}
+.atl .atl-menu .atl-option span:last-child {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+.atl-lane[data-can-delete="1"] .atl-bar:not(.is-pending):not([data-locked="1"]) {
+    cursor: pointer;
+}
+.atl-bar.is-selected {
+    outline: 2px solid rgba(255, 255, 255, 0.92);
+    outline-offset: 1px;
+}
 .atl-popover__dates {
     margin-bottom: 0.7rem;
 }
@@ -15044,14 +15086,27 @@ a.emp-rail__item { text-decoration: none; }
 .rax-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.85rem 1.1rem;
+    gap: 0.45rem 0.55rem;
     color: var(--text-muted);
     font-size: 0.78rem;
 }
-.rax-legend span {
+.rax-legend__btn {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0.22rem 0.55rem;
+    font-size: 0.78rem;
+    opacity: 0.45;
+}
+.rax-legend__btn.is-active {
+    opacity: 1;
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--glass-border);
 }
 .rax-dot {
     width: 0.55rem;
@@ -15081,17 +15136,6 @@ a.emp-rail__item { text-decoration: none; }
     overflow: hidden;
     background: rgba(255, 255, 255, 0.03);
 }
-.rax-head {
-    display: grid;
-    grid-template-columns: var(--rax-gutter) minmax(0, 1fr);
-    flex: none;
-    background: var(--rax-panel);
-    border-bottom: 1px solid var(--glass-border);
-}
-.rax-head-view {
-    overflow: hidden;
-    min-width: 0;
-}
 .rax-body {
     overflow: auto;
     min-height: 0;
@@ -15100,9 +15144,33 @@ a.emp-rail__item { text-decoration: none; }
 .rax-sheet {
     display: grid;
     grid-template-columns: var(--rax-gutter) max-content;
+    grid-template-rows: auto auto;
     width: max-content;
     min-width: 100%;
     min-height: 100%;
+}
+.rax-tools {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 4.85rem;
+    box-sizing: border-box;
+    padding: 0.55rem 0.7rem;
+    border-right: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--glass-border);
+    background: var(--rax-panel);
+}
+.rax-canvas--scale {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    border-bottom: 1px solid var(--glass-border);
+    background: var(--rax-panel);
 }
 .rax-side {
     position: sticky;
@@ -15110,19 +15178,6 @@ a.emp-rail__item { text-decoration: none; }
     z-index: 5;
     border-right: 1px solid var(--glass-border);
     background: var(--rax-panel);
-}
-.rax-tools,
-.rax-scale {
-    min-height: 4.85rem;
-    box-sizing: border-box;
-}
-.rax-tools {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.45rem;
-    padding: 0.55rem 0.7rem;
-    border-right: 1px solid var(--glass-border);
 }
 .rax-place {
     display: grid;
@@ -15202,6 +15257,7 @@ a.emp-rail__item { text-decoration: none; }
 .rax-scale {
     display: flex;
     position: relative;
+    min-height: 4.85rem;
     height: 100%;
     background: var(--rax-panel, #0c111c);
 }

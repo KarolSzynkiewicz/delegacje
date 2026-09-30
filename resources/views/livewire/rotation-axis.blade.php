@@ -13,32 +13,43 @@
                 <p class="rax-hint">Pusty tor rysujesz w bok, daty ciągniesz za krawędź, środek paska usuwa.</p>
             </div>
             <div class="rax-legend">
-                <span><i class="rax-dot rax-dot--past"></i> Historyczne</span>
-                <span><i class="rax-dot rax-dot--active"></i> Aktywne</span>
-                <span title="Kończą się w ciągu 7 dni"><i class="rax-dot rax-dot--soon"></i> Wygasają wkrótce</span>
-                <span><i class="rax-dot rax-dot--future"></i> Przyszłe</span>
+                @foreach([
+                    'past' => 'Historyczne',
+                    'active' => 'Aktywne',
+                    'soon' => 'Wygasają wkrótce',
+                    'future' => 'Przyszłe',
+                ] as $tone => $label)
+                    <button
+                        type="button"
+                        class="rax-legend__btn {{ in_array($tone, $tones, true) ? 'is-active' : '' }}"
+                        @if($tone === 'soon') title="Kończą się w ciągu 7 dni" @endif
+                        wire:click="toggleTone('{{ $tone }}')"
+                    >
+                        <i class="rax-dot rax-dot--{{ $tone }}"></i> {{ $label }}
+                    </button>
+                @endforeach
             </div>
         </div>
 
         <div class="rax-board">
-            <div class="rax-head">
-                <div class="rax-tools">
-                    <div class="rax-place">
-                        <button type="button" class="rax-place__btn {{ $place === 'base' ? 'is-active' : '' }}" wire:click="setPlace('base')">W bazie</button>
-                        <button type="button" class="rax-place__btn {{ $place === 'away' ? 'is-active' : '' }}" wire:click="setPlace('away')">Poza bazą</button>
+            <div class="rax-body" x-ref="scroller">
+                <div class="rax-sheet">
+                    <div class="rax-tools">
+                        <div class="rax-place">
+                            <button type="button" class="rax-place__btn {{ $place === 'base' ? 'is-active' : '' }}" wire:click="setPlace('base')">W bazie</button>
+                            <button type="button" class="rax-place__btn {{ $place === 'away' ? 'is-active' : '' }}" wire:click="setPlace('away')">Poza bazą</button>
+                        </div>
+                        <div class="rax-search">
+                            <input
+                                type="search"
+                                class="form-control form-control-sm"
+                                placeholder="Imię, telefon…"
+                                wire:model.live.debounce.300ms="search"
+                            >
+                            <span class="rax-count font-mono">{{ count($board['rows']) }}</span>
+                        </div>
                     </div>
-                    <div class="rax-search">
-                        <input
-                            type="search"
-                            class="form-control form-control-sm"
-                            placeholder="Imię, telefon…"
-                            wire:model.live.debounce.300ms="search"
-                        >
-                        <span class="rax-count font-mono">{{ count($board['rows']) }}</span>
-                    </div>
-                </div>
-                <div class="rax-head-view">
-                    <div class="rax-canvas" x-ref="headCanvas">
+                    <div class="rax-canvas rax-canvas--scale">
                         <div class="rax-scale">
                             @foreach($board['days'] as $day)
                                 <span class="rax-day {{ $day['weekend'] ? 'is-weekend' : '' }}">
@@ -54,11 +65,6 @@
                             @endif
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="rax-body" x-ref="scroller">
-                <div class="rax-sheet">
                     <div class="rax-side" x-ref="side">
                         @forelse($board['rows'] as $row)
                             <div class="rax-person {{ $loop->even ? 'is-alt' : '' }}" wire:key="rax-person-{{ $row['id'] }}">
@@ -84,53 +90,53 @@
                         @endforelse
                     </div>
                     <div class="rax-canvas">
-                    <div class="rax-plot">
-                        @foreach($board['days'] as $index => $day)
-                            @if($day['weekend'])
-                                <span class="rax-weekend" style="left: {{ $index * $board['day_width'] }}px"></span>
+                        <div class="rax-plot">
+                            @foreach($board['days'] as $index => $day)
+                                @if($day['weekend'])
+                                    <span class="rax-weekend" style="left: {{ $index * $board['day_width'] }}px"></span>
+                                @endif
+                            @endforeach
+                            @if($board['today_left'] !== null)
+                                <span class="rax-line rax-line--today" style="left: {{ $board['today_left'] }}px"></span>
                             @endif
-                        @endforeach
-                        @if($board['today_left'] !== null)
-                            <span class="rax-line rax-line--today" style="left: {{ $board['today_left'] }}px"></span>
-                        @endif
-                        @if($board['wednesday_left'] !== null)
-                            <span class="rax-line rax-line--wed" style="left: {{ $board['wednesday_left'] }}px"></span>
-                        @endif
-                        @foreach($board['rows'] as $row)
-                            <div
-                                class="rax-lane atl-lane {{ $loop->even ? 'is-alt' : '' }}"
-                                data-lane="rotation"
-                                data-employee="{{ $row['id'] }}"
-                                data-can-create="{{ $board['can_create'] ? '1' : '0' }}"
-                                data-can-delete="{{ $board['can_delete'] ? '1' : '0' }}"
-                                data-gaps='@json($row['gaps'])'
-                                wire:key="rax-lane-{{ $row['id'] }}"
-                            >
-                                <div class="atl-track">
-                                    @foreach($row['bars'] as $bar)
-                                        <div
-                                            class="atl-bar rax-bar rax-bar--{{ $bar['tone'] }} {{ !empty($bar['pending']) ? 'is-pending' : '' }} {{ ($selection['id'] ?? null) === $bar['id'] && ($selection['employee_id'] ?? null) === $row['id'] ? 'is-selected' : '' }}"
-                                            style="left: {{ $bar['left'] }}px; width: {{ $bar['width'] }}px"
-                                            data-id="{{ $bar['id'] }}"
-                                            data-start="{{ $bar['start'] }}"
-                                            data-end="{{ $bar['end'] }}"
-                                            data-min="{{ $bar['min'] }}"
-                                            data-max="{{ $bar['max'] }}"
-                                            data-open="0"
-                                            title="{{ $bar['title'] }}"
-                                            wire:key="rax-bar-{{ $row['id'] }}-{{ $bar['id'] }}-{{ $bar['start'] }}"
-                                        >
-                                            @if($board['can_update'] && empty($bar['pending']) && empty($bar['locked']))
-                                                <span class="atl-handle atl-handle--start" data-edge="start"></span>
-                                                <span class="atl-handle atl-handle--end" data-edge="end"></span>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                    <div class="atl-rubber" x-show="dragging && employeeId === {{ (int) $row['id'] }}" x-cloak :style="rubberStyle"></div>
+                            @if($board['wednesday_left'] !== null)
+                                <span class="rax-line rax-line--wed" style="left: {{ $board['wednesday_left'] }}px"></span>
+                            @endif
+                            @foreach($board['rows'] as $row)
+                                <div
+                                    class="rax-lane atl-lane {{ $loop->even ? 'is-alt' : '' }}"
+                                    data-lane="rotation"
+                                    data-employee="{{ $row['id'] }}"
+                                    data-can-create="{{ $board['can_create'] ? '1' : '0' }}"
+                                    data-can-delete="{{ $board['can_delete'] ? '1' : '0' }}"
+                                    data-gaps='@json($row['gaps'])'
+                                    wire:key="rax-lane-{{ $row['id'] }}"
+                                >
+                                    <div class="atl-track">
+                                        @foreach($row['bars'] as $bar)
+                                            <div
+                                                class="atl-bar rax-bar rax-bar--{{ $bar['tone'] }} {{ !empty($bar['pending']) ? 'is-pending' : '' }} {{ ($selection['id'] ?? null) === $bar['id'] && ($selection['employee_id'] ?? null) === $row['id'] ? 'is-selected' : '' }}"
+                                                style="left: {{ $bar['left'] }}px; width: {{ $bar['width'] }}px"
+                                                data-id="{{ $bar['id'] }}"
+                                                data-start="{{ $bar['start'] }}"
+                                                data-end="{{ $bar['end'] }}"
+                                                data-min="{{ $bar['min'] }}"
+                                                data-max="{{ $bar['max'] }}"
+                                                data-open="0"
+                                                title="{{ $bar['title'] }}"
+                                                wire:key="rax-bar-{{ $row['id'] }}-{{ $bar['id'] }}-{{ $bar['start'] }}"
+                                            >
+                                                @if($board['can_update'] && empty($bar['pending']) && empty($bar['locked']))
+                                                    <span class="atl-handle atl-handle--start" data-edge="start"></span>
+                                                    <span class="atl-handle atl-handle--end" data-edge="end"></span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                        <div class="atl-rubber" x-show="dragging && employeeId === {{ (int) $row['id'] }}" x-cloak :style="rubberStyle"></div>
+                                    </div>
                                 </div>
-                            </div>
-                        @endforeach
-                    </div>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
             </div>

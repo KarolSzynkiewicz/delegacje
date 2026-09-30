@@ -19,6 +19,7 @@ export function registerAssignmentTimeline(Alpine) {
         selecting: false,
         selectId: null,
         selectEmployee: null,
+        selectLane: null,
         originX: 0,
         originY: 0,
         track: null,
@@ -38,27 +39,16 @@ export function registerAssignmentTimeline(Alpine) {
 
         bindAxisScroll() {
             const body = this.$refs.scroller;
-            const canvas = this.$refs.headCanvas;
-            if (!body || !canvas || this._axisScroll) {
+            if (!body || this._axisScroll) {
                 return;
             }
             this._axisScroll = true;
-            const placeHead = () => {
-                canvas.style.transform = `translateX(${-body.scrollLeft}px)`;
-            };
-            body.addEventListener('scroll', placeHead, { passive: true });
-            const bar = body.offsetWidth - body.clientWidth;
-            const head = this.root.querySelector('.rax-head');
-            if (head && bar > 0) {
-                head.style.paddingRight = `${bar}px`;
-            }
             const today = this.root.querySelector('.rax-line--today');
             const side = this.$refs.side;
             if (today) {
                 const chart = Math.max(160, body.clientWidth - (side?.offsetWidth || 0));
                 body.scrollLeft = Math.max(0, today.offsetLeft - chart * 0.22);
             }
-            placeHead();
         },
 
         get rubberStyle() {
@@ -119,14 +109,15 @@ export function registerAssignmentTimeline(Alpine) {
 
         armSelect(event, bar) {
             const lane = bar.closest('.atl-lane');
-            if (!lane || lane.dataset.canDelete !== '1' || !bar.dataset.id || bar.classList.contains('is-pending')) {
+            if (!lane || lane.dataset.canDelete !== '1' || !bar.dataset.id || bar.classList.contains('is-pending') || bar.dataset.locked === '1') {
                 return;
             }
             event.preventDefault();
             this.detach();
             this.selecting = true;
             this.selectId = Number(bar.dataset.id);
-            this.selectEmployee = Number(lane.dataset.employee);
+            this.selectEmployee = lane.dataset.employee ? Number(lane.dataset.employee) : null;
+            this.selectLane = lane.dataset.lane || null;
             this.originX = event.clientX;
             this.originY = event.clientY;
             this._up = (pointer) => this.finishSelect(pointer);
@@ -140,12 +131,18 @@ export function registerAssignmentTimeline(Alpine) {
             }
             const moved = Math.hypot(event.clientX - this.originX, event.clientY - this.originY) > 4;
             const employeeId = this.selectEmployee;
+            const lane = this.selectLane;
             const id = this.selectId;
             this.selecting = false;
             this.detach();
-            if (!moved && employeeId && id) {
-                const menu = this.menuAnchor(event);
+            if (moved || !id) {
+                return;
+            }
+            const menu = this.menuAnchor(event);
+            if (employeeId) {
                 this.$wire.selectBar(employeeId, id, menu.left, menu.top, menu.above);
+            } else if (lane) {
+                this.$wire.selectBar(lane, id, menu.left, menu.top, menu.above);
             }
         },
 
@@ -292,7 +289,8 @@ export function registerAssignmentTimeline(Alpine) {
                 const menu = this.menuAnchor(event);
                 this.$wire.propose(employeeId, id, start, end, menu.left, menu.top, menu.above);
             } else {
-                this.$wire.propose(lane, id, start, keepOpen ? null : end, keepOpen);
+                const menu = this.menuAnchor(event);
+                this.$wire.propose(lane, id, start, keepOpen ? null : end, keepOpen, menu.left, menu.top, menu.above);
             }
         },
 

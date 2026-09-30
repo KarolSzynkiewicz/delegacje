@@ -122,6 +122,19 @@ class LocationTrackingService
     }
 
     /**
+     * ID pracowników poza bazą albo w podróży — wyłącznie po logistyce (wyjazd/zjazd/transfer),
+     * bez heurystyki „ma projekt = poza bazą”.
+     *
+     * @return list<int>
+     */
+    public function employeeIdsInFieldByTripOn(Carbon $date): array
+    {
+        [, $inTransit, $outsideByLastEvent] = $this->employeeLocationCohortsOn($date);
+
+        return array_values(array_unique(array_merge($inTransit, $outsideByLastEvent)));
+    }
+
+    /**
      * @return array{0: list<int>, 1: list<int>, 2: list<int>}
      */
     protected function employeeLocationCohortsOn(Carbon $date): array

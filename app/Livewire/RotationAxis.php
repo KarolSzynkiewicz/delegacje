@@ -19,23 +19,8 @@ class RotationAxis extends Component
 
     public string $place = 'base';
 
-    public ?array $selection = null;
-
-    public ?float $menuX = null;
-
-    public ?float $menuY = null;
-
-    public bool $menuAbove = true;
-
-    public function cancel(): void
-    {
-        $this->selection = null;
-        $this->proposal = null;
-        $this->options = [];
-        $this->choice = null;
-        $this->seat = 'passenger';
-        $this->error = null;
-    }
+    /** @var list<string> */
+    public array $tones = ['past', 'active', 'soon', 'future'];
 
     public function setPlace(string $place): void
     {
@@ -45,6 +30,22 @@ class RotationAxis extends Component
 
         $this->cancel();
         $this->place = $place;
+    }
+
+    public function toggleTone(string $tone): void
+    {
+        if (! in_array($tone, ['past', 'active', 'soon', 'future'], true)) {
+            return;
+        }
+
+        if (in_array($tone, $this->tones, true)) {
+            if (count($this->tones) === 1) {
+                return;
+            }
+            $this->tones = array_values(array_filter($this->tones, fn (string $item): bool => $item !== $tone));
+        } else {
+            $this->tones[] = $tone;
+        }
     }
 
     public function updatedSearch(): void
@@ -181,7 +182,8 @@ class RotationAxis extends Component
         $board = $this->paintProposal($this->withPermissions($axis->board($this->search, $this->place)));
 
         return view('livewire.rotation-axis', [
-            'board' => $this->paintTones($board),
+            'board' => $this->filterTones($this->paintTones($board)),
+            'tones' => $this->tones,
         ]);
     }
 
@@ -228,16 +230,27 @@ class RotationAxis extends Component
         return $board;
     }
 
-    private function placeMenu(mixed $x, mixed $y, bool $above): void
-    {
-        $this->menuX = is_numeric($x) ? (float) $x : null;
-        $this->menuY = is_numeric($y) ? (float) $y : null;
-        $this->menuAbove = $above;
-    }
-
     /**
+     * @param  array<string, mixed>  $board
      * @return array<string, mixed>
      */
+    private function filterTones(array $board): array
+    {
+        if (count($this->tones) === 4) {
+            return $board;
+        }
+
+        $allowed = array_fill_keys($this->tones, true);
+        foreach ($board['rows'] as $index => $row) {
+            $board['rows'][$index]['bars'] = array_values(array_filter(
+                $row['bars'],
+                fn (array $bar): bool => isset($allowed[$bar['tone'] ?? ''])
+            ));
+        }
+
+        return $board;
+    }
+
     private function preparedBoard(): array
     {
         return $this->withPermissions(app(RotationAxisService::class)->board($this->search, $this->place));

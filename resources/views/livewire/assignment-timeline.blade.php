@@ -11,7 +11,7 @@
         </div>
     </div>
 
-    <p class="atl-phone-note d-lg-none">Pusty tor rysujesz w bok, krawędź paska ciągniesz. Biały pasek na końcu zakresu to uchwyt.</p>
+    <p class="atl-phone-note d-lg-none">Pusty tor rysujesz w bok, krawędź paska ciągniesz, środek usuwa.</p>
 
     <div class="atl-scroll" x-ref="scroller">
         <div class="atl-canvas">
@@ -39,6 +39,7 @@
                         class="atl-lane"
                         data-lane="{{ $lane['key'] }}"
                         data-can-create="{{ $lane['can_create'] ? '1' : '0' }}"
+                        data-can-delete="{{ !empty($lane['can_delete']) ? '1' : '0' }}"
                         data-gaps='@json($lane['gaps'])'
                         wire:key="atl-lane-{{ $lane['key'] }}"
                     >
@@ -46,7 +47,7 @@
                         <div class="atl-track" style="--atl-rows: {{ $lane['rows'] ?? 1 }}">
                             @foreach($lane['bars'] as $bar)
                                 <div
-                                    class="atl-bar atl-bar--{{ $lane['key'] }} {{ $bar['open'] ? 'is-open' : '' }} {{ !empty($bar['pending']) ? 'is-pending' : '' }}"
+                                    class="atl-bar atl-bar--{{ $lane['key'] }} {{ $bar['open'] ? 'is-open' : '' }} {{ !empty($bar['pending']) ? 'is-pending' : '' }} {{ ($selection['lane'] ?? null) === $lane['key'] && ($selection['id'] ?? null) === $bar['id'] ? 'is-selected' : '' }}"
                                     style="left: {{ $bar['left'] }}px; width: {{ $bar['width'] }}px; --row: {{ $bar['row'] ?? 0 }}"
                                     data-id="{{ $bar['id'] }}"
                                     data-start="{{ $bar['start'] }}"
@@ -54,6 +55,7 @@
                                     data-min="{{ $bar['min'] }}"
                                     data-max="{{ $bar['max'] }}"
                                     data-open="{{ $bar['open'] ? '1' : '0' }}"
+                                    data-locked="{{ !empty($bar['locked']) ? '1' : '0' }}"
                                     wire:key="atl-bar-{{ $lane['key'] }}-{{ $bar['id'] }}-{{ $bar['start'] }}"
                                 >
                                     @if($lane['can_update'] && empty($bar['locked']) && empty($bar['pending']))
@@ -73,13 +75,19 @@
 
     <div class="atl-tip font-mono" x-show="dragging" x-cloak x-text="tip" :style="tipStyle"></div>
 
+    @php
+        $menuCss = $menuX === null
+            ? ''
+            : 'left: '.$menuX.'px; top: '.$menuY.'px; transform: '.($menuAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)');
+    @endphp
+
     @if($proposal)
         @php
             $selected = collect($options)->firstWhere('key', $choice);
             $needsChoice = $proposal['id'] === null && $proposal['lane'] !== 'rotation';
             $driverTaken = (bool) ($selected['driver_taken'] ?? false);
         @endphp
-        <div class="atl-popover">
+        <div class="atl-popover atl-menu" style="{{ $menuCss }}">
             <div class="atl-popover__dates font-mono">
                 {{ \Carbon\Carbon::parse($proposal['start'])->format('j.m.Y') }}
                 –
@@ -130,15 +138,36 @@
                 </div>
             @endif
 
-            <div class="d-flex gap-2 flex-wrap justify-content-end mt-3">
+            <div class="atl-menu__actions d-flex gap-2 flex-wrap justify-content-end">
                 <x-ui.button type="button" variant="ghost" wire:click="cancel">Cofnij</x-ui.button>
                 <button type="button" class="btn btn-primary" wire:click="confirm" wire:loading.attr="disabled" @disabled($needsChoice && ! $choice)>
                     Zapisz
                 </button>
             </div>
         </div>
+    @elseif($selection)
+        <div class="atl-popover atl-menu" style="{{ $menuCss }}">
+            <div class="atl-popover__dates font-mono">
+                @if(!empty($selection['label']))
+                    {{ $selection['label'] }} ·
+                @endif
+                {{ \Carbon\Carbon::parse($selection['start'])->format('j.m.Y') }}
+                –
+                {{ empty($selection['end']) ? 'otwarte' : \Carbon\Carbon::parse($selection['end'])->format('j.m.Y') }}
+            </div>
+            <p class="text-muted small mb-0">Usunąć ten pasek?</p>
+            @if($error)
+                <div class="atl-popover__error">{{ $error }}</div>
+            @endif
+            <div class="atl-menu__actions d-flex gap-2 flex-wrap justify-content-end">
+                <x-ui.button type="button" variant="ghost" wire:click="cancel">Cofnij</x-ui.button>
+                <button type="button" class="btn btn-danger" wire:click="deleteSelected" wire:loading.attr="disabled">
+                    Usuń
+                </button>
+            </div>
+        </div>
     @elseif($error)
-        <div class="atl-popover">
+        <div class="atl-popover atl-menu" style="{{ $menuCss }}">
             <div class="atl-popover__error">{{ $error }}</div>
             <div class="d-flex justify-content-end">
                 <x-ui.button type="button" variant="ghost" wire:click="cancel">Cofnij</x-ui.button>

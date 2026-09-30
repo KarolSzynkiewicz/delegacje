@@ -2,20 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
+use App\Enums\VehiclePosition;
 use App\Models\Accommodation;
 use App\Models\AccommodationAssignment;
 use App\Models\AccommodationLease;
 use App\Models\Employee;
 use App\Models\Location;
+use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectDemand;
 use App\Models\Role;
 use App\Models\Rotation;
+use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Services\AssignmentTimelineService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class AssignmentTimelinePickerTest extends TestCase
@@ -67,6 +73,33 @@ class AssignmentTimelinePickerTest extends TestCase
         $this->assertTrue($byKey[(string) $free->id]['enabled']);
         $this->assertSame(0, $byKey[(string) $free->id]['group']);
         $this->assertGreaterThan($byKey[(string) $free->id]['group'], $byKey[(string) $full->id]['group']);
+    }
+
+    public function test_house_picker_allows_owned_houses_without_a_lease(): void
+    {
+        $employee = Employee::factory()->create();
+        $owned = Accommodation::factory()->create([
+            'name' => 'Dom Własny',
+            'capacity' => 3,
+        ]);
+        $rentedOutside = Accommodation::factory()->create([
+            'name' => 'Dom Poza Umową',
+            'capacity' => 3,
+        ]);
+        AccommodationLease::query()->create([
+            'accommodation_id' => $rentedOutside->id,
+            'type' => 'wynajmowany',
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-10',
+        ]);
+
+        $options = collect(app(AssignmentTimelineService::class)->houseOptions($employee, '2026-07-01', '2026-07-20'))
+            ->keyBy('key');
+
+        $this->assertTrue($options[(string) $owned->id]['enabled']);
+        $this->assertSame('0/3', $options[(string) $owned->id]['meta']);
+        $this->assertFalse($options[(string) $rentedOutside->id]['enabled']);
+        $this->assertSame('poza umową', $options[(string) $rentedOutside->id]['meta']);
     }
 
     public function test_role_picker_uses_the_smallest_gap_and_grays_a_missing_role(): void
@@ -153,6 +186,7 @@ class AssignmentTimelinePickerTest extends TestCase
             'start_date' => '2026-07-01',
             'end_date' => '2026-07-10',
         ]);
+        $this->putEmployeeInField($employee, '2026-06-20', '2026-06-28');
 
         $options = collect(app(AssignmentTimelineService::class)->vehicleOptions($employee, '2026-07-01', '2026-07-10'))
             ->keyBy('key');
@@ -164,6 +198,45 @@ class AssignmentTimelinePickerTest extends TestCase
         $this->assertTrue($options[(string) $other->id]['enabled']);
         $this->assertFalse($options[(string) $inBase->id]['enabled']);
         $this->assertSame('w bazie', $options[(string) $inBase->id]['meta']);
+    }
+
+    public function test_vehicle_picker_blocks_base_employee_from_field_car_without_trip(): void
+    {
+        $employee = Employee::factory()->create();
+        $fieldCar = Vehicle::factory()->create([
+            'type' => 'company_vehicle',
+            'capacity' => 4,
+            'registration_number' => 'WX FIELD',
+        ]);
+        $base = Location::factory()->create();
+        $field = Location::factory()->create();
+        $actor = User::factory()->create();
+
+        LogisticsEvent::query()->create([
+            'type' => LogisticsEventType::DEPARTURE,
+            'event_date' => '2026-06-01',
+            'end_date' => '2026-06-10',
+            'from_location_id' => $base->id,
+            'to_location_id' => $field->id,
+            'vehicle_id' => $fieldCar->id,
+            'status' => LogisticsEventStatus::COMPLETED,
+            'created_by' => $actor->id,
+        ]);
+
+        $options = collect(app(AssignmentTimelineService::class)->vehicleOptions($employee, '2026-07-01', '2026-07-10'))
+            ->keyBy('key');
+
+        $this->assertFalse($options[(string) $fieldCar->id]['enabled']);
+        $this->assertSame('brak wyjazdu', $options[(string) $fieldCar->id]['meta']);
+
+        $this->expectException(ValidationException::class);
+        app(AssignmentTimelineService::class)->commitEmployee($employee, [
+            'lane' => 'vehicle',
+            'id' => null,
+            'start' => '2026-07-01',
+            'end' => '2026-07-10',
+            'keep_open' => false,
+        ], (string) $fieldCar->id, VehiclePosition::PASSENGER->value);
     }
 
     public function test_moving_the_start_of_an_open_stay_keeps_the_end_empty(): void
@@ -199,5 +272,22 @@ class AssignmentTimelinePickerTest extends TestCase
         $assignment->refresh();
         $this->assertSame('2026-07-10', $assignment->start_date->toDateString());
         $this->assertNull($assignment->end_date);
+    }
+
+    private function putEmployeeInField(Employee $employee, string $start, string $end): void
+    {
+        $base = Location::factory()->create();
+        $field = Location::factory()->create();
+        $actor = User::factory()->create();
+        $departure = LogisticsEvent::query()->create([
+            'type' => LogisticsEventType::DEPARTURE,
+            'event_date' => $start,
+            'end_date' => $end,
+            'from_location_id' => $base->id,
+            'to_location_id' => $field->id,
+            'status' => LogisticsEventStatus::COMPLETED,
+            'created_by' => $actor->id,
+        ]);
+        $departure->participants()->create(['employee_id' => $employee->id]);
     }
 }

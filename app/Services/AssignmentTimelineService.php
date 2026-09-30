@@ -207,6 +207,7 @@ class AssignmentTimelineService
             'label' => $label,
             'can_create' => $can['create'],
             'can_update' => $can['update'],
+            'can_delete' => $can['delete'] ?? false,
             'bars' => $packed['bars'],
             'rows' => $packed['rows'],
             'gaps' => $can['create'] ? [['start' => $windowStart, 'end' => $windowEnd]] : [],
@@ -288,7 +289,7 @@ class AssignmentTimelineService
                 $start,
                 $end,
             ),
-            'vehicle' => $this->vehicles->createAssignment(
+            'vehicle' => $this->createVehicleForEmployee(
                 $employee,
                 Vehicle::query()->findOrFail((int) $choice),
                 $seat === VehiclePosition::DRIVER->value ? VehiclePosition::DRIVER : VehiclePosition::PASSENGER,
@@ -297,6 +298,48 @@ class AssignmentTimelineService
             ),
             default => throw ValidationException::withMessages(['lane' => 'Nieznany tor.']),
         };
+    }
+
+    public function deleteEmployee(Employee $employee, string $lane, int $id): void
+    {
+        match ($lane) {
+            'rotation' => Rotation::query()->where('employee_id', $employee->id)->findOrFail($id)->delete(),
+            'project' => ProjectAssignment::query()->where('employee_id', $employee->id)->findOrFail($id)->delete(),
+            'accommodation' => AccommodationAssignment::query()->where('employee_id', $employee->id)->findOrFail($id)->delete(),
+            'vehicle' => $this->deleteVehicleAssignment(
+                VehicleAssignment::query()->where('employee_id', $employee->id)->findOrFail($id)
+            ),
+            default => throw ValidationException::withMessages(['lane' => 'Nieznany tor.']),
+        };
+    }
+
+    public function deleteResource(string $type, int $resourceId, int $id): void
+    {
+        $assignment = match ($type) {
+            'project' => ProjectAssignment::query()->where('project_id', $resourceId)->findOrFail($id),
+            'accommodation' => AccommodationAssignment::query()->where('accommodation_id', $resourceId)->findOrFail($id),
+            'vehicle' => VehicleAssignment::query()->where('vehicle_id', $resourceId)->findOrFail($id),
+            default => throw ValidationException::withMessages(['lane' => 'Nieznany zasób.']),
+        };
+
+        if ($assignment instanceof VehicleAssignment) {
+            $this->deleteVehicleAssignment($assignment);
+
+            return;
+        }
+
+        $assignment->delete();
+    }
+
+    private function deleteVehicleAssignment(VehicleAssignment $assignment): void
+    {
+        if ($assignment->is_return_trip) {
+            throw ValidationException::withMessages([
+                'vehicle' => 'Przypisania ze zjazdu nie usuwa się z tej osi.',
+            ]);
+        }
+
+        $assignment->delete();
     }
 
     /**
@@ -346,7 +389,7 @@ class AssignmentTimelineService
             return;
         }
 
-        $this->vehicles->createAssignment(
+        $this->createVehicleForEmployee(
             $employee,
             Vehicle::query()->findOrFail($resourceId),
             $seat === VehiclePosition::DRIVER->value ? VehiclePosition::DRIVER : VehiclePosition::PASSENGER,
@@ -494,11 +537,17 @@ class AssignmentTimelineService
         );
 
         $byVehicle = $assignments->groupBy('vehicle_id');
+        $day = Carbon::parse($start)->startOfDay();
         $outside = array_fill_keys(
             $this->locations->vehicleIdsOutsideBaseOn(
                 $vehicles->pluck('id')->map(fn ($id) => (int) $id)->all(),
-                Carbon::parse($start)->startOfDay(),
+                $day,
             ),
+            true,
+        );
+        $employeeInField = in_array(
+            (int) $employee->id,
+            $this->locations->employeeIdsInFieldByTripOn($day),
             true,
         );
         $options = [];
@@ -519,14 +568,16 @@ class AssignmentTimelineService
             $inField = isset($outside[(int) $vehicle->id]);
             $free = $capacity - $occupancy['peak'];
             $sameProject = in_array((int) $vehicle->id, $sameProjectVehicleIds, true);
-            $enabled = ! $conflict && $inField && $free > 0;
+            $enabled = ! $conflict && $inField && $employeeInField && $free > 0;
             $meta = $conflict
                 ? 'kolizja z wyjazdem'
                 : (! $inField
                     ? 'w bazie'
-                    : ($free > 0
-                        ? ($sameProject ? 'ten sam projekt · ' : '').$occupancy['peak'].'/'.$capacity
-                        : $occupancy['peak'].'/'.$capacity));
+                    : (! $employeeInField
+                        ? 'brak wyjazdu'
+                        : ($free > 0
+                            ? ($sameProject ? 'ten sam projekt · ' : '').$occupancy['peak'].'/'.$capacity
+                            : $occupancy['peak'].'/'.$capacity)));
             $group = $enabled ? ($sameProject ? 0 : 1) : 2;
             $option = $this->option(
                 (string) $vehicle->id,
@@ -709,18 +760,52 @@ class AssignmentTimelineService
         );
         $conflict = $conflicting !== [];
         $seated = $rows->pluck('employee_id')->map(fn ($id) => (int) $id)->all();
+        $day = Carbon::parse($start)->startOfDay();
+        $vehicleOutside = $this->locations->vehicleIdsOutsideBaseOn([$vehicleId], $day) !== [];
+        $inField = array_fill_keys($this->locations->employeeIdsInFieldByTripOn($day), true);
 
         $options = [];
         foreach ($employees as $employee) {
             $already = in_array((int) $employee->id, $seated, true);
-            $enabled = ! $conflict && $free > 0 && ! $already;
-            $meta = $already ? 'już w aucie' : ($conflict ? 'kolizja z wyjazdem' : $occupancy['peak'].'/'.$capacity);
+            $employeeAway = isset($inField[(int) $employee->id]);
+            $enabled = ! $conflict && $vehicleOutside && $employeeAway && $free > 0 && ! $already;
+            $meta = $already
+                ? 'już w aucie'
+                : ($conflict
+                    ? 'kolizja z wyjazdem'
+                    : (! $vehicleOutside
+                        ? 'auto w bazie'
+                        : (! $employeeAway
+                            ? 'brak wyjazdu'
+                            : $occupancy['peak'].'/'.$capacity)));
             $option = $this->option((string) $employee->id, $employee->full_name, $meta, $enabled, $enabled ? 0 : 1);
             $option['driver_taken'] = $driverTaken;
             $options[] = $option;
         }
 
         return $this->sortOptions($options);
+    }
+
+    private function createVehicleForEmployee(
+        Employee $employee,
+        Vehicle $vehicle,
+        VehiclePosition $position,
+        Carbon $start,
+        Carbon $end,
+    ): void {
+        $day = $start->copy()->startOfDay();
+        if ($this->locations->vehicleIdsOutsideBaseOn([(int) $vehicle->id], $day) === []) {
+            throw ValidationException::withMessages([
+                'vehicle_id' => 'Nie można przypisać do auta, które jest w bazie.',
+            ]);
+        }
+        if (! in_array((int) $employee->id, $this->locations->employeeIdsInFieldByTripOn($day), true)) {
+            throw ValidationException::withMessages([
+                'vehicle_id' => 'Nie można dopisać do auta poza bazą bez wyjazdu — pracownik jest w bazie.',
+            ]);
+        }
+
+        $this->vehicles->createAssignment($employee, $vehicle, $position, $start, $end);
     }
 
     private function resizeEmployee(Employee $employee, string $lane, int $id, Carbon $start, ?Carbon $end, bool $keepOpen): void
@@ -996,6 +1081,7 @@ class AssignmentTimelineService
             'label' => $label,
             'can_create' => (bool) ($can['create'] ?? false),
             'can_update' => (bool) ($can['update'] ?? false),
+            'can_delete' => (bool) ($can['delete'] ?? false),
             'bars' => $packed['bars'],
             'rows' => $packed['rows'],
             'gaps' => $can['create'] ? AssignmentTimelineMath::gaps($bounds, $blockRanges) : [],
@@ -1307,7 +1393,22 @@ class AssignmentTimelineService
             return true;
         }
 
-        return false;
+        // Jak AccommodationAssignmentService: brak najmu w okresie = dom własny / dostępny.
+        return ! $leases->contains(function (AccommodationLease $lease) use ($start, $end): bool {
+            if ($lease->type !== 'wynajmowany') {
+                return false;
+            }
+            $leaseStart = $lease->start_date?->toDateString();
+            $leaseEnd = $lease->end_date?->toDateString();
+            if ($leaseStart && $leaseStart > $end) {
+                return false;
+            }
+            if ($leaseEnd && $leaseEnd < $start) {
+                return false;
+            }
+
+            return true;
+        });
     }
 
     /**
