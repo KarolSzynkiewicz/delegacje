@@ -33,6 +33,7 @@ class ProjectTabs extends Component
         $allTabs = [
             'info' => ['label' => 'Informacje', 'permission' => null, 'icon' => 'bi bi-info-circle'],
             'files' => ['label' => 'Pliki', 'permission' => 'project-files.view', 'icon' => 'bi bi-file-earmark'],
+            'timeline' => ['label' => 'Oś przypisań', 'permission' => 'timeline', 'icon' => 'bi bi-bar-chart-steps'],
             'assignments' => ['label' => 'Przypisani pracownicy', 'permission' => 'assignments.view', 'icon' => 'bi bi-person-check'],
             'comments' => ['label' => 'Komentarze', 'permission' => 'comments.view', 'icon' => 'bi bi-chat-left-text'],
         ];
@@ -43,11 +44,16 @@ class ProjectTabs extends Component
         }
 
         // Filtracja po permission - tylko taby do których user ma dostęp
-        $this->availableTabs = array_filter($allTabs, function ($tab) {
-            // permission === null (np. info) zawsze dostępny
-            // lub user ma wymagane permission
+        $this->availableTabs = array_filter($allTabs, function ($tab, $key) {
+            if ($key === 'timeline') {
+                $user = auth()->user();
+
+                return $user->hasPermission('project-assignments.view')
+                    || $user->hasPermission('assignments.view');
+            }
+
             return $tab['permission'] === null || auth()->user()->hasPermission($tab['permission']);
-        });
+        }, ARRAY_FILTER_USE_BOTH);
     }
 
     protected function validateActiveTab()

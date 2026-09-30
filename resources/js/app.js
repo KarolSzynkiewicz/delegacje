@@ -1,4 +1,5 @@
 import './bootstrap';
+import { registerAssignmentTimeline } from './assignment-timeline';
 import './dashboard-snaps';
 import './procedure-run-flow';
 import './forum-composer';
@@ -120,6 +121,8 @@ document.addEventListener('livewire:init', () => {
  * Używamy wire:model.defer — .live przeładowywałoby komponent przy każdym znaku i niszczyło dropdown.
  */
 document.addEventListener('alpine:init', () => {
+    registerAssignmentTimeline(window.Alpine);
+
     window.Alpine.data('subtaskMention', (users, wireProperty) => ({
         users: users || [],
         wireProperty,

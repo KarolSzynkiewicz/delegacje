@@ -140,6 +140,7 @@ class EmployeeTabs extends Component
         $allTabs = [
             'info' => ['label' => 'Informacje', 'short' => 'Informacje', 'group' => 'Profil', 'permission' => null, 'icon' => 'bi bi-person'],
             'documents' => ['label' => 'Dokumenty', 'short' => 'Dokumenty', 'group' => 'Profil', 'permission' => 'employee-documents.view', 'icon' => 'bi bi-file-earmark-medical'],
+            'timeline' => ['label' => 'Oś przypisań', 'short' => 'Oś', 'group' => 'Praca', 'permission' => 'timeline', 'icon' => 'bi bi-bar-chart-steps'],
             'rotations' => ['label' => 'Rotacje', 'short' => 'Rotacje', 'group' => 'Praca', 'permission' => 'rotations.view', 'icon' => 'bi bi-arrow-repeat'],
             'assignments' => ['label' => 'Przypisania do projektów', 'short' => 'Projekty', 'group' => 'Praca', 'permission' => 'project-assignments.view', 'icon' => 'bi bi-person-check'],
             'vehicle-assignments' => ['label' => 'Przypisania do aut', 'short' => 'Auta', 'group' => 'Praca', 'permission' => 'vehicle-assignments.view', 'icon' => 'bi bi-car-front-fill'],
@@ -156,11 +157,18 @@ class EmployeeTabs extends Component
         ];
 
         // Filtracja po permission - tylko taby do których user ma dostęp
-        $this->availableTabs = array_filter($allTabs, function ($tab) {
-            // permission === null (np. info) zawsze dostępny
-            // lub user ma wymagane permission
+        $this->availableTabs = array_filter($allTabs, function ($tab, $key) {
+            if ($key === 'timeline') {
+                $user = auth()->user();
+
+                return $user->hasPermission('rotations.view')
+                    || $user->hasPermission('project-assignments.view')
+                    || $user->hasPermission('vehicle-assignments.view')
+                    || $user->hasPermission('accommodation-assignments.view');
+            }
+
             return $tab['permission'] === null || auth()->user()->hasPermission($tab['permission']);
-        });
+        }, ARRAY_FILTER_USE_BOTH);
     }
 
     protected function validateActiveTab()

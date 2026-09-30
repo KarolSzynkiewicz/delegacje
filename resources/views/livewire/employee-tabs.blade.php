@@ -266,6 +266,10 @@
                 @endif
             </x-ui.card>
         </div>
+    @elseif($activeTab === 'timeline')
+        <div id="timeline" role="tabpanel">
+            <livewire:employee-assignment-timeline :employee="$employee" :wire:key="'emp-timeline-'.$employee->id" />
+        </div>
     @elseif($activeTab === 'rotations')
         <div id="rotations" role="tabpanel">
             <div class="d-flex justify-content-end mb-3">

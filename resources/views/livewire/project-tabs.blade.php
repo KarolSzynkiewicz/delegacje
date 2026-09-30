@@ -136,6 +136,10 @@
         <div id="files" role="tabpanel">
             <x-project-files :project="$project" />
         </div>
+    @elseif($activeTab === 'timeline')
+        <div id="timeline" role="tabpanel">
+            <livewire:resource-assignment-timeline resource-type="project" :resource-id="$project->id" :wire:key="'project-timeline-'.$project->id" />
+        </div>
     @elseif($activeTab === 'assignments')
         <!-- Zakładka Przypisani pracownicy -->
         <div id="assignments" role="tabpanel">

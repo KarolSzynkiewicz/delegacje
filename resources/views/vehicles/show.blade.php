@@ -327,6 +327,11 @@
                             @endif
                         </x-ui.card>
                     @elseif($tab === 'assignments')
+                        @if(auth()->user()->hasPermission('vehicle-assignments.view'))
+                            <div class="mb-4">
+                                <livewire:resource-assignment-timeline resource-type="vehicle" :resource-id="$vehicle->id" :wire:key="'vehicle-timeline-'.$vehicle->id" />
+                            </div>
+                        @endif
                         <x-ui.card>
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h5 class="mb-0">Przypisania do pojazdu</h5>

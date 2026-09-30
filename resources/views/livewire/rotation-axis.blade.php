@@ -1,0 +1,203 @@
+<x-ui.card class="rax-card">
+    <div
+        class="rax"
+        x-data="assignmentTimeline()"
+        data-start="{{ $board['start'] }}"
+        data-days="{{ $board['day_count'] }}"
+        style="--atl-day: {{ $board['day_width'] }}px; --atl-days: {{ $board['day_count'] }}; --rax-day: {{ $board['day_width'] }}px; --rax-days: {{ $board['day_count'] }}"
+    >
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+            <div>
+                <div class="rax-heading">Rotacje · oś</div>
+                <div class="font-mono text-muted small">Oś przypisań · {{ $board['range_label'] }}</div>
+                <p class="rax-hint">Pusty tor rysujesz w bok, daty ciągniesz za krawędź, środek paska usuwa.</p>
+            </div>
+            <div class="rax-legend">
+                <span><i class="rax-dot rax-dot--past"></i> Historyczne</span>
+                <span><i class="rax-dot rax-dot--active"></i> Aktywne</span>
+                <span title="Kończą się w ciągu 7 dni"><i class="rax-dot rax-dot--soon"></i> Wygasają wkrótce</span>
+                <span><i class="rax-dot rax-dot--future"></i> Przyszłe</span>
+            </div>
+        </div>
+
+        <div class="rax-board">
+            <div class="rax-head">
+                <div class="rax-tools">
+                    <div class="rax-place">
+                        <button type="button" class="rax-place__btn {{ $place === 'base' ? 'is-active' : '' }}" wire:click="setPlace('base')">W bazie</button>
+                        <button type="button" class="rax-place__btn {{ $place === 'away' ? 'is-active' : '' }}" wire:click="setPlace('away')">Poza bazą</button>
+                    </div>
+                    <div class="rax-search">
+                        <input
+                            type="search"
+                            class="form-control form-control-sm"
+                            placeholder="Imię, telefon…"
+                            wire:model.live.debounce.300ms="search"
+                        >
+                        <span class="rax-count font-mono">{{ count($board['rows']) }}</span>
+                    </div>
+                </div>
+                <div class="rax-head-view">
+                    <div class="rax-canvas" x-ref="headCanvas">
+                        <div class="rax-scale">
+                            @foreach($board['days'] as $day)
+                                <span class="rax-day {{ $day['weekend'] ? 'is-weekend' : '' }}">
+                                    <span class="rax-day__week">{{ $day['weekday'] }}</span>
+                                    <span class="rax-day__num font-mono">{{ $day['number'] }}</span>
+                                </span>
+                            @endforeach
+                            @if($board['today_left'] !== null)
+                                <span class="rax-marker rax-marker--today" style="left: {{ $board['today_left'] }}px">Dziś</span>
+                            @endif
+                            @if($board['wednesday_left'] !== null)
+                                <span class="rax-marker rax-marker--wed" style="left: {{ $board['wednesday_left'] }}px">Nast. śr.</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rax-body" x-ref="scroller">
+                <div class="rax-sheet">
+                    <div class="rax-side" x-ref="side">
+                        @forelse($board['rows'] as $row)
+                            <div class="rax-person {{ $loop->even ? 'is-alt' : '' }}" wire:key="rax-person-{{ $row['id'] }}">
+                                <div class="wo-emp">
+                                    <x-employee-cell :employee="$row['employee']" />
+                                    <div class="wo-emp-meta">
+                                        <x-ui.rating
+                                            :score="$row['score']"
+                                            :evaluation="$row['evaluation']"
+                                            :show-empty="true"
+                                        />
+                                        <span class="wo-emp-meta__rule" aria-hidden="true"></span>
+                                        <x-planner-document-icons
+                                            :documents="$row['documents']"
+                                            :show-empty="true"
+                                            stacked
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="rax-empty text-muted small mb-0">Brak aktywnych pracowników dla tego filtra.</p>
+                        @endforelse
+                    </div>
+                    <div class="rax-canvas">
+                    <div class="rax-plot">
+                        @foreach($board['days'] as $index => $day)
+                            @if($day['weekend'])
+                                <span class="rax-weekend" style="left: {{ $index * $board['day_width'] }}px"></span>
+                            @endif
+                        @endforeach
+                        @if($board['today_left'] !== null)
+                            <span class="rax-line rax-line--today" style="left: {{ $board['today_left'] }}px"></span>
+                        @endif
+                        @if($board['wednesday_left'] !== null)
+                            <span class="rax-line rax-line--wed" style="left: {{ $board['wednesday_left'] }}px"></span>
+                        @endif
+                        @foreach($board['rows'] as $row)
+                            <div
+                                class="rax-lane atl-lane {{ $loop->even ? 'is-alt' : '' }}"
+                                data-lane="rotation"
+                                data-employee="{{ $row['id'] }}"
+                                data-can-create="{{ $board['can_create'] ? '1' : '0' }}"
+                                data-can-delete="{{ $board['can_delete'] ? '1' : '0' }}"
+                                data-gaps='@json($row['gaps'])'
+                                wire:key="rax-lane-{{ $row['id'] }}"
+                            >
+                                <div class="atl-track">
+                                    @foreach($row['bars'] as $bar)
+                                        <div
+                                            class="atl-bar rax-bar rax-bar--{{ $bar['tone'] }} {{ !empty($bar['pending']) ? 'is-pending' : '' }} {{ ($selection['id'] ?? null) === $bar['id'] && ($selection['employee_id'] ?? null) === $row['id'] ? 'is-selected' : '' }}"
+                                            style="left: {{ $bar['left'] }}px; width: {{ $bar['width'] }}px"
+                                            data-id="{{ $bar['id'] }}"
+                                            data-start="{{ $bar['start'] }}"
+                                            data-end="{{ $bar['end'] }}"
+                                            data-min="{{ $bar['min'] }}"
+                                            data-max="{{ $bar['max'] }}"
+                                            data-open="0"
+                                            title="{{ $bar['title'] }}"
+                                            wire:key="rax-bar-{{ $row['id'] }}-{{ $bar['id'] }}-{{ $bar['start'] }}"
+                                        >
+                                            @if($board['can_update'] && empty($bar['pending']) && empty($bar['locked']))
+                                                <span class="atl-handle atl-handle--start" data-edge="start"></span>
+                                                <span class="atl-handle atl-handle--end" data-edge="end"></span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                    <div class="atl-rubber" x-show="dragging && employeeId === {{ (int) $row['id'] }}" x-cloak :style="rubberStyle"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="atl-tip font-mono" x-show="dragging" x-cloak x-text="tip" :style="tipStyle"></div>
+
+        @php
+            $menuCss = $menuX === null
+                ? ''
+                : 'left: '.$menuX.'px; top: '.$menuY.'px; transform: '.($menuAbove ? 'translate(-50%, -100%)' : 'translate(-50%, 0)');
+        @endphp
+
+        @if($proposal)
+            @php
+                $person = collect($board['rows'])->firstWhere('id', $proposal['employee_id'] ?? null);
+            @endphp
+            <div class="atl-popover rax-menu" style="{{ $menuCss }}">
+                <div class="atl-popover__dates font-mono">
+                    @if($person)
+                        {{ $person['name'] }} ·
+                    @endif
+                    {{ \Carbon\Carbon::parse($proposal['start'])->format('j.m.Y') }}
+                    –
+                    {{ \Carbon\Carbon::parse($proposal['end'])->format('j.m.Y') }}
+                </div>
+                @if($error)
+                    <div class="atl-popover__error">{{ $error }}</div>
+                @endif
+                <div class="rax-menu__actions d-flex gap-2 flex-wrap justify-content-end">
+                    <x-ui.button type="button" variant="ghost" wire:click="cancel">Cofnij</x-ui.button>
+                    <button type="button" class="btn btn-primary" wire:click="confirm" wire:loading.attr="disabled">
+                        Zapisz
+                    </button>
+                </div>
+            </div>
+        @elseif($selection)
+            @php
+                $person = collect($board['rows'])->firstWhere('id', $selection['employee_id']);
+            @endphp
+            <div class="atl-popover rax-menu" style="{{ $menuCss }}">
+                <div class="atl-popover__dates font-mono">
+                    @if($person)
+                        {{ $person['name'] }} ·
+                    @endif
+                    {{ \Carbon\Carbon::parse($selection['start'])->format('j.m.Y') }}
+                    –
+                    {{ \Carbon\Carbon::parse($selection['end'])->format('j.m.Y') }}
+                </div>
+                <p class="text-muted small mb-0">Usunąć tę rotację?</p>
+                @if($error)
+                    <div class="atl-popover__error">{{ $error }}</div>
+                @endif
+                <div class="rax-menu__actions d-flex gap-2 flex-wrap justify-content-end">
+                    <x-ui.button type="button" variant="ghost" wire:click="cancel">Cofnij</x-ui.button>
+                    <button type="button" class="btn btn-danger" wire:click="deleteSelected" wire:loading.attr="disabled">
+                        Usuń
+                    </button>
+                </div>
+            </div>
+        @elseif($error)
+            <div class="atl-popover rax-menu" style="{{ $menuCss }}">
+                <div class="atl-popover__error">{{ $error }}</div>
+                <div class="d-flex justify-content-end">
+                    <x-ui.button type="button" variant="ghost" wire:click="cancel">Cofnij</x-ui.button>
+                </div>
+            </div>
+        @endif
+    </div>
+</x-ui.card>

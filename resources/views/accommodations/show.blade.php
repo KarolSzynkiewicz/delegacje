@@ -279,6 +279,12 @@
                 </div>
             </x-ui.card>
 
+            @if(auth()->user()->hasPermission('accommodation-assignments.view'))
+                <div class="mt-4">
+                    <livewire:resource-assignment-timeline resource-type="accommodation" :resource-id="$accommodation->id" :wire:key="'house-timeline-'.$accommodation->id" />
+                </div>
+            @endif
+
             <x-ui.card label="Przypisania do mieszkania" class="mt-4">
                 @if($assignments->count() > 0)
                     <div class="table-responsive">

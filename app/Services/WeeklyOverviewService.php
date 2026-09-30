@@ -567,7 +567,7 @@ class WeeklyOverviewService
     /**
      * @param  Collection<int, int|string>  $employeeIds
      */
-    protected function loadPlannerDocumentsByEmployee(Collection $employeeIds): Collection
+    public function loadPlannerDocumentsByEmployee(Collection $employeeIds): Collection
     {
         if ($employeeIds->isEmpty()) {
             return collect();
