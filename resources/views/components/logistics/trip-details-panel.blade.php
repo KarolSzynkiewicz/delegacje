@@ -126,6 +126,7 @@
                 :ticket-costs-binding-key="$ticketCostsBindingKey"
                 :attachment-flat-binding-key="$attachmentFlatBindingKey"
                 :flat-attachment-uploads="$flatUploads"
+                :read-only="$readOnly"
             />
         @endif
     @endif

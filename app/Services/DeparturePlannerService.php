@@ -293,13 +293,22 @@ class DeparturePlannerService
      *   ]
      * ]
      */
-    public function getProjectGapsForTwoWeeks(Carbon $arrivalDate, array $formAssignments = [], array $formAssignmentRanges = []): array
-    {
+    /**
+     * @param  list<int>  $onlyProjectIds  Gdy niepuste — tylko te projekty (np. drop na jedną kolumnę transferu).
+     */
+    public function getProjectGapsForTwoWeeks(
+        Carbon $arrivalDate,
+        array $formAssignments = [],
+        array $formAssignmentRanges = [],
+        array $onlyProjectIds = [],
+    ): array {
         $weekStart = $arrivalDate->copy();
         $weekEnd = $arrivalDate->copy()->addDays(13); // 14 days total (0-13 = 14 days)
 
-        // OPTIMIZATION: Load all projects with all demands and assignments for the entire period in one go
-        $projects = Project::where('status', 'active')
+        $onlyProjectIds = array_values(array_unique(array_filter(array_map('intval', $onlyProjectIds))));
+
+        // OPTIMIZATION: Load projects with demands and assignments for the entire period in one go
+        $projectsQuery = Project::where('status', 'active')
             ->with([
                 'location',
                 'demands' => function ($query) use ($weekStart, $weekEnd) {
@@ -309,8 +318,13 @@ class DeparturePlannerService
                 'assignments' => function ($query) use ($weekStart, $weekEnd) {
                     $query->overlappingWith($weekStart, $weekEnd);
                 },
-            ])
-            ->get();
+            ]);
+
+        if ($onlyProjectIds !== []) {
+            $projectsQuery->whereIn('id', $onlyProjectIds);
+        }
+
+        $projects = $projectsQuery->get();
 
         $result = [];
 

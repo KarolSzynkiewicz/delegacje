@@ -124,8 +124,10 @@
 
     $departureEventsCount = collect($allDepartures ?? [])->count();
     $returnEventsCount = collect($returnTrips ?? [])->count();
+    $transferEventsCount = collect($allTransfers ?? [])->count();
     $departurePeopleCount = $peopleOnEvents($allDepartures ?? collect());
     $returnPeopleCount = $peopleOnEvents($returnTrips ?? collect());
+    $transferPeopleCount = $peopleOnEvents($allTransfers ?? collect());
     $rotationsEndingCount = collect($rotationsEnding ?? [])->count();
     $employeesNeededCount = (int) ($employeesNeededCount ?? 0);
     $housingOccupied = (int) ($housingOccupied ?? 0);
@@ -159,15 +161,15 @@
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="Osoby, których rotacja kończy się w tym tygodniu albo najpóźniej w przyszłą środę (włącznie)"
-                    @click.prevent="openPanel('rotations-ending', $event)"
+                    data-tip="Lista transferów w tym tygodniu"
+                    @click.prevent="openPanel('transfers', $event)"
                 >
-                    <i class="bi bi-hourglass-bottom weekly-logistics-metric__icon" aria-hidden="true"></i>
-                    <div class="weekly-logistics-metric__label">Kończą rotację</div>
-                    <div class="weekly-logistics-metric__value">{{ $rotationsEndingCount }}</div>
-                    @if(! empty($rotationHorizonLabel))
-                        <div class="weekly-logistics-metric__hint">{{ $rotationHorizonLabel }}</div>
-                    @endif
+                    <i class="bi bi-arrow-left-right weekly-logistics-metric__icon" aria-hidden="true"></i>
+                    <div class="weekly-logistics-metric__label">Transfery</div>
+                    <div class="weekly-logistics-metric__sentence">
+                        Transfer: {{ $transferPeopleCount }} {{ $pl($transferPeopleCount, 'osoba', 'osoby', 'osób') }}
+                        / {{ $transferEventsCount }} {{ $pl($transferEventsCount, 'transfer', 'transfery', 'transferów') }}
+                    </div>
                 </button>
             </div>
             <div class="col-6 col-lg-3">
@@ -210,6 +212,16 @@
                     <i class="bi bi-people weekly-logistics-metric__icon" aria-hidden="true"></i>
                     <div class="weekly-logistics-metric__label">Pracownicy</div>
                     <div class="weekly-logistics-metric__value">{{ $employeesInFieldCount }}/{{ $employeesNeededCount }}</div>
+                    <div
+                        class="weekly-logistics-metric__hint"
+                        role="button"
+                        tabindex="0"
+                        data-tip="Osoby, których rotacja kończy się w tym tygodniu albo najpóźniej w przyszłą środę (włącznie){{ ! empty($rotationHorizonLabel) ? ' — '.$rotationHorizonLabel : '' }}"
+                        @click.stop.prevent="openPanel('rotations-ending', $event)"
+                        @keydown.enter.stop.prevent="openPanel('rotations-ending', $event)"
+                    >
+                        {{ $rotationsEndingCount }} {{ $pl($rotationsEndingCount, 'kończy rotację', 'kończą rotację', 'kończy rotację') }}
+                    </div>
                 </button>
             </div>
         </div>
@@ -375,6 +387,52 @@
                         </ul>
                     @else
                         <p class="text-muted small mb-0">Nikt nie kończy rotacji w tym tygodniu ani do najbliższej środy po nim.</p>
+                    @endif
+                </div>
+
+                <div x-show="active === 'transfers'" x-cloak>
+                    @if(isset($allTransfers) && collect($allTransfers)->isNotEmpty())
+                        <ul class="mb-0 small list-unstyled">
+                            @foreach($allTransfers as $transfer)
+                                @php
+                                    $uniqueParticipants = $transfer->participants
+                                        ->filter(fn ($p) => $p->employee !== null);
+                                    $participantsCount = $uniqueParticipants->count();
+                                    $participantNames = $uniqueParticipants
+                                        ->map(fn ($p) => $p->employee->full_name)
+                                        ->join(', ');
+                                    $visualStatus = $transfer->getVisualStatus();
+                                    $dayOfWeek = $transfer->event_date->locale('pl')->isoFormat('dd');
+                                @endphp
+                                <li class="mb-2">
+                                    <a href="{{ route('transfers.show', $transfer) }}" class="text-decoration-none d-flex align-items-center gap-1 flex-wrap">
+                                        <i class="bi bi-calendar-week"></i>
+                                        <span class="text-uppercase">{{ $dayOfWeek }}</span>
+                                        @if($transfer->fromLocation || $transfer->toLocation)
+                                            <i class="bi bi-arrow-left-right"></i>
+                                            <span>{{ $transfer->fromLocation?->name ?? '?' }} → {{ $transfer->toLocation?->name ?? '?' }}</span>
+                                        @endif
+                                        <span class="text-muted">|</span>
+                                        @if($participantsCount > 0)
+                                            <span data-tip="{{ $participantNames }}">
+                                                {{ $participantsCount }} os.
+                                            </span>
+                                        @endif
+                                        @if($transfer->vehicle)
+                                            <span class="text-muted">|</span>
+                                            <i class="bi bi-car-front"></i>
+                                            <span>{{ $transfer->vehicle->registration_number }}</span>
+                                        @endif
+                                        <span class="text-muted">|</span>
+                                        <small class="badge badge-sm {{ $visualStatus === 'oczekuje' ? 'badge-primary' : ($visualStatus === 'w trakcie' ? 'badge-warning' : 'badge-success') }}">
+                                            {{ $visualStatus }}
+                                        </small>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="text-muted small mb-0">Brak transferów w tym tygodniu.</p>
                     @endif
                 </div>
 
@@ -725,6 +783,7 @@ document.addEventListener('alpine:init', () => {
         panelTitle() {
             const map = {
                 'rotations-ending': 'Kończą rotację',
+                transfers: 'Transfery (tydzień)',
                 returns: 'Zjazdy (tydzień)',
                 departures: 'Wyjazdy (tydzień)',
                 'employees-by-project': 'Pracownicy wg projektu (tydzień)',
@@ -743,6 +802,7 @@ document.addEventListener('alpine:init', () => {
         panelIconClass() {
             const map = {
                 'rotations-ending': 'bi-hourglass-bottom',
+                transfers: 'bi-arrow-left-right',
                 returns: 'bi-arrow-return-left',
                 departures: 'bi-arrow-right',
                 'employees-by-project': 'bi-people',

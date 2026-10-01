@@ -1,8 +1,14 @@
 <div>
     <style>
         .transfer-kanban-card {
+            position: relative;
             padding: 0.65rem 0.75rem;
             transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+            overflow: visible;
+        }
+        .transfer-kanban-card.is-site-lead {
+            border-left: 3px solid #fbbf24 !important;
+            padding-left: calc(0.75rem - 2px);
         }
         .transfer-kanban-card--planned {
             background: linear-gradient(145deg, rgba(251, 191, 36, 0.06) 0%, rgba(15, 23, 42, 0.4) 100%);
@@ -13,93 +19,60 @@
             box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35) !important;
             background: rgba(251, 191, 36, 0.04);
         }
-        .transfer-kanban-card__top {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 0.5rem;
-            margin-bottom: 0.35rem;
-        }
-        .transfer-kanban-card__name {
-            font-weight: 600;
-            font-size: 0.82rem;
-            line-height: 1.25;
-            color: var(--text-main, #f1f5f9);
-            min-width: 0;
-        }
-        .transfer-kanban-card__pill {
-            flex-shrink: 0;
-            font-size: 0.6rem;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            padding: 0.2rem 0.45rem;
-            border-radius: 6px;
-            background: rgba(251, 191, 36, 0.12);
-            color: #fcd34d;
-            border: 1px solid rgba(251, 191, 36, 0.28);
-        }
-        .transfer-kanban-card__planned {
-            margin-top: 0.35rem;
-            padding: 0.5rem 0.55rem;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.22);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-        }
-        .transfer-kanban-card__planned-title {
-            font-size: 0.62rem;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            color: #94a3b8;
-            margin-bottom: 0.35rem;
-        }
-        .transfer-kanban-card__row {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.45rem;
-            font-size: 0.78rem;
-            line-height: 1.35;
-        }
-        .transfer-kanban-card__row + .transfer-kanban-card__row {
-            margin-top: 0.4rem;
-        }
-        .transfer-kanban-card__row i {
-            flex-shrink: 0;
-            margin-top: 0.12rem;
-            opacity: 0.85;
-        }
-        .transfer-kanban-card__role {
-            font-weight: 600;
-            color: #e2e8f0;
-        }
-        .transfer-kanban-card__dates {
-            font-variant-numeric: tabular-nums;
-            color: #cbd5e1;
-        }
-        .transfer-kanban-card__hint {
-            margin-top: 0.45rem;
-            padding-top: 0.4rem;
-            border-top: 1px dashed rgba(148, 163, 184, 0.25);
-            font-size: 0.62rem;
-            color: #94a3b8;
-            display: flex;
-            align-items: center;
+        .transfer-kanban-card .wo-emp {
             gap: 0.35rem;
         }
-        .transfer-kanban-card__hint i {
-            color: #94a3b8;
+        .transfer-kanban-card__role-row {
+            max-width: 100%;
+            overflow: hidden;
         }
-        /* Obecna rola — jeden wiersz z etykietą, bez badge (żeby nie mylić z „bazą danych”) */
-        .transfer-kanban-current-role {
+        .transfer-kanban-card__role-row .role-ribbon {
+            max-width: 100%;
+        }
+        .transfer-kanban-draft-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
             font-size: 0.62rem;
-            color: #94a3b8;
-            line-height: 1.35;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #fcd34d;
         }
-        .transfer-kanban-current-role strong {
-            font-size: 0.68rem;
-            font-weight: 600;
+        .transfer-kanban-plan-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #93c5fd;
+        }
+        .transfer-kanban-card__hover {
+            display: none;
+            position: absolute;
+            left: 0.5rem;
+            right: 0.5rem;
+            bottom: calc(100% + 0.35rem);
+            z-index: 20;
+            padding: 0.55rem 0.65rem;
+            border-radius: 8px;
+            background: rgba(8, 12, 22, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+            font-size: 0.72rem;
+            line-height: 1.4;
             color: #e2e8f0;
+            pointer-events: none;
+        }
+        .transfer-kanban-card__hover div + div {
+            margin-top: 0.25rem;
+            color: #cbd5e1;
+        }
+        .transfer-kanban-card:hover .transfer-kanban-card__hover,
+        .transfer-kanban-card:focus-within .transfer-kanban-card__hover {
+            display: block;
         }
         /* Modal wyboru roli: badge „X brak” — bez ostrych żółci */
         .transfer-gap-pill {
@@ -117,6 +90,13 @@
             cursor: not-allowed !important;
             background: rgba(15, 23, 42, 0.65) !important;
             border-color: rgba(71, 85, 105, 0.55) !important;
+        }
+        .transfer-role-card--disabled .transfer-role-card__name,
+        .transfer-role-card--disabled .small {
+            color: #94a3b8 !important;
+        }
+        .transfer-role-card--disabled .transfer-gap-pill {
+            opacity: 0.85;
         }
         .transfer-role-card--disabled .transfer-role-card__title {
             color: #cbd5e1 !important;
@@ -206,26 +186,23 @@
     @endif
 
     @if($wizardPhase === 'board')
+    @if($transportOnly)
     @php
         $tripPanelVehicle = $transportMode === 'own' && ! empty($vehicleId)
             ? $this->availableVehicles->firstWhere('id', (int) $vehicleId)
             : null;
-        $tripOwnEmptyHint = $mode === 'assignment'
-            ? 'Dodaj kogoś do szkicu (przeciągnij), aby zobaczyć siatkę miejsc.'
-            : 'Wybierz uczestników poniżej, aby zobaczyć siatkę miejsc.';
-        $tripPublicEmptyHint = $mode === 'assignment'
-            ? 'Dodaj kogoś do szkicu (przeciągnij), aby wpisać koszty biletów.'
-            : 'Wybierz uczestników poniżej, aby wpisać koszty biletów.';
+        $tripOwnEmptyHint = 'Wybierz uczestników poniżej, aby zobaczyć siatkę miejsc.';
+        $tripPublicEmptyHint = 'Wybierz uczestników poniżej, aby wpisać koszty biletów.';
     @endphp
     <x-logistics.trip-details-panel
         class="mb-4"
         :trip-logistics-header="[
-            'title' => 'Szczegóły transferu',
+            'title' => 'Szczegóły transportu',
             'firstWire' => 'departureDate',
-            'firstLabel' => 'Data transferu',
+            'firstLabel' => 'Data przejazdu',
             'datesHelp' => 'Wybierz datę początkową i datę zakończenia.',
-            'vehiclePoolHint' => $mode === 'assignment' ? 'transfer_assignment' : 'transfer_transport',
-            'enableRelatedDepartureLink' => true,
+            'vehiclePoolHint' => 'transfer_transport',
+            'enableRelatedDepartureLink' => false,
         ]"
         :end-date="$endDate"
         :departure-date="$departureDate"
@@ -249,7 +226,7 @@
         ticket-wire-key-prefix="transfer-ticket"
         attachment-flat-binding-key="ticketAttachmentUploads"
         :flat-attachment-uploads="$ticketAttachmentUploads"
-        :linkable-departures="$this->linkableDepartures"
+        :linkable-departures="collect()"
     />
 
     @if($transportMode === 'own' && $vehicleId && $this->selectedVehicleActiveEventInfo)
@@ -280,25 +257,43 @@
             :base-location-id="\App\Models\Location::getBase()->id"
         />
     @endif
+    @else
+    <x-ui.card label="Dzień zmian" class="mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">Data</label>
+                <input
+                    type="date"
+                    class="form-control"
+                    wire:model.live="departureDate"
+                    @disabled((bool) $extendPlanId)
+                >
+            </div>
+            <div class="col-md-8">
+                <p class="small text-muted mb-0">
+                    @if($extendPlanId)
+                        Dopisujesz osoby do istniejącego planu #{{ $extendPlanId }}.
+                        Osoby już w planie są na docelowych projektach (badge „W planie”) — przeciągnij tylko nowe.
+                    @else
+                        Aktualne przypisania (projekt / dom / auto) zostaną skrócone do dnia poprzedzającego tę datę.
+                        Od tego dnia obowiązują nowe przypisania ze szkicu. Transport dokleisz później z podglądu planu.
+                    @endif
+                </p>
+            </div>
+        </div>
+    </x-ui.card>
+    @endif
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-        <div class="btn-group" role="group" aria-label="Tryb kreatora">
-            <button
-                type="button"
-                class="btn btn-sm {{ $mode === 'assignment' ? 'btn-primary' : 'btn-outline-secondary' }}"
-                wire:click="$set('mode', 'assignment')"
-            >
-                <i class="bi bi-kanban me-1"></i>
-                Przypisania
-            </button>
-            <button
-                type="button"
-                class="btn btn-sm {{ $mode === 'transport' ? 'btn-primary' : 'btn-outline-secondary' }}"
-                wire:click="$set('mode', 'transport')"
-            >
-                <i class="bi bi-truck me-1"></i>
-                Transport
-            </button>
+        <div class="small text-muted">
+            @if($transportOnly)
+                <i class="bi bi-truck me-1"></i>Tryb: <strong>transport</strong>
+                @if($relatedDepartureId)
+                    · parent #{{ $relatedDepartureId }}
+                @endif
+            @else
+                <i class="bi bi-kanban me-1"></i>Tryb: <strong>plan zmian przypisań</strong>
+            @endif
         </div>
 
         @if($mode === 'assignment' && count($draftProjectByAssignment) > 0)
@@ -326,7 +321,7 @@
                 wire:loading.attr="disabled"
                 @disabled($selectedEmployeeIds === [])>
             <span wire:loading.remove wire:target="saveSimpleTransfer">
-                <i class="bi bi-floppy me-1"></i> Zapisz transfer
+                <i class="bi bi-floppy me-1"></i> Zapisz transport
             </span>
             <span wire:loading wire:target="saveSimpleTransfer">
                 <span class="spinner-border spinner-border-sm me-1"></span> Zapisuję…
@@ -391,129 +386,143 @@
                                     $employee = $assignment->employee;
                                     $isDraft = isset($draftProjectByAssignment[$assignment->id]);
                                     $draftDetails = $draftAssignmentDetails[$assignment->id] ?? null;
+                                    $isSiteLead = isset($column['site_lead_employee_ids'][(int) $assignment->employee_id]);
+                                    $isInPlan = $extendPlanId
+                                        && in_array((int) $assignment->employee_id, $planEmployeeIds, true);
+                                    $liveLog = ($mode === 'assignment' && ! $draftDetails)
+                                        ? ($this->kanbanLiveLogisticsByAssignmentId[$assignment->id] ?? null)
+                                        : null;
+                                    $planExtras = $draftDetails
+                                        ? ($this->draftKanbanPlanExtras[$assignment->id] ?? null)
+                                        : null;
+
+                                    $displayRole = $assignment->role;
+                                    $displaySeniority = null;
+                                    $draftRoleNameFallback = null;
+                                    if ($draftDetails && ! empty($draftDetails['role_id']) && $employee) {
+                                        $draftRoleId = (int) $draftDetails['role_id'];
+                                        $draftRole = $employee->roles->firstWhere('id', $draftRoleId);
+                                        if ($draftRole) {
+                                            $displayRole = $draftRole;
+                                            $displaySeniority = $draftRole->pivot->seniority ?? null;
+                                        } elseif ($assignment->role && (int) $assignment->role_id === $draftRoleId) {
+                                            $displaySeniority = $employee->roles->firstWhere('id', $draftRoleId)?->pivot?->seniority;
+                                        } else {
+                                            $displayRole = null;
+                                            $draftRoleNameFallback = $draftDetails['role_name'] ?? null;
+                                        }
+                                    } elseif ($assignment->role && $employee) {
+                                        $displaySeniority = $employee->roles->firstWhere('id', (int) $assignment->role_id)?->pivot?->seniority;
+                                    }
+
+                                    $hoverLines = [];
+                                    if ($displayRole) {
+                                        $hoverLines[] = 'Rola: '.$displayRole->name;
+                                    } elseif ($draftRoleNameFallback) {
+                                        $hoverLines[] = 'Rola: '.$draftRoleNameFallback;
+                                    }
+                                    if ($isInPlan) {
+                                        $hoverLines[] = 'Już w tym planie zmian — bez przeciągania';
+                                    }
+                                    if ($draftDetails) {
+                                        $hoverLines[] = 'Szkic: '.($draftDetails['role_name'] ?? '?')
+                                            .' · '.(\Carbon\Carbon::parse($draftDetails['start_date'])->format('d.m.Y'))
+                                            .(
+                                                $draftDetails['end_date'] !== $draftDetails['start_date']
+                                                    ? ' → '.\Carbon\Carbon::parse($draftDetails['end_date'])->format('d.m.Y')
+                                                    : ''
+                                            );
+                                        if (! empty($planExtras['project_name'])) {
+                                            $hoverLines[] = 'Projekt: '.$planExtras['project_name'];
+                                        }
+                                        if (! empty($planExtras['accommodation_name'])) {
+                                            $hoverLines[] = 'Dom: '.$planExtras['accommodation_name'];
+                                        }
+                                        if (! empty($planExtras['vehicle_label'])) {
+                                            $hoverLines[] = 'Auto: '.$planExtras['vehicle_label'];
+                                        }
+                                    } else {
+                                        if (! empty($liveLog['accommodation_name'])) {
+                                            $hoverLines[] = 'Dom: '.$liveLog['accommodation_name'];
+                                        }
+                                        if (! empty($liveLog['vehicle_label'])) {
+                                            $hoverLines[] = 'Auto: '.$liveLog['vehicle_label'];
+                                        }
+                                        if (empty($liveLog['accommodation_name']) && empty($liveLog['vehicle_label'])) {
+                                            $hoverLines[] = 'Dom / auto: brak przypisania na ten dzień';
+                                        }
+                                    }
                                 @endphp
                                 <div
-                                    draggable="true"
+                                    @if(! $isInPlan) draggable="true" @endif
                                     @class([
                                         'rounded-3 border user-select-none transfer-kanban-card',
                                         'transfer-kanban-card--planned' => $draftDetails,
                                         'transfer-kanban-card--draft-only' => $isDraft && ! $draftDetails,
+                                        'is-site-lead' => $isSiteLead,
+                                        'opacity-75' => $isInPlan,
                                     ])
-                                    style="cursor: grab; border-color: var(--glass-border) !important;"
+                                    style="cursor: {{ $isInPlan ? 'default' : 'grab' }}; border-color: {{ $isInPlan ? 'rgba(59,130,246,0.45)' : 'var(--glass-border)' }} !important;"
+                                    @if(! $isInPlan)
                                     x-on:dragstart="
                                         $event.dataTransfer.setData('text/plain', '{{ $assignment->id }}');
                                         $event.dataTransfer.effectAllowed = 'move';
                                     "
                                     x-on:dragend="$el.closest('.transfer-kanban-column')?.classList.remove('border-primary')"
+                                    @endif
                                 >
-                                    <div class="transfer-kanban-card__top">
-                                        <div class="transfer-kanban-card__name text-truncate" title="{{ $employee?->full_name }}">
-                                            {{ $employee?->full_name ?? '?' }}
+                                    <div class="wo-emp">
+                                        @if($isSiteLead)
+                                            <span class="wo-lead-tag">Kierownik</span>
+                                        @endif
+                                        @if($employee)
+                                            <x-employee-cell :employee="$employee" :link="false" />
+                                        @else
+                                            <div class="transfer-kanban-card__name">?</div>
+                                        @endif
+                                        <div class="wo-emp-meta">
+                                            <x-ui.rating
+                                                :score="$employee?->latestEvaluation?->average_score"
+                                                :evaluation="$employee?->latestEvaluation"
+                                                :show-empty="true"
+                                            />
+                                            @if($isInPlan)
+                                                <span class="wo-emp-meta__rule" aria-hidden="true"></span>
+                                                <span class="transfer-kanban-plan-chip" title="Już zapisana w tym planie">
+                                                    <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                                                    W planie
+                                                </span>
+                                            @elseif($isDraft || $draftDetails)
+                                                <span class="wo-emp-meta__rule" aria-hidden="true"></span>
+                                                <span class="transfer-kanban-draft-chip" title="Szkic — jeszcze nie zapisano w systemie">
+                                                    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                                                    Szkic
+                                                </span>
+                                            @endif
                                         </div>
-                                        @if($draftDetails)
-                                            <span class="transfer-kanban-card__pill">Szkic</span>
-                                        @elseif($isDraft)
-                                            <span class="transfer-kanban-card__pill">Szkic</span>
+                                        @if($displayRole)
+                                            <div class="transfer-kanban-card__role-row">
+                                                <x-role-seniority-badge
+                                                    :role="$displayRole"
+                                                    :seniority="$displaySeniority"
+                                                />
+                                            </div>
+                                        @elseif($draftRoleNameFallback)
+                                            <div class="transfer-kanban-card__role-row">
+                                                <span class="role-ribbon role-ribbon--unset" title="{{ $draftRoleNameFallback }}">
+                                                    <span class="role-ribbon__name">{{ $draftRoleNameFallback }}</span>
+                                                    <span class="role-ribbon__tag"><span class="role-ribbon__wrap">?</span></span>
+                                                </span>
+                                            </div>
                                         @endif
                                     </div>
 
-                                    @if($draftDetails)
-                                        <div class="transfer-kanban-card__planned">
-                                            <div class="transfer-kanban-card__planned-title">Plan po zatwierdzeniu</div>
-                                            <div class="transfer-kanban-card__row">
-                                                <i class="bi bi-person-badge" style="color: #fcd34d;"></i>
-                                                <div>
-                                                    <span class="text-muted small d-block" style="font-size: 0.62rem;">Rola</span>
-                                                    <span class="transfer-kanban-card__role">{{ $draftDetails['role_name'] }}</span>
-                                                </div>
-                                            </div>
-                                            <div class="transfer-kanban-card__row">
-                                                <i class="bi bi-calendar-range text-info"></i>
-                                                <div>
-                                                    <span class="text-muted small d-block" style="font-size: 0.62rem;">Zakres dat</span>
-                                                    <span class="transfer-kanban-card__dates">
-                                                        {{ \Carbon\Carbon::parse($draftDetails['start_date'])->format('d.m.Y') }}
-                                                        @if($draftDetails['end_date'] !== $draftDetails['start_date'])
-                                                            <span class="text-muted"> → </span>{{ \Carbon\Carbon::parse($draftDetails['end_date'])->format('d.m.Y') }}
-                                                        @endif
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            @php
-                                                $planExtras = $this->draftKanbanPlanExtras[$assignment->id] ?? null;
-                                            @endphp
-                                            @if($planExtras && ! empty($planExtras['project_name']))
-                                                <div class="transfer-kanban-card__row">
-                                                    <i class="bi bi-kanban" style="color: #a78bfa;"></i>
-                                                    <div>
-                                                        <span class="text-muted small d-block" style="font-size: 0.62rem;">Docelowy projekt</span>
-                                                        <span class="transfer-kanban-card__role">{{ $planExtras['project_name'] }}</span>
-                                                    </div>
-                                                </div>
-                                            @endif
-                                            @if($planExtras && ! empty($planExtras['accommodation_name']))
-                                                <div class="transfer-kanban-card__row">
-                                                    <i class="bi bi-house" style="color: #34d399;"></i>
-                                                    <div>
-                                                        <span class="text-muted small d-block" style="font-size: 0.62rem;">Mieszkanie po transferze</span>
-                                                        <span class="transfer-kanban-card__role">{{ $planExtras['accommodation_name'] }}</span>
-                                                    </div>
-                                                </div>
-                                            @endif
-                                            @if($planExtras && ! empty($planExtras['vehicle_label']))
-                                                <div class="transfer-kanban-card__row">
-                                                    <i class="bi bi-car-front" style="color: #38bdf8;"></i>
-                                                    <div>
-                                                        <span class="text-muted small d-block" style="font-size: 0.62rem;">Pojazd po transferze</span>
-                                                        <span class="transfer-kanban-card__role">{{ $planExtras['vehicle_label'] }}</span>
-                                                    </div>
-                                                </div>
-                                            @endif
+                                    @if($hoverLines !== [])
+                                        <div class="transfer-kanban-card__hover" role="tooltip">
+                                            @foreach($hoverLines as $line)
+                                                <div>{{ $line }}</div>
+                                            @endforeach
                                         </div>
-                                        <div class="transfer-kanban-card__hint">
-                                            <i class="bi bi-info-circle"></i>
-                                            <span>Jeszcze nie zapisano w systemie — podgląd planowanego przypisania.</span>
-                                        </div>
-                                    @else
-                                        @if($assignment->role)
-                                            <div class="mt-1 transfer-kanban-current-role">
-                                                Obecna rola: <strong>{{ $assignment->role->name }}</strong>
-                                            </div>
-                                        @endif
-                                        @if($mode === 'assignment')
-                                            @php
-                                                $liveLog = $this->kanbanLiveLogisticsByAssignmentId[$assignment->id] ?? null;
-                                            @endphp
-                                            @if($liveLog && (! empty($liveLog['accommodation_name']) || ! empty($liveLog['vehicle_label'])))
-                                                <div class="transfer-kanban-card__planned mt-2 pt-2" style="border-top: 1px dashed rgba(148, 163, 184, 0.28);">
-                                                    <div class="transfer-kanban-card__planned-title">Aktualnie w ({{ \Carbon\Carbon::parse($transferDate)->format('d.m.Y') }})</div>
-                                                    @if(! empty($liveLog['accommodation_name']))
-                                                        <div class="transfer-kanban-card__row">
-                                                            <i class="bi bi-house" style="color: #34d399;"></i>
-                                                            <div>
-                                                                <span class="text-muted small d-block" style="font-size: 0.62rem;">Mieszkanie</span>
-                                                                <span class="transfer-kanban-card__role">{{ $liveLog['accommodation_name'] }}</span>
-                                                            </div>
-                                                        </div>
-                                                    @endif
-                                                    @if(! empty($liveLog['vehicle_label']))
-                                                        <div class="transfer-kanban-card__row">
-                                                            <i class="bi bi-car-front" style="color: #38bdf8;"></i>
-                                                            <div>
-                                                                <span class="text-muted small d-block" style="font-size: 0.62rem;">Pojazd</span>
-                                                                <span class="transfer-kanban-card__role">{{ $liveLog['vehicle_label'] }}</span>
-                                                            </div>
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            @endif
-                                        @endif
-                                        @if($isDraft)
-                                            <div class="transfer-kanban-card__hint mb-0 mt-2" style="border-top: none; padding-top: 0;">
-                                                <i class="bi bi-pencil-square"></i>
-                                                <span>Upuść na projekt i dokończ w oknach, aby ustalić rolę i daty.</span>
-                                            </div>
-                                        @endif
                                     @endif
                                 </div>
                             @empty
@@ -550,12 +559,17 @@
                         wire:target="saveReassignmentTransferToSystem"
                     >
                         <span wire:loading.remove wire:target="saveReassignmentTransferToSystem">
-                            <i class="bi bi-floppy me-1"></i> Zapisz transfer w systemie
+                            <i class="bi bi-floppy me-1"></i>
+                            {{ $extendPlanId ? 'Dopisz do planu w systemie' : 'Zapisz transfer w systemie' }}
                         </span>
                         <span wire:loading wire:target="saveReassignmentTransferToSystem">Zapisywanie…</span>
                     </x-ui.button>
                     <span class="small" style="color: #94a3b8;">
-                        Zatwierdza zdarzenie i przypisania w bazie, gdy szkic i sekcja „Szczegóły transferu” są kompletne.
+                        @if($extendPlanId)
+                            Zapisuje tylko nowe osoby ze szkicu do istniejącego planu #{{ $extendPlanId }}.
+                        @else
+                            Zatwierdza zdarzenie i przypisania w bazie. Transport dokleisz później z podglądu planu.
+                        @endif
                     </span>
                 </div>
             @endif
@@ -790,7 +804,7 @@
 
             <div class="rounded-3 border px-3 py-2 mb-4 small" style="border-color: rgba(148, 163, 184, 0.25) !important; color: #94a3b8;">
                 Poniższy przycisk tylko <strong>zamyka podsumowanie</strong> i wraca do tablicy — uaktualnia zakresy przypisań w kreatorze, <strong>nie zapisuje nic w systemie</strong>.
-                Zapis w bazie: na tablicy użyj <strong>Zapisz transfer w systemie</strong> (gdy szkic i transport są gotowe), albo wybierz tryb <strong>Transport</strong> i zapis tam.
+                Zapis w bazie: na tablicy użyj <strong>Zapisz transfer w systemie</strong> (szkic gotowy; trasa opcjonalnie później), albo wybierz tryb <strong>Transport</strong> i zapis tam.
             </div>
 
             <div class="d-flex flex-wrap gap-2 align-items-center">

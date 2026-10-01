@@ -1,6 +1,6 @@
 <x-app-layout>
     <x-slot name="header">
-        <x-ui.page-header title="Szczegóły transferu">
+        <x-ui.page-header title="{{ ($isReassignmentPlan ?? false) ? 'Plan zmian (transfer)' : (($transportParentContext['title'] ?? null) ?: 'Szczegóły transportu') }}">
             <x-slot name="left">
                 <x-ui.button
                     variant="ghost"
@@ -12,10 +12,39 @@
             </x-slot>
             <x-slot name="right">
                 @if(in_array($transfer->status, [\App\Enums\LogisticsEventStatus::PLANNED, \App\Enums\LogisticsEventStatus::COMPLETED]))
+                    @if(($isReassignmentPlan ?? false) && ! empty($canMutateParticipants))
+                        <x-ui.button
+                            variant="ghost"
+                            href="{{ route('transfers.create', ['parent' => $transfer->id]) }}"
+                            action="create"
+                        >
+                            Dodaj transport
+                        </x-ui.button>
+                        <x-ui.button
+                            variant="ghost"
+                            href="{{ route('transfers.create', ['plan' => $transfer->id]) }}"
+                            action="create"
+                        >
+                            Dopisz uczestnika
+                        </x-ui.button>
+                    @elseif(! ($isReassignmentPlan ?? false) && ! empty($canMutateParticipants))
+                        <x-ui.button
+                            variant="ghost"
+                            href="{{ route('transfers.participants.create', $transfer) }}"
+                            action="create"
+                        >
+                            Dopisz uczestnika
+                        </x-ui.button>
+                    @endif
                     <form method="POST" action="{{ route('transfers.cancel', $transfer) }}" class="d-inline">
                         @csrf
-                        <x-ui.button variant="danger" type="submit" onclick="return confirm('{{ $transfer->has_reassignment ? 'Anulować ten transfer? Przypisania zostaną przywrócone do stanu sprzed transferu.' : 'Anulować ten transfer?' }}')">
-                            <i class="bi bi-x-circle me-1"></i> Anuluj transfer
+                        <x-ui.button
+                            variant="danger"
+                            type="submit"
+                            onclick="return confirm('{{ ($isReassignmentPlan ?? false) ? 'Anulować plan zmian? Przypisania wrócą do stanu sprzed planu, a powiązane transporty zostaną anulowane.' : 'Anulować ten transport?' }}')"
+                        >
+                            <i class="bi bi-x-circle me-1"></i>
+                            {{ ($isReassignmentPlan ?? false) ? 'Anuluj plan' : 'Anuluj transport' }}
                         </x-ui.button>
                     </form>
                 @endif
@@ -54,81 +83,215 @@
                 color: #f8fafc;
                 font-weight: 500;
             }
+            .transfer-assignment-cell {
+                display: block;
+                max-width: 24rem;
+            }
+            .transfer-assignment-cell--changed {
+                padding: 0.45rem 0.6rem;
+                border-radius: 8px;
+                background: rgba(251, 191, 36, 0.07);
+                box-shadow: inset 3px 0 0 #fbbf24;
+            }
+            .transfer-assignment-cell--unchanged {
+                padding: 0.45rem 0.6rem;
+                border-radius: 8px;
+                border: 1px solid rgba(59, 130, 246, 0.4);
+                background: rgba(59, 130, 246, 0.07);
+            }
+            .transfer-change-hotspot {
+                position: relative;
+                display: inline-flex;
+                vertical-align: middle;
+                margin-right: 0.25rem;
+            }
+            .transfer-change-popover {
+                position: absolute;
+                left: 0;
+                top: calc(100% + 0.45rem);
+                z-index: 40;
+                min-width: 14rem;
+                max-width: 20rem;
+                padding: 0.7rem 0.85rem;
+                border-radius: 10px;
+                background: rgba(15, 23, 42, 0.97);
+                border: 1px solid rgba(251, 191, 36, 0.35);
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+            }
+            .transfer-change-popover::after {
+                content: '';
+                position: absolute;
+                left: 1rem;
+                bottom: 100%;
+                border: 6px solid transparent;
+                border-bottom-color: rgba(251, 191, 36, 0.35);
+            }
+            .transfer-show .table-responsive {
+                overflow: visible;
+            }
+            .transfer-show .departure-participants-table {
+                overflow: visible;
+            }
+            .transfer-show .departure-participants-table td {
+                overflow: visible;
+            }
+            .transfer-change-popover__label {
+                font-size: 0.62rem;
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                color: #fcd34d;
+                margin-bottom: 0.3rem;
+            }
+            .transfer-change-popover__title {
+                display: block;
+                font-weight: 600;
+                color: #f1f5f9;
+                line-height: 1.3;
+            }
+            .transfer-change-popover__meta {
+                display: block;
+                font-size: 0.75rem;
+                color: #94a3b8;
+                margin-top: 0.15rem;
+                line-height: 1.35;
+            }
+            .transfer-change-pill {
+                background: rgba(251, 191, 36, 0.2) !important;
+                color: #fcd34d !important;
+                border: 1px solid rgba(251, 191, 36, 0.35);
+                font-size: 0.62rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                cursor: pointer;
+                vertical-align: middle;
+            }
+            .transfer-change-pill:hover,
+            .transfer-change-pill:focus-visible,
+            .transfer-change-hotspot [aria-expanded="true"].transfer-change-pill {
+                background: rgba(251, 191, 36, 0.32) !important;
+                border-color: rgba(251, 191, 36, 0.55);
+            }
+            .transfer-keep-pill {
+                background: rgba(59, 130, 246, 0.18) !important;
+                color: #93c5fd !important;
+                border: 1px solid rgba(59, 130, 246, 0.35);
+                font-size: 0.62rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+            }
+            .transfer-assignment-legend {
+                display: inline-flex;
+                align-items: center;
+                font-size: 0.62rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                padding: 0.15rem 0.45rem;
+                border-radius: 6px;
+            }
+            .transfer-assignment-legend--changed {
+                background: rgba(251, 191, 36, 0.2);
+                color: #fcd34d;
+                border: 1px solid rgba(251, 191, 36, 0.35);
+            }
+            .transfer-assignment-legend--unchanged {
+                background: rgba(59, 130, 246, 0.18);
+                color: #93c5fd;
+                border: 1px solid rgba(59, 130, 246, 0.35);
+            }
+            .transfer-show .departure-participants-table thead th {
+                border-bottom-color: rgba(255, 255, 255, 0.08);
+            }
+            .transfer-show .departure-participants-table tbody tr:last-child td {
+                border-bottom: 0;
+            }
         </style>
     @endonce
 
-    <!-- Podstawowe informacje -->
-    <x-ui.card label="Informacje podstawowe" class="mb-4">
-        <div class="row g-4">
-            <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Data i godzina</h6>
-                <p class="fw-semibold mb-0">{{ $transfer->event_date->format('d.m.Y H:i') }}</p>
-            </div>
-            <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Status</h6>
-                @php
-                    $visualStatus = $transfer->getVisualStatus();
-                    $badgeVariant = match($visualStatus) {
-                        'oczekuje' => 'primary',
-                        'w trakcie' => 'warning',
-                        'zakończone' => 'success',
-                        'anulowany' => 'danger',
-                        default => 'accent'
-                    };
-                @endphp
-                <x-ui.badge variant="{{ $badgeVariant }}">{{ ucfirst($visualStatus) }}</x-ui.badge>
-            </div>
-            <div class="col-md-4">
-                <h6 class="text-muted small mb-1">Środek transportu</h6>
-                @if($transfer->vehicle)
-                    <p class="fw-semibold mb-0">
-                        Pojazd służbowy:
-                        {{ $transfer->vehicle->registration_number }}
-                        @if($transfer->vehicle->brand || $transfer->vehicle->model)
-                            <small class="text-muted">— {{ trim($transfer->vehicle->brand . ' ' . $transfer->vehicle->model) }}</small>
-                        @endif
-                    </p>
-                @elseif($transfer->has_transport)
-                    <p class="fw-semibold mb-0">Transport publiczny</p>
-                    @if(($publicHubKind ?? null) === 'airport')
-                        <small class="text-muted d-block">Lotnisko — trasa lotnicza (samolot)</small>
-                    @elseif(($publicHubKind ?? null) === 'station')
-                        <small class="text-muted d-block">Dworzec — transport naziemny (autobus / pociąg)</small>
-                    @else
-                        <small class="text-muted d-block">Bez pojazdu służbowego</small>
-                    @endif
-                @else
-                    <span class="text-muted">Bez pojazdu służbowego</span>
-                @endif
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-muted small mb-1"><i class="bi bi-geo-alt text-danger me-1"></i>Skąd</h6>
-                <p class="fw-semibold mb-0">{{ $transfer->fromLocation?->name ?? '—' }}</p>
-                @if($transfer->fromLocation?->city)
-                    <small class="text-muted">{{ $transfer->fromLocation->city }}</small>
-                @endif
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-muted small mb-1"><i class="bi bi-geo-alt-fill text-success me-1"></i>Dokąd</h6>
-                <p class="fw-semibold mb-0">{{ $transfer->toLocation?->name ?? '—' }}</p>
-                @if($transfer->toLocation?->city)
-                    <small class="text-muted">{{ $transfer->toLocation->city }}</small>
-                @endif
-            </div>
-            @if($transfer->notes)
-                <div class="col-12">
-                    <h6 class="text-muted small mb-1">Notatki</h6>
-                    <p class="mb-0">{{ $transfer->notes }}</p>
+    @unless($isReassignmentPlan ?? false)
+    @php
+        $panel = $transportCreatorPanel ?? null;
+        $parentCtx = $transportParentContext ?? null;
+    @endphp
+
+    @if($parentCtx)
+        <div class="mb-4 rounded-3 px-3 py-3 d-flex flex-wrap align-items-center justify-content-between gap-3"
+             style="background: rgba(59,130,246,0.10); border: 1px solid rgba(59,130,246,0.35);">
+            <div class="min-w-0">
+                <div class="small text-uppercase fw-semibold mb-1" style="color: #93c5fd; letter-spacing: .04em;">
+                    <i class="bi bi-link-45deg me-1"></i>Doklejony przejazd
                 </div>
-            @endif
+                <div class="fw-semibold text-white">{{ $parentCtx['title'] }}</div>
+                <div class="small text-muted mt-1">
+                    {{ $parentCtx['label'] }} · {{ $parentCtx['subtitle'] }}
+                </div>
+            </div>
+            <a href="{{ $parentCtx['url'] }}" class="btn btn-sm btn-outline-info flex-shrink-0">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Otwórz rodzica
+            </a>
         </div>
-    </x-ui.card>
+    @endif
+
+    @if($panel)
+        <x-logistics.trip-details-panel
+            class="mb-4"
+            :read-only="true"
+            :seats-interactive="false"
+            :trip-logistics-header="[
+                'title' => 'Szczegóły transportu',
+                'firstWire' => 'departureDate',
+                'firstLabel' => 'Data przejazdu',
+                'readOnlyHelp' => 'Podgląd zapisanego transportu — bez edycji.',
+            ]"
+            :end-date="$panel['endDate']"
+            :departure-date="$panel['departureDate']"
+            :public-transport-hub-kind="$panel['publicTransportHubKind']"
+            :shared-start-airport-location-id="$panel['sharedStartAirportLocationId']"
+            :shared-end-airport-location-id="$panel['sharedEndAirportLocationId']"
+            :available-vehicles="$panel['availableVehicles']"
+            :available-public-transport-hubs="$panel['availablePublicTransportHubs']"
+            :transport-mode="$panel['transportMode']"
+            :vehicle-id="$panel['vehicleId']"
+            :selected-vehicle="$panel['selectedVehicle']"
+            :vehicle-seats="$panel['vehicleSeats']"
+            :employees="$panel['employees']"
+            :defer-seat-grid-until-employees="false"
+            seat-grid-wire-key-prefix="transfer-show-vs"
+            :public-tickets-section-title="$panel['ticketsSectionTitle']"
+            :ticket-costs-by-employee="$panel['ticketCostsByEmployee']"
+            :tickets-incomplete="false"
+            :require-attachment-tickets="false"
+            ticket-wire-key-prefix="transfer-show-ticket"
+        />
+    @endif
 
     <!-- Trasa -->
-    @php $isPublicTransport = ! $transfer->vehicle_id && $transfer->has_transport; @endphp
-    <x-ui.card label="Trasa" class="mb-4">
-        <div class="row g-4">
-            @if(! $isPublicTransport)
+    @php
+        $isPublicTransport = ! $transfer->vehicle_id && $transfer->has_transport;
+        $canEditRoute = (bool) $transfer->vehicle_id
+            && in_array($transfer->status, [\App\Enums\LogisticsEventStatus::PLANNED, \App\Enums\LogisticsEventStatus::COMPLETED], true);
+        $routeEstablished = isset($routeStopRows) && $routeStopRows->count() > 0;
+    @endphp
+    @if(! $isPublicTransport)
+    <x-ui.card label="Trasa — przystanki i dystans" class="mb-4">
+        @if($canEditRoute && ! $routeEstablished)
+            <x-ui.empty-state icon="signpost-split" message="Ustal trasę">
+                <p class="small text-muted mt-2 mb-0" style="line-height: 1.55; max-width: 28rem; margin-inline: auto;">
+                    Kolejność przystanków, dystans i czas jazdy dopiszesz tutaj — teraz albo później.
+                </p>
+                <livewire:departure-route-editor
+                    :departure="$transfer"
+                    trigger-label="Ustal trasę"
+                    trigger-variant="primary"
+                    :key="'transfer-route-empty-'.$transfer->id"
+                />
+            </x-ui.empty-state>
+        @else
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+            <div class="row g-4 flex-grow-1">
                 <div class="col-md-4">
                     <h6 class="text-muted small mb-1">Dystans</h6>
                     <p class="fw-semibold mb-0">{{ $transfer->getFormattedDistance() ?? '—' }}</p>
@@ -141,18 +304,17 @@
                     <h6 class="text-muted small mb-1">Przystanki</h6>
                     <p class="fw-semibold mb-0">{{ $routeStopCount ?? ($routeStopRows->count() ?? 0) }}</p>
                 </div>
-            @else
-                <div class="col-12">
-                    <p class="small mb-0" style="color: #94a3b8;">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Transport publiczny — dystans i czas nie są obliczane automatycznie.
-                    </p>
-                </div>
+            </div>
+            @if($canEditRoute)
+                <livewire:departure-route-editor
+                    :departure="$transfer"
+                    :key="'transfer-route-'.$transfer->id"
+                />
             @endif
         </div>
 
         <div class="mt-3">
-            @if(isset($routeStopRows) && $routeStopRows->count() > 0)
+            @if($routeEstablished)
                 <div class="d-flex flex-column gap-2">
                     @foreach($routeStopRows as $i => $row)
                         @php
@@ -189,188 +351,185 @@
                         </div>
                     @endforeach
                 </div>
-            @else
+            @elseif(! $canEditRoute)
                 <x-ui.empty-state icon="map" message="Brak zapisanej trasy (brak przystanków)" />
             @endif
         </div>
+        @endif
     </x-ui.card>
+    @endif
 
-    @if(! $transfer->vehicle_id)
-        <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows ?? []" />
+    @if($isPublicTransport && ! empty($groundLegTicketRows))
+        <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows" />
+    @endif
+    @endunless
 
-        @php $savedTickets = $transfer->transportCosts->where('cost_type', 'ticket')->values(); @endphp
-        <x-ui.card label="Bilety (zapisane przy transferze)" class="mb-4">
-            @if($savedTickets->isNotEmpty())
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0 align-middle">
-                        <thead>
-                            <tr class="text-muted small">
-                                <th>Opis</th>
-                                <th>Kwota</th>
-                                <th class="text-end">Załącznik</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($savedTickets as $tc)
-                                @php $u = \App\Support\PublicDiskFileUrl::url($tc->file_path); @endphp
-                                <tr>
-                                    <td>
-                                        <div>{{ $tc->description ?: 'Bilet' }}</div>
-                                        @if($tc->notes)
-                                            <div class="text-muted small">{{ $tc->notes }}</div>
-                                        @endif
-                                    </td>
-                                    <td>{{ number_format((float) $tc->amount, 2) }} {{ $tc->currency }}</td>
-                                    <td class="text-end">
-                                        @if($u)
-                                            <a href="{{ $u }}" target="_blank" rel="noopener" class="text-decoration-none">
-                                                <i class="bi bi-paperclip"></i> Podgląd
-                                            </a>
+    @if($isReassignmentPlan ?? false)
+        @php
+            $legs = $linkedTransportLegs ?? collect();
+            $canAddTransport = in_array($transfer->status, [\App\Enums\LogisticsEventStatus::PLANNED, \App\Enums\LogisticsEventStatus::COMPLETED], true);
+        @endphp
+        <x-ui.card label="Transporty" class="mb-4">
+            @if($legs->isNotEmpty())
+                <div class="d-flex flex-column gap-3 mb-3">
+                    @foreach($legs as $leg)
+                        @php $driverAdj = $leg->driverAdjustments->first(); @endphp
+                        <div class="rounded-3 p-3 border" style="border-color: rgba(255,255,255,0.08) !important; background: rgba(255,255,255,0.03);">
+                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                                <div>
+                                    <a href="{{ route('transfers.show', $leg) }}" class="fw-semibold text-decoration-none">
+                                        Transport #{{ $leg->id }}
+                                    </a>
+                                    <span class="text-muted small ms-1">{{ $leg->event_date?->format('d.m.Y H:i') }}</span>
+                                    @if($leg->status === \App\Enums\LogisticsEventStatus::CANCELLED)
+                                        <x-ui.badge variant="danger" class="ms-1">Anulowany</x-ui.badge>
+                                    @endif
+                                </div>
+                                <a href="{{ route('transfers.show', $leg) }}" class="btn btn-sm btn-outline-light border-opacity-25">
+                                    Szczegóły
+                                </a>
+                            </div>
+                            <div class="row g-2 small">
+                                <div class="col-12 col-md-4">
+                                    <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Pojazd</div>
+                                    <div class="fw-semibold">
+                                        @if($leg->vehicle)
+                                            {{ $leg->vehicle->registration_number }} — {{ trim($leg->vehicle->brand.' '.$leg->vehicle->model) }}
+                                        @elseif($leg->has_transport)
+                                            Transport publiczny
                                         @else
-                                            <span class="text-muted">—</span>
+                                            —
                                         @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-5">
+                                    <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Trasa</div>
+                                    <div class="fw-semibold">
+                                        {{ $leg->fromLocation?->name ?? '—' }}
+                                        <span class="mx-1 text-muted">→</span>
+                                        {{ $leg->toLocation?->name ?? '—' }}
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-3">
+                                    <div class="text-muted" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Kierowca</div>
+                                    <div class="fw-semibold">
+                                        @if($driverAdj)
+                                            {{ $driverAdj->employee?->full_name ?? '—' }}
+                                        @else
+                                            —
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
             @else
-                <p class="text-muted small mb-0">Brak zapisanych kosztów biletu przy tym transferze.</p>
+                <p class="text-muted small mb-3">Brak doklejonych transportów. Najpierw zapisz plan zmian, potem dodaj kto/czym jedzie.</p>
+            @endif
+            @if($canAddTransport)
+                <a href="{{ route('transfers.create', ['parent' => $transfer->id]) }}" class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-plus-lg me-1"></i>Dodaj transport
+                </a>
             @endif
         </x-ui.card>
     @endif
 
-    <!-- Uczestnicy -->
-    <x-ui.card label="Uczestnicy" class="mb-4">
-        @if($transfer->participants->count() > 0)
-            @php
-                $uniqueEmployees = $transfer->participants
-                    ->filter(fn($p) => $p->employee)
-                    ->unique('employee_id');
-            @endphp
-            <div class="row g-2">
-                @foreach($uniqueEmployees as $participant)
-                    <div class="col-md-4 col-lg-3">
-                        <div class="d-flex align-items-center gap-2 p-2 border rounded-3">
-                            <i class="bi bi-person text-primary"></i>
-                            <div>
-                                <div class="fw-semibold small">{{ $participant->employee->full_name }}</div>
-                                @if($participant->employee->phone)
-                                    <div class="text-muted" style="font-size: 0.75rem;">{{ $participant->employee->phone }}</div>
+    <!-- Uczestnicy / zmiany przypisań -->
+    <x-ui.card label="{{ ($isReassignmentPlan ?? false) ? 'Zmiany przypisań' : 'Uczestnicy przejazdu' }}" class="mb-4 transfer-show">
+        @if($transfer->has_reassignment)
+            <p class="small text-muted mb-3">
+                <span class="transfer-assignment-legend transfer-assignment-legend--changed me-2">zmiana</span>
+                klik → poprzednie przypisanie (popover)
+                <span class="transfer-assignment-legend transfer-assignment-legend--unchanged ms-3 me-2">bez zmian</span>
+                dom / auto / projekt pozostawione jak było
+            </p>
+        @else
+            <p class="small text-muted mb-3">
+                Lista kto jedzie tym przejazdem. Wypisanie usuwa tylko z transportu — nie zmienia projektu, auta ani zakwaterowania.
+            </p>
+        @endif
+
+        @if(($participantRows ?? collect())->isNotEmpty())
+            <div class="table-responsive rounded-3 border" style="border-color: rgba(255,255,255,0.08) !important;">
+                <table class="table table-hover departure-participants-table mb-0 align-middle">
+                    <thead class="table-light" style="--bs-table-bg: rgba(255,255,255,0.04);">
+                        <tr>
+                            <th class="text-uppercase small text-muted fw-semibold py-3 ps-4">Pracownik</th>
+                            @if($transfer->has_reassignment)
+                                <th class="text-uppercase small text-muted fw-semibold py-3">
+                                    <i class="bi bi-briefcase me-1"></i>
+                                    Projekt
+                                </th>
+                                <th class="text-uppercase small text-muted fw-semibold py-3">
+                                    <i class="bi bi-truck me-1"></i>
+                                    Pojazd
+                                </th>
+                                <th class="text-uppercase small text-muted fw-semibold py-3">
+                                    <i class="bi bi-house me-1"></i>
+                                    Zakwaterowanie
+                                </th>
+                            @endif
+                            @if(! empty($canMutateParticipants))
+                                <th class="text-uppercase small text-muted fw-semibold py-3 pe-4 text-end">Akcja</th>
+                            @endif
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($participantRows as $participant)
+                            @php
+                                $employeeId = (int) $participant->employee_id;
+                                $cells = $assignmentCellsByEmployee[$employeeId] ?? [
+                                    'project' => ['state' => 'empty', 'before' => null, 'after' => null, 'current' => null],
+                                    'vehicle' => ['state' => 'empty', 'before' => null, 'after' => null, 'current' => null],
+                                    'accommodation' => ['state' => 'empty', 'before' => null, 'after' => null, 'current' => null],
+                                ];
+                            @endphp
+                            <tr>
+                                <td class="ps-4 py-3{{ (! $transfer->has_reassignment && empty($canMutateParticipants)) ? ' pe-4' : '' }}">
+                                    <x-employee-cell :employee="$participant->employee" />
+                                </td>
+                                @if($transfer->has_reassignment)
+                                    <td class="py-3">
+                                        @include('transfers.partials.assignment-cell', ['cell' => $cells['project'], 'emptyLabel' => 'Nie przypisany'])
+                                    </td>
+                                    <td class="py-3">
+                                        @include('transfers.partials.assignment-cell', ['cell' => $cells['vehicle'], 'emptyLabel' => '—'])
+                                    </td>
+                                    <td class="py-3{{ empty($canMutateParticipants) ? ' pe-4' : '' }}">
+                                        @include('transfers.partials.assignment-cell', ['cell' => $cells['accommodation'], 'emptyLabel' => '—'])
+                                    </td>
                                 @endif
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
+                                @if(! empty($canMutateParticipants))
+                                    <td class="py-3 pe-4 text-end">
+                                        <div class="d-flex flex-wrap justify-content-end gap-2">
+                                            @if(! empty($canRemoveParticipants))
+                                                <form method="POST"
+                                                      action="{{ route('transfers.participants.remove', [$transfer, $participant->employee]) }}"
+                                                      class="d-inline"
+                                                      onsubmit="return confirm('Wypisać {{ addslashes($participant->employee->full_name ?? 'uczestnika') }} {{ $transfer->has_reassignment ? 'z planu? Przypisania tej osoby zostaną przywrócone do stanu sprzed planu.' : 'z tego przejazdu? Przypisania (projekt / auto / dom) pozostaną bez zmian.' }}');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger border-opacity-50">
+                                                        <i class="bi bi-person-dash me-1"></i>Wypisz
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <span class="small text-muted align-self-center" title="{{ $transfer->has_reassignment ? 'Nie można wypisać ostatniego uczestnika — anuluj plan.' : 'Nie można wypisać ostatniego uczestnika — anuluj transport.' }}">
+                                                    <i class="bi bi-lock-fill me-1"></i>Ostatni
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </td>
+                                @endif
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
         @else
-            <p class="text-muted mb-0">Brak uczestników.</p>
+            <p class="text-muted mb-0">{{ $transfer->has_reassignment ? 'Brak uczestników planu' : 'Brak osób w przejeździe' }}</p>
         @endif
     </x-ui.card>
-
-    @if($transfer->has_reassignment)
-    <!-- Zmiany przypisań -->
-    <x-ui.card label="Zmiany przypisań (przeniesienie)" class="mb-4">
-        <x-ui.badge variant="info" class="mb-2">
-            <i class="bi bi-arrow-left-right me-1"></i> Transfer z przeniesieniem
-        </x-ui.badge>
-        <p class="text-muted small mb-4">
-            Dla każdej kategorii: <strong>stare przypisanie</strong> → <strong>nowe przypisanie</strong>.
-        </p>
-
-        @php
-            $reassignmentTypeLabels = [
-                'project_assignment' => 'Projekt',
-                'accommodation_assignment' => 'Mieszkanie',
-                'vehicle_assignment' => 'Pojazd',
-            ];
-            $participantsByEmployee = $transfer->participants->groupBy('employee_id');
-        @endphp
-
-        @foreach($participantsByEmployee as $employeeId => $parts)
-            @php
-                $employee = $parts->first()->employee;
-                $hasAssignmentRows = $parts->contains(fn ($p) => filled($p->assignment_type));
-            @endphp
-
-            @if($employee)
-            <div class="border rounded-3 p-3 mb-3">
-                <h6 class="fw-semibold mb-3">
-                    <i class="bi bi-person-fill text-primary me-1"></i>
-                    {{ $employee->full_name }}
-                </h6>
-
-                @if(! $hasAssignmentRows)
-                    <p class="text-muted small mb-0">Bez zmiany przypisań (zachowano poprzednie).</p>
-                @else
-                    <div class="table-responsive">
-                        <table class="table table-sm table-borderless mb-0 align-middle" style="--bs-table-bg: transparent;">
-                            <thead>
-                                <tr class="text-muted small">
-                                    <th scope="col" class="pb-2">Kategoria</th>
-                                    <th scope="col" class="pb-2">Stare przypisanie</th>
-                                    <th scope="col" class="pb-2 text-center" style="width: 2rem;"></th>
-                                    <th scope="col" class="pb-2">Nowe przypisanie</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($reassignmentTypeLabels as $typeKey => $typeLabel)
-                                    @php
-                                        $oldP = $parts->first(fn ($p) => $p->assignment_type === $typeKey && $p->original_end_date !== null);
-                                        $newP = $parts->first(fn ($p) => $p->assignment_type === $typeKey && $p->original_end_date === null);
-                                        $oldA = $oldP?->assignment;
-                                        $newA = $newP?->assignment;
-                                        $oldText = '—';
-                                        $newText = '—';
-                                        if ($oldP && $oldA) {
-                                            if ($typeKey === 'project_assignment') {
-                                                $oldText = $oldA->project?->name ?? ('#'.$oldP->assignment_id);
-                                                $oldText .= $oldP->original_end_date ? ' (do '.$oldP->original_end_date->format('d.m.Y').')' : '';
-                                            } elseif ($typeKey === 'accommodation_assignment') {
-                                                $oldText = $oldA->accommodation?->name ?? ('#'.$oldP->assignment_id);
-                                                $oldText .= $oldP->original_end_date ? ' (do '.$oldP->original_end_date->format('d.m.Y').')' : '';
-                                            } elseif ($typeKey === 'vehicle_assignment') {
-                                                $oldText = $oldA->vehicle?->registration_number ?? ('#'.$oldP->assignment_id);
-                                                $pos = $oldA->position ?? null;
-                                                $oldText .= $pos ? ' ('.$pos->label().')' : '';
-                                                $oldText .= $oldP->original_end_date ? ' (do '.$oldP->original_end_date->format('d.m.Y').')' : '';
-                                            }
-                                        }
-                                        if ($newP && $newA) {
-                                            if ($typeKey === 'project_assignment') {
-                                                $newText = $newA->project?->name ?? ('#'.$newP->assignment_id);
-                                            } elseif ($typeKey === 'accommodation_assignment') {
-                                                $newText = $newA->accommodation?->name ?? ('#'.$newP->assignment_id);
-                                            } elseif ($typeKey === 'vehicle_assignment') {
-                                                $newText = $newA->vehicle?->registration_number ?? ('#'.$newP->assignment_id);
-                                                $pos = $newA->position ?? null;
-                                                $newText .= $pos ? ' ('.$pos->label().')' : '';
-                                            }
-                                            if ($newA->start_date) {
-                                                $newText .= ' ('.$newA->start_date->format('d.m.Y').' – '.($newA->end_date?->format('d.m.Y') ?? '∞').')';
-                                            }
-                                        }
-                                        $showRow = $oldP || $newP;
-                                    @endphp
-                                    @if($showRow)
-                                        <tr>
-                                            <td class="text-muted small fw-semibold text-nowrap pe-2">{{ $typeLabel }}</td>
-                                            <td class="small">{{ $oldText }}</td>
-                                            <td class="text-center text-muted small px-1">→</td>
-                                            <td class="small">{{ $newText }}</td>
-                                        </tr>
-                                    @endif
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
-            @endif
-        @endforeach
-    </x-ui.card>
-    @endif
 
     <!-- Wynagrodzenie kierowcy -->
     @if($transfer->driverAdjustments->count() > 0)
@@ -405,9 +564,11 @@
         </x-ui.card>
     @endif
 
+    @unless($isReassignmentPlan ?? false)
     <div class="mb-4">
         <livewire:logistics-event-warehouse-transfers :event="$transfer" :key="'tr-wh-mm-'.$transfer->id" />
     </div>
+    @endunless
 
     <!-- Meta -->
     <x-ui.card label="Informacje systemowe">

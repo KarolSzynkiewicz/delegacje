@@ -79,11 +79,17 @@ class TransferService
             if ($relatedDepartureId !== null) {
                 $relatedExists = LogisticsEvent::query()
                     ->whereKey($relatedDepartureId)
-                    ->where('type', LogisticsEventType::DEPARTURE)
+                    ->where(function ($q) {
+                        $q->where('type', LogisticsEventType::DEPARTURE)
+                            ->orWhere(function ($q2) {
+                                $q2->where('type', LogisticsEventType::TRANSFER)
+                                    ->where('has_reassignment', true);
+                            });
+                    })
                     ->exists();
                 if (! $relatedExists) {
                     throw ValidationException::withMessages([
-                        'related_departure_id' => 'Wybrany wyjazd do powiązania nie istnieje.',
+                        'related_departure_id' => 'Wybrane zdarzenie nadrzędne (wyjazd lub plan zmian) nie istnieje.',
                     ]);
                 }
             }
@@ -95,7 +101,7 @@ class TransferService
                 'from_location_id' => $data['from_location_id'],
                 'to_location_id' => $data['to_location_id'],
                 'vehicle_id' => $data['vehicle_id'],
-                'has_transport' => empty($data['vehicle_id']),
+                'has_transport' => ! $data['has_reassignment'] && empty($data['vehicle_id']),
                 'status' => LogisticsEventStatus::PLANNED,
                 'has_reassignment' => $data['has_reassignment'],
                 'notes' => $data['notes'],
@@ -581,6 +587,273 @@ class TransferService
 
             $transfer->participants()->delete();
         });
+    }
+
+    /**
+     * Anuluje transfer: przy planie zmian odwraca przypisania i kaskadowo anuluje
+     * doklejone przejazdy (related_departure_id → ten event).
+     */
+    public function cancelTransfer(LogisticsEvent $transfer): void
+    {
+        if ($transfer->type !== LogisticsEventType::TRANSFER) {
+            throw new \InvalidArgumentException('Can only cancel transfers.');
+        }
+
+        if (! in_array($transfer->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true)) {
+            throw ValidationException::withMessages([
+                'status' => 'Tego transferu nie można anulować.',
+            ]);
+        }
+
+        DB::transaction(function () use ($transfer) {
+            $children = LogisticsEvent::query()
+                ->where('related_departure_id', $transfer->id)
+                ->where('type', LogisticsEventType::TRANSFER)
+                ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+                ->orderBy('id')
+                ->get();
+
+            foreach ($children as $child) {
+                $this->cancelTransfer($child);
+            }
+
+            if ($transfer->has_reassignment) {
+                $this->reverseTransfer($transfer);
+            }
+
+            $transfer->update(['status' => LogisticsEventStatus::CANCELLED]);
+        });
+    }
+
+    /**
+     * Wypisuje jedną osobę z transferu i cofa efekty reassignment tylko dla niej.
+     *
+     * @return array{participants_removed: int, cancelled_empty: bool}
+     */
+    public function removeParticipant(LogisticsEvent $transfer, int $employeeId): array
+    {
+        if ($transfer->type !== LogisticsEventType::TRANSFER) {
+            throw new \InvalidArgumentException('Can only remove participants from transfers.');
+        }
+
+        if (! in_array($transfer->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true)) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Można wypisać uczestnika tylko z aktywnego transferu.',
+            ]);
+        }
+
+        $participantRows = $transfer->participants()->where('employee_id', $employeeId)->get();
+        if ($participantRows->isEmpty()) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Ta osoba nie jest uczestnikiem tego transferu.',
+            ]);
+        }
+
+        $uniqueEmployees = $transfer->participants()->pluck('employee_id')->unique();
+        if ($uniqueEmployees->count() <= 1) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Nie można wypisać ostatniego uczestnika — anuluj cały transfer.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($transfer, $employeeId, $participantRows) {
+            if ($transfer->has_reassignment) {
+                $this->reverseParticipantReassignment($transfer, $participantRows);
+            }
+
+            $removed = $transfer->participants()->where('employee_id', $employeeId)->delete();
+
+            $cancelledEmpty = false;
+            if ($transfer->participants()->count() === 0) {
+                $transfer->update(['status' => LogisticsEventStatus::CANCELLED]);
+                $cancelledEmpty = true;
+            }
+
+            $employee = Employee::find($employeeId);
+            if ($employee) {
+                $this->locationTracking->getLocationStatus($employee, now());
+            }
+
+            return [
+                'participants_removed' => (int) $removed,
+                'cancelled_empty' => $cancelledEmpty,
+            ];
+        });
+    }
+
+    /**
+     * Dopisuje osobę do istniejącego transferu (opcjonalnie ze zmianą przypisań).
+     *
+     * @param  array{
+     *     employee_id: int,
+     *     project_id?: int|null,
+     *     role_id?: int|null,
+     *     start_date?: string|null,
+     *     end_date?: string|null,
+     *     accommodation_id?: int|null,
+     *     vehicle_id?: int|null,
+     *     vehicle_position?: string|null,
+     *     keep_current?: bool,
+     * }  $data
+     */
+    public function addParticipant(LogisticsEvent $transfer, array $data): void
+    {
+        if ($transfer->type !== LogisticsEventType::TRANSFER) {
+            throw new \InvalidArgumentException('Can only add participants to transfers.');
+        }
+
+        if (! in_array($transfer->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true)) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Można dopisać uczestnika tylko do aktywnego transferu.',
+            ]);
+        }
+
+        $employeeId = (int) ($data['employee_id'] ?? 0);
+        $employee = Employee::find($employeeId);
+        if (! $employee) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Nie znaleziono pracownika.',
+            ]);
+        }
+
+        if ($transfer->participants()->where('employee_id', $employeeId)->exists()) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Ta osoba jest już uczestnikiem tego transferu.',
+            ]);
+        }
+
+        $transferDate = $transfer->event_date instanceof Carbon
+            ? $transfer->event_date->copy()->startOfDay()
+            : Carbon::parse($transfer->event_date)->startOfDay();
+
+        if ($transfer->has_reassignment) {
+            if (! $this->locationTracking->isEmployeeEligibleForTransfer($employee, $transferDate)) {
+                throw ValidationException::withMessages([
+                    'employee_id' => "Pracownik {$employee->full_name} jest w lokalizacji bazy w dniu transferu — użyj wyjazdu lub zjazdu.",
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($transfer, $employeeId, $transferDate, $data) {
+            if (! $transfer->has_reassignment || ! empty($data['keep_current'])) {
+                LogisticsEventParticipant::create([
+                    'logistics_event_id' => $transfer->id,
+                    'employee_id' => $employeeId,
+                    'status' => 'pending',
+                ]);
+
+                return;
+            }
+
+            $projectId = (int) ($data['project_id'] ?? 0);
+            if ($projectId <= 0) {
+                throw ValidationException::withMessages([
+                    'project_id' => 'Wybierz projekt docelowy.',
+                ]);
+            }
+
+            $this->processReassignment($transfer, $employeeId, $transferDate, [
+                'project_id' => $projectId,
+                'role_id' => ! empty($data['role_id']) ? (int) $data['role_id'] : null,
+                'start_date' => $data['start_date'] ?? $transferDate->format('Y-m-d'),
+                'end_date' => $data['end_date'] ?? null,
+                'accommodation_id' => ! empty($data['accommodation_id']) ? (int) $data['accommodation_id'] : null,
+                'vehicle_id' => ! empty($data['vehicle_id']) ? (int) $data['vehicle_id'] : null,
+                'vehicle_position' => $data['vehicle_position'] ?? VehiclePosition::PASSENGER->value,
+                'skip_old_accommodation_shorten' => empty($data['accommodation_id']),
+                'skip_old_vehicle_shorten' => empty($data['vehicle_id']),
+            ]);
+        });
+
+        $this->locationTracking->getLocationStatus($employee, now());
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \App\Models\LogisticsEventParticipant>  $participantRows
+     */
+    protected function reverseParticipantReassignment(LogisticsEvent $transfer, $participantRows): void
+    {
+        $transferId = (int) $transfer->id;
+        $participantRows->loadMissing('assignment');
+
+        foreach ($participantRows as $participant) {
+            if ($participant->restoration_payload) {
+                continue;
+            }
+
+            if (! $participant->assignment_type || ! $participant->assignment_id) {
+                continue;
+            }
+
+            $assignment = $participant->assignment;
+            if (! $assignment) {
+                continue;
+            }
+
+            $createdByThisTransfer = (int) ($assignment->logistics_event_id ?? 0) === $transferId;
+
+            if ($createdByThisTransfer) {
+                $assignment->delete();
+
+                continue;
+            }
+
+            $assignment->update([
+                'end_date' => $participant->original_end_date,
+            ]);
+        }
+
+        foreach ($participantRows as $participant) {
+            $payload = $participant->restoration_payload;
+            if (! is_array($payload)) {
+                continue;
+            }
+
+            if (! empty($payload['project_assignment']) && is_array($payload['project_assignment'])) {
+                ProjectAssignment::create(Arr::only(
+                    $payload['project_assignment'],
+                    [
+                        'project_id',
+                        'employee_id',
+                        'role_id',
+                        'start_date',
+                        'end_date',
+                        'notes',
+                        'logistics_event_id',
+                    ]
+                ));
+            }
+
+            if (! empty($payload['accommodation_assignment']) && is_array($payload['accommodation_assignment'])) {
+                AccommodationAssignment::create(Arr::only(
+                    $payload['accommodation_assignment'],
+                    [
+                        'accommodation_id',
+                        'employee_id',
+                        'start_date',
+                        'end_date',
+                        'notes',
+                        'logistics_event_id',
+                    ]
+                ));
+            }
+
+            if (! empty($payload['vehicle_assignment']) && is_array($payload['vehicle_assignment'])) {
+                VehicleAssignment::create(Arr::only(
+                    $payload['vehicle_assignment'],
+                    [
+                        'vehicle_id',
+                        'employee_id',
+                        'position',
+                        'start_date',
+                        'end_date',
+                        'notes',
+                        'is_return_trip',
+                        'logistics_event_id',
+                    ]
+                ));
+            }
+        }
     }
 
     /**

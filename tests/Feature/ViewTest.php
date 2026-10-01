@@ -225,11 +225,13 @@ class ViewTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertViewIs('weekly-overview.index');
-        $response->assertSee('Kończą rotację', false);
+        $response->assertSee('Transfery', false);
+        $response->assertSee('kończy rotację', false);
         $response->assertSee('Wyjeżdża:', false);
         $response->assertSee('Zjeżdża:', false);
         $response->assertSee('Ławka', false);
         $response->assertSee('Do dosłania', false);
+        $response->assertSee("openPanel('transfers'", false);
         $response->assertSee("openPanel('housing'", false);
         $response->assertSee("openPanel('field-vehicles'", false);
         $response->assertSee("openPanel('bench'", false);

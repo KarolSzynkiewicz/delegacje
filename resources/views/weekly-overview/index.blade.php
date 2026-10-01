@@ -73,6 +73,7 @@
     @include('weekly-overview.partials.week-summary', [
         'returnTrips' => $returnTrips,
         'allDepartures' => $allDepartures,
+        'allTransfers' => $allTransfers,
         'employeesInFieldCount' => $employeesInFieldCount,
         'employeesNeededCount' => $employeesNeededCount,
         'employeesInFieldByProject' => $employeesInFieldByProject,

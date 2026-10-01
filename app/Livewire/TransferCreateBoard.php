@@ -65,10 +65,26 @@ class TransferCreateBoard extends Component
     /** assignment | transport */
     public string $mode = 'assignment';
 
-    /** FK do wyjazdu (DEPARTURE) — zapisywane na transferze jako related_departure_id */
+    /**
+     * Parent logistics event id (DEPARTURE lub plan zmian) — zapisywane jako related_departure_id.
+     * Gdy ustawione, kreator jest zablokowany na tryb „transport”.
+     */
     public ?int $relatedDepartureId = null;
 
-    /** Remount EmployeePicker po powiązaniu z wyjazdem (żeby przejąć listę osób). */
+    public ?int $parentEventId = null;
+
+    /** true = tylko przejazd (z kontekstu parenta); false = tylko plan przypisań */
+    public bool $transportOnly = false;
+
+    /**
+     * Istniejący plan zmian — tryb „dopisz”: kanban z tą datą, osoby już w planie zablokowane.
+     */
+    public ?int $extendPlanId = null;
+
+    /** @var list<int> */
+    public array $planEmployeeIds = [];
+
+    /** Remount EmployeePicker po powiązaniu z parentem (żeby przejąć listę osób). */
     public int $employeePickerKey = 0;
 
     public ?string $successBanner = null;
@@ -111,6 +127,9 @@ class TransferCreateBoard extends Component
     public bool $showCalendarModal = false;
 
     public ?int $pendingEmployeeId = null;
+
+    /** @var list<int> Role IDs of pending employee (avoids N× hasRole queries in gaps modal). */
+    public array $pendingEmployeeRoleIds = [];
 
     public ?int $selectedRoleId = null;
 
@@ -201,64 +220,6 @@ class TransferCreateBoard extends Component
         $this->groundTransferConfig = $config;
     }
 
-    public function updatedRelatedDepartureId(mixed $value): void
-    {
-        $id = $value === null || $value === '' ? null : (int) $value;
-        $this->relatedDepartureId = $id > 0 ? $id : null;
-
-        if ($this->relatedDepartureId === null) {
-            return;
-        }
-
-        $departure = LogisticsEvent::query()
-            ->whereKey($this->relatedDepartureId)
-            ->where('type', LogisticsEventType::DEPARTURE)
-            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
-            ->with(['participants', 'fromLocation', 'toLocation'])
-            ->first();
-
-        if (! $departure) {
-            $this->relatedDepartureId = null;
-            session()->flash('warning', 'Nie znaleziono wyjazdu do powiązania.');
-
-            return;
-        }
-
-        $employeeIds = $departure->participants
-            ->pluck('employee_id')
-            ->map(fn ($eid) => (int) $eid)
-            ->filter(fn (int $eid) => $eid > 0)
-            ->unique()
-            ->values()
-            ->all();
-
-        $this->mode = 'transport';
-        $this->selectedEmployeeIds = $employeeIds;
-        $this->employeePickerKey++;
-
-        if ($this->departureDate === '' && $departure->event_date) {
-            $this->departureDate = $departure->event_date->format('Y-m-d');
-        }
-        if ($this->endDate === '' && ($departure->end_date || $departure->event_date)) {
-            $this->endDate = ($departure->end_date ?? $departure->event_date)->format('Y-m-d');
-        }
-
-        if ($this->transportMode === 'own' && ! empty($this->vehicleId)) {
-            $this->initVehicleSeats();
-        }
-
-        if ($this->transportMode === 'public') {
-            $this->ticketCostsByEmployee = array_intersect_key(
-                $this->ticketCostsByEmployee,
-                array_flip($this->selectedEmployeeIds)
-            );
-            $this->ticketAttachmentUploads = array_intersect_key(
-                $this->ticketAttachmentUploads,
-                array_flip($this->selectedEmployeeIds)
-            );
-        }
-    }
-
     /**
      * Wyjazdy do dropdownu „Powiąż z innym transportem”.
      *
@@ -269,13 +230,14 @@ class TransferCreateBoard extends Component
         return LogisticsEvent::query()
             ->where('type', LogisticsEventType::DEPARTURE)
             ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
-            ->with(['participants', 'fromLocation', 'toLocation'])
+            ->with(['fromLocation:id,name', 'toLocation:id,name'])
+            ->withCount('participants')
             ->orderByDesc('event_date')
             ->orderByDesc('id')
             ->limit(80)
             ->get()
             ->map(function (LogisticsEvent $event) {
-                $people = $event->participants->count();
+                $people = (int) $event->participants_count;
                 $transport = $event->vehicle_id ? 'własny' : 'publiczny';
                 $from = $event->fromLocation?->name ?? '?';
                 $to = $event->toLocation?->name ?? '?';
@@ -371,17 +333,141 @@ class TransferCreateBoard extends Component
     // Lifecycle
     // -------------------------------------------------------------------------
 
-    public function mount(): void
+    public function mount(?int $parentEventId = null, ?int $extendPlanId = null): void
     {
         $now = now();
         $this->departureDate = $now->format('Y-m-d');
         $this->endDate = $now->format('Y-m-d');
         $this->transferDate = $this->departureDate;
+
+        $planId = $extendPlanId ?: (int) request()->query('plan', 0);
+        if ($planId > 0) {
+            $this->bindExtendPlan($planId);
+
+            return;
+        }
+
+        $parentId = $parentEventId ?: (int) request()->query('parent', 0);
+        if ($parentId > 0) {
+            $this->bindParentEvent($parentId);
+        } else {
+            $this->mode = 'assignment';
+            $this->transportOnly = false;
+        }
+    }
+
+    /**
+     * Dopisywanie osób do istniejącego planu zmian — kanban z tą samą datą.
+     */
+    protected function bindExtendPlan(int $planId): void
+    {
+        $plan = LogisticsEvent::query()
+            ->whereKey($planId)
+            ->where('type', LogisticsEventType::TRANSFER)
+            ->where('has_reassignment', true)
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->with('participants')
+            ->first();
+
+        if (! $plan) {
+            session()->flash('warning', 'Nie znaleziono planu zmian do dopisania.');
+
+            return;
+        }
+
+        $this->extendPlanId = (int) $plan->id;
+        $this->mode = 'assignment';
+        $this->transportOnly = false;
+        $day = $plan->event_date?->format('Y-m-d') ?? now()->format('Y-m-d');
+        $this->departureDate = $day;
+        $this->endDate = $day;
+        $this->transferDate = $day;
+        $this->planEmployeeIds = $plan->participants
+            ->pluck('employee_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Podpięcie kreatora transportu do wyjazdu albo planu zmian.
+     */
+    protected function bindParentEvent(int $parentId): void
+    {
+        $parent = LogisticsEvent::query()
+            ->whereKey($parentId)
+            ->where(function ($q) {
+                $q->where('type', LogisticsEventType::DEPARTURE)
+                    ->orWhere(function ($q2) {
+                        $q2->where('type', LogisticsEventType::TRANSFER)
+                            ->where('has_reassignment', true);
+                    });
+            })
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->with(['participants', 'fromLocation', 'toLocation'])
+            ->first();
+
+        if (! $parent) {
+            session()->flash('warning', 'Nie znaleziono zdarzenia nadrzędnego do dodania transportu.');
+
+            return;
+        }
+
+        $this->parentEventId = (int) $parent->id;
+        $this->relatedDepartureId = (int) $parent->id;
+        $this->transportOnly = true;
+        $this->mode = 'transport';
+
+        $employeeIds = $parent->participants
+            ->pluck('employee_id')
+            ->map(fn ($eid) => (int) $eid)
+            ->filter(fn (int $eid) => $eid > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->selectedEmployeeIds = $employeeIds;
+        $this->employeePickerKey++;
+
+        if ($parent->event_date) {
+            $this->departureDate = $parent->event_date->format('Y-m-d');
+            $this->transferDate = $this->departureDate;
+        }
+        if ($parent->end_date || $parent->event_date) {
+            $this->endDate = ($parent->end_date ?? $parent->event_date)->format('Y-m-d');
+        }
+    }
+
+    public function updatedRelatedDepartureId(mixed $value): void
+    {
+        $id = $value === null || $value === '' ? null : (int) $value;
+        $this->relatedDepartureId = $id > 0 ? $id : null;
+
+        if ($this->relatedDepartureId === null || $this->transportOnly) {
+            return;
+        }
+
+        $this->bindParentEvent($this->relatedDepartureId);
     }
 
     public function updatedDepartureDate(): void
     {
+        if ($this->extendPlanId) {
+            $plan = LogisticsEvent::query()->find($this->extendPlanId);
+            $locked = $plan?->event_date?->format('Y-m-d');
+            if ($locked) {
+                $this->departureDate = $locked;
+                $this->endDate = $locked;
+                $this->transferDate = $locked;
+            }
+
+            return;
+        }
+
         $this->transferDate = $this->departureDate;
+        $this->endDate = $this->departureDate;
         $this->draftProjectByAssignment = [];
         $this->draftAssignmentDetails = [];
         $this->successBanner = null;
@@ -449,6 +535,12 @@ class TransferCreateBoard extends Component
 
     public function updatedMode(string $value): void
     {
+        if ($this->transportOnly) {
+            $this->mode = 'transport';
+        } else {
+            $this->mode = 'assignment';
+        }
+
         if ($this->transportMode !== 'own') {
             return;
         }
@@ -475,6 +567,11 @@ class TransferCreateBoard extends Component
             return collect();
         }
 
+        // Public mode never shows the own-fleet list — skip the location filter entirely.
+        if ($this->transportMode === 'public') {
+            return collect();
+        }
+
         $vehicles = Vehicle::where('type', 'company_vehicle')
             ->operational()
             ->orderBy('registration_number')
@@ -484,14 +581,27 @@ class TransferCreateBoard extends Component
             return $vehicles;
         }
 
+        if ($vehicles->isEmpty()) {
+            return $vehicles;
+        }
+
         $departureDate = Carbon::parse($this->departureDate);
         $locationTrackingService = app(LocationTrackingService::class);
+        $vehicleIds = $vehicles->pluck('id')->all();
 
-        return $vehicles->filter(function (Vehicle $vehicle) use ($departureDate, $locationTrackingService) {
-            $status = $locationTrackingService->getVehicleLocationStatus($vehicle, $departureDate);
+        // Same criteria as getVehicleLocationStatus: outside base and not in transit,
+        // but batched (one last-event query) instead of N heavy per-vehicle lookups.
+        $outsideIds = array_fill_keys(
+            $locationTrackingService->vehicleIdsOutsideBaseOn($vehicleIds, $departureDate),
+            true
+        );
+        $inTransitIds = $locationTrackingService->inTransitVehicleIds($vehicleIds, $departureDate);
 
-            return ! $status['in_transit'] && $status['outside_base'];
-        });
+        return $vehicles->filter(function (Vehicle $vehicle) use ($outsideIds, $inTransitIds) {
+            $id = (int) $vehicle->id;
+
+            return isset($outsideIds[$id]) && ! isset($inTransitIds[$id]);
+        })->values();
     }
 
     public function getAvailablePublicTransportHubsProperty()
@@ -933,18 +1043,24 @@ class TransferCreateBoard extends Component
 
     public function getDraftEmployeeIdsProperty(): array
     {
-        $ids = [];
+        $assignmentIds = [];
         foreach ($this->draftProjectByAssignment as $assignmentId => $_) {
-            if (empty($this->draftAssignmentDetails[$assignmentId])) {
-                continue;
-            }
-            $pa = ProjectAssignment::query()->find($assignmentId);
-            if ($pa) {
-                $ids[$pa->employee_id] = true;
+            if (! empty($this->draftAssignmentDetails[$assignmentId])) {
+                $assignmentIds[] = (int) $assignmentId;
             }
         }
 
-        return array_map('intval', array_keys($ids));
+        if ($assignmentIds === []) {
+            return [];
+        }
+
+        return ProjectAssignment::query()
+            ->whereIn('id', $assignmentIds)
+            ->pluck('employee_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
@@ -1316,6 +1432,12 @@ class TransferCreateBoard extends Component
             return;
         }
 
+        if ($this->extendPlanId) {
+            $this->saveExtendPlanDraftToSystem();
+
+            return;
+        }
+
         try {
             $event = $this->transferService->commitTransfer($this->buildCommitTransferPayload());
         } catch (ValidationException $e) {
@@ -1333,7 +1455,76 @@ class TransferCreateBoard extends Component
         $this->successBanner = null;
         $this->resetTransferWizardState();
 
-        session()->flash('success', 'Transfer został zapisany — wrócono do tablicy. Szczegóły zdarzenia: #'.$event->id.'.');
+        session()->flash('success', 'Transfer został zapisany.');
+        $this->redirect(route('transfers.show', $event), navigate: true);
+    }
+
+    /**
+     * Dopisuje nowe osoby ze szkicu do istniejącego planu zmian.
+     */
+    protected function saveExtendPlanDraftToSystem(): void
+    {
+        $transfer = LogisticsEvent::query()
+            ->whereKey($this->extendPlanId)
+            ->where('type', LogisticsEventType::TRANSFER)
+            ->where('has_reassignment', true)
+            ->first();
+
+        if (! $transfer) {
+            session()->flash('warning', 'Nie znaleziono planu zmian.');
+
+            return;
+        }
+
+        $payload = $this->buildCommitTransferPayload();
+        $reassignments = $payload['reassignments'] ?? [];
+        $added = 0;
+
+        try {
+            foreach ($reassignments as $employeeId => $row) {
+                $employeeId = (int) $employeeId;
+                if ($employeeId <= 0) {
+                    continue;
+                }
+                if (in_array($employeeId, $this->planEmployeeIds, true)) {
+                    continue;
+                }
+
+                $this->transferService->addParticipant($transfer, [
+                    'employee_id' => $employeeId,
+                    'project_id' => $row['project_id'] ?? null,
+                    'role_id' => $row['role_id'] ?? null,
+                    'start_date' => $row['start_date'] ?? null,
+                    'end_date' => $row['end_date'] ?? null,
+                    'accommodation_id' => $row['accommodation_id'] ?? null,
+                    'vehicle_id' => $row['vehicle_id'] ?? null,
+                    'vehicle_position' => $row['vehicle_position'] ?? null,
+                ]);
+                $added++;
+            }
+        } catch (ValidationException $e) {
+            session()->flash('warning', collect($e->errors())->flatten()->first() ?: $e->getMessage());
+
+            return;
+        } catch (\Throwable $e) {
+            session()->flash('warning', $e->getMessage());
+
+            return;
+        }
+
+        if ($added === 0) {
+            session()->flash('warning', 'Brak nowych osób do dopisania — przeciągnij kogoś spoza planu.');
+
+            return;
+        }
+
+        $this->draftProjectByAssignment = [];
+        $this->draftAssignmentDetails = [];
+        $this->successBanner = null;
+        $this->resetTransferWizardState();
+
+        session()->flash('success', 'Dopisano '.$added.' '.($added === 1 ? 'osobę' : 'osób').' do planu.');
+        $this->redirect(route('transfers.show', $transfer), navigate: true);
     }
 
     // -------------------------------------------------------------------------
@@ -1501,48 +1692,10 @@ class TransferCreateBoard extends Component
         if ($this->draftProjectByAssignment === []) {
             return 'Brak szkicu przypisań do projektu.';
         }
-        if ($this->transportMode === null) {
-            return 'Wybierz sposób transportu (Publiczny / Własny) w sekcji „Szczegóły transferu".';
+        if ($this->departureDate === '') {
+            return 'Uzupełnij datę zmian.';
         }
-        if ($this->departureDate === '' || $this->endDate === '') {
-            return 'Uzupełnij datę początkową i datę zakończenia.';
-        }
-        if ($this->departureDate > $this->endDate) {
-            return 'Data zakończenia nie może być wcześniejsza niż data początkowa.';
-        }
-        if ($this->transportMode === 'public') {
-            if ($this->publicTransportHubKind === null) {
-                return 'Wybierz typ punktu: lotnisko lub dworzec.';
-            }
-            $hubPurpose = $this->publicTransportHubKind === 'station'
-                ? LocationPurposeType::STATION
-                : LocationPurposeType::AIRPORT;
-            if (empty($this->sharedStartAirportLocationId) || ! Location::matchesPurpose((int) $this->sharedStartAirportLocationId, $hubPurpose)) {
-                return 'Wybierz prawidłowy punkt startowy (lotnisko / dworzec).';
-            }
-            if (empty($this->sharedEndAirportLocationId) || ! Location::matchesPurpose((int) $this->sharedEndAirportLocationId, $hubPurpose)) {
-                return 'Wybierz prawidłowy punkt docelowy (lotnisko / dworzec).';
-            }
-            if ((int) $this->sharedStartAirportLocationId === (int) $this->sharedEndAirportLocationId) {
-                return 'Punkt startowy i docelowy nie mogą być takie same.';
-            }
-        } elseif ($this->transportMode === 'own') {
-            if (empty($this->vehicleId)) {
-                return 'Wybierz pojazd służbowy (transport własny).';
-            }
-            $ownConfig = TransferGroundConfig::fromArray($this->groundTransferConfig);
-            $ownWaypoints = $ownConfig->routeWaypoints;
-            if (count($ownWaypoints) < 2) {
-                return 'Skonfiguruj trasę — transport własny wymaga co najmniej 2 przystanków (start i cel).';
-            }
-            $firstLocId = str_starts_with((string) ($ownWaypoints[0] ?? ''), 'loc:')
-                ? (int) substr($ownWaypoints[0], 4) : 0;
-            $lastLocId = str_starts_with((string) ($ownWaypoints[count($ownWaypoints) - 1] ?? ''), 'loc:')
-                ? (int) substr($ownWaypoints[count($ownWaypoints) - 1], 4) : 0;
-            if ($firstLocId > 0 && $firstLocId === $lastLocId) {
-                return 'Start i cel trasy to ta sama lokalizacja — skonfiguruj trasę z różnym punktem startowym i docelowym.';
-            }
-        }
+        $this->endDate = $this->departureDate;
 
         $seenEmployees = [];
         foreach ($this->draftProjectByAssignment as $assignmentId => $_) {
@@ -1630,8 +1783,8 @@ class TransferCreateBoard extends Component
             'from_location_id' => $fromLocationId,
             'to_location_id' => $toLocationId,
             'transfer_date' => $transferMoment,
-            'vehicle_id' => $this->transportMode === 'own' ? ($this->vehicleId ?: null) : null,
-            'notes' => 'Transfer z tablicy (kreator)',
+            'vehicle_id' => null,
+            'notes' => 'Plan zmian przypisań (kreator)',
             'route_distance' => null,
             'route_duration' => null,
             'route_waypoints' => null,
@@ -1641,7 +1794,7 @@ class TransferCreateBoard extends Component
             'driver_payment_amount' => null,
             'driver_payment_currency' => null,
             'driver_payroll_id' => null,
-            'related_departure_id' => $this->relatedDepartureId,
+            'related_departure_id' => null,
         ];
     }
 
@@ -1739,6 +1892,15 @@ class TransferCreateBoard extends Component
             return;
         }
 
+        if (
+            $this->extendPlanId
+            && in_array((int) $assignment->employee_id, $this->planEmployeeIds, true)
+        ) {
+            session()->flash('warning', 'Ta osoba jest już w planie — przeciągnij kogoś innego.');
+
+            return;
+        }
+
         $project = Project::query()
             ->where('status', ProjectStatus::ACTIVE)
             ->activeAtDate($date)
@@ -1759,9 +1921,19 @@ class TransferCreateBoard extends Component
         $this->pendingAssignmentId = $assignmentId;
         $this->pendingTargetProjectId = $targetProjectId;
         $this->pendingEmployeeId = $assignment->employee_id;
+        $this->pendingEmployeeRoleIds = $assignment->employee->roles
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
 
         $arrival = $date->copy();
-        $gapsAll = $this->departurePlannerService->getProjectGapsForTwoWeeks($arrival);
+        $gapsAll = $this->departurePlannerService->getProjectGapsForTwoWeeks(
+            $arrival,
+            [],
+            [],
+            [$targetProjectId]
+        );
         $slice = $gapsAll[$targetProjectId] ?? null;
 
         $project->loadMissing('location');
@@ -1792,11 +1964,7 @@ class TransferCreateBoard extends Component
 
     public function employeeHasRole(int $roleId): bool
     {
-        if (! $this->pendingEmployeeId) {
-            return false;
-        }
-
-        return Employee::find($this->pendingEmployeeId)?->hasRole($roleId) ?? false;
+        return in_array($roleId, $this->pendingEmployeeRoleIds, true);
     }
 
     protected function fallbackRolesFromDemands(Project $project, Carbon $arrival): array
@@ -2048,6 +2216,7 @@ class TransferCreateBoard extends Component
         $this->pendingAssignmentId = null;
         $this->pendingTargetProjectId = null;
         $this->pendingEmployeeId = null;
+        $this->pendingEmployeeRoleIds = [];
         $this->gapsModalProject = null;
         $this->gapsModalRoles = [];
         $this->showGapsModal = false;
@@ -2099,7 +2268,12 @@ class TransferCreateBoard extends Component
         $assignments = ProjectAssignment::query()
             ->activeAtDate($date)
             ->whereHas('project', fn ($q) => $q->where('status', ProjectStatus::ACTIVE))
-            ->with(['project.location', 'employee', 'role'])
+            ->with([
+                'project.location',
+                'employee.latestEvaluation.createdBy',
+                'employee.roles',
+                'role',
+            ])
             ->orderBy('project_id')
             ->orderBy('employee_id')
             ->get();
@@ -2122,8 +2296,33 @@ class TransferCreateBoard extends Component
             $byProject->get($effectiveProjectId)['assignments']->push($assignment);
         }
 
+        $projectIds = $byProject->keys()->map(fn ($id) => (int) $id)->all();
+        $siteLeadPairs = [];
+        if ($projectIds !== []) {
+            $leads = \App\Models\ProjectSiteLead::query()
+                ->whereIn('project_id', $projectIds)
+                ->where('start_date', '<=', $date)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $date))
+                ->get(['project_id', 'employee_id']);
+            foreach ($leads as $lead) {
+                $siteLeadPairs[(int) $lead->project_id.':'.(int) $lead->employee_id] = true;
+            }
+        }
+
         return $byProject
             ->sortBy(fn (array $col) => mb_strtolower($col['project']->name))
+            ->map(function (array $col) use ($siteLeadPairs) {
+                $projectId = (int) $col['project']->id;
+                $col['site_lead_employee_ids'] = [];
+                foreach ($col['assignments'] as $assignment) {
+                    $key = $projectId.':'.(int) $assignment->employee_id;
+                    if (isset($siteLeadPairs[$key])) {
+                        $col['site_lead_employee_ids'][(int) $assignment->employee_id] = true;
+                    }
+                }
+
+                return $col;
+            })
             ->values()
             ->all();
     }

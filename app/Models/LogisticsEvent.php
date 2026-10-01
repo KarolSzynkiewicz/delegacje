@@ -155,7 +155,8 @@ class LogisticsEvent extends Model
     }
 
     /**
-     * Wyjazd (DEPARTURE), z którego utworzono ten transfer (np. lotnisko → baza).
+     * Wyjazd / plan zmian, do którego doklejono ten przejazd (FK related_departure_id —
+     * historyczna nazwa; parentem może być DEPARTURE albo TRANSFER z has_reassignment).
      */
     public function relatedDeparture(): BelongsTo
     {
@@ -163,11 +164,37 @@ class LogisticsEvent extends Model
     }
 
     /**
-     * Transfery powiązane z tym wyjazdem (np. transfer z lotniska przy transporcie zbiorowym).
+     * Zdarzenia (głównie przejazdy) powiązane z tym eventem jako parentem.
      */
     public function transfersLinkedFromThisDeparture(): HasMany
     {
         return $this->hasMany(self::class, 'related_departure_id');
+    }
+
+    /**
+     * Plan zmian przypisań (roszady projekt/dom/auto) — bez wymogu trasy/pojazdu na tym rekordzie.
+     */
+    public function isReassignmentPlan(): bool
+    {
+        return $this->type === LogisticsEventType::TRANSFER && (bool) $this->has_reassignment;
+    }
+
+    /**
+     * Sam przejazd (kto/czym/skąd/dokąd), bez zmiany przypisań.
+     */
+    public function isTransportLeg(): bool
+    {
+        return $this->type === LogisticsEventType::TRANSFER && ! $this->has_reassignment;
+    }
+
+    /**
+     * Transporty (przejazdy) doklejone do tego zdarzenia (wyjazdu lub planu zmian).
+     */
+    public function linkedTransportLegs(): HasMany
+    {
+        return $this->transfersLinkedFromThisDeparture()
+            ->where('type', LogisticsEventType::TRANSFER)
+            ->where('has_reassignment', false);
     }
 
     /**

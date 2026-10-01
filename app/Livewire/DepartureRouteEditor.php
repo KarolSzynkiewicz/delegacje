@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 
 /**
- * Bezinwazyjna edycja przebiegu trasy wyjazdu (własny transport):
+ * Bezinwazyjna edycja przebiegu trasy (własny transport) dla wyjazdu lub transferu:
  * waypointy, notatki przystanków, dystans/czas — ten sam panel co Step4 / GroundTransferSlot.
  */
 class DepartureRouteEditor extends Component
@@ -27,6 +27,9 @@ class DepartureRouteEditor extends Component
     public string $triggerLabel = 'Edytuj trasę';
 
     public string $triggerVariant = 'outline';
+
+    /** departure|transfer — for UI copy without extra queries */
+    public string $eventKind = 'departure';
 
     /** @var list<string> */
     public array $routeWaypoints = [];
@@ -50,11 +53,12 @@ class DepartureRouteEditor extends Component
 
     public function mount(LogisticsEvent $departure): void
     {
-        if ($departure->type !== LogisticsEventType::DEPARTURE) {
+        if (! in_array($departure->type, [LogisticsEventType::DEPARTURE, LogisticsEventType::TRANSFER], true)) {
             abort(404);
         }
 
         $this->departureId = (int) $departure->id;
+        $this->eventKind = $departure->type === LogisticsEventType::TRANSFER ? 'transfer' : 'departure';
         $this->hydrateFromDeparture($departure);
     }
 
@@ -169,7 +173,9 @@ class DepartureRouteEditor extends Component
 
         $departure = $this->departure();
         if (! $this->canEdit($departure)) {
-            $this->saveError = 'Tego wyjazdu nie można edytować.';
+            $this->saveError = $departure->type === LogisticsEventType::TRANSFER
+                ? 'Tego transferu nie można edytować.'
+                : 'Tego wyjazdu nie można edytować.';
 
             return;
         }
@@ -198,10 +204,20 @@ class DepartureRouteEditor extends Component
             $attributes['to_location_id'] = $toLocationId;
         }
 
+        if ($departure->type === LogisticsEventType::TRANSFER) {
+            $fromLocationId = $this->resolveOriginLocationId($normalized);
+            if ($fromLocationId) {
+                $attributes['from_location_id'] = $fromLocationId;
+            }
+        }
+
         $departure->update($attributes);
 
         $this->showModal = false;
-        $this->redirect(route('departures.show', $departure), navigate: true);
+        $redirect = $departure->type === LogisticsEventType::TRANSFER
+            ? route('transfers.show', $departure)
+            : route('departures.show', $departure);
+        $this->redirect($redirect, navigate: true);
     }
 
     public function getRouteTilesProperty(): array
@@ -320,7 +336,7 @@ class DepartureRouteEditor extends Component
     {
         return LogisticsEvent::query()
             ->whereKey($this->departureId)
-            ->where('type', LogisticsEventType::DEPARTURE)
+            ->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::TRANSFER])
             ->firstOrFail();
     }
 
@@ -328,6 +344,11 @@ class DepartureRouteEditor extends Component
     {
         return $departure->vehicle_id
             && in_array($departure->status, [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED], true);
+    }
+
+    public function getEventKindLabelProperty(): string
+    {
+        return $this->eventKind === 'transfer' ? 'transfer' : 'wyjazd';
     }
 
     protected function hydrateFromDeparture(LogisticsEvent $departure): void
@@ -425,17 +446,34 @@ class DepartureRouteEditor extends Component
             return null;
         }
 
-        $last = LogisticsEvent::parseRouteWaypointKey(end($normalized));
-        if (! $last) {
+        return $this->resolveLocationIdFromWaypointKey((string) end($normalized));
+    }
+
+    /**
+     * @param  list<string>  $normalized
+     */
+    protected function resolveOriginLocationId(array $normalized): ?int
+    {
+        if ($normalized === []) {
             return null;
         }
 
-        if ($last['type'] === 'loc') {
-            return $last['id'] > 0 ? $last['id'] : null;
+        return $this->resolveLocationIdFromWaypointKey((string) $normalized[0]);
+    }
+
+    protected function resolveLocationIdFromWaypointKey(string $key): ?int
+    {
+        $parsed = LogisticsEvent::parseRouteWaypointKey($key);
+        if (! $parsed) {
+            return null;
         }
 
-        if ($last['type'] === 'acc') {
-            $acc = Accommodation::find($last['id']);
+        if ($parsed['type'] === 'loc') {
+            return $parsed['id'] > 0 ? $parsed['id'] : null;
+        }
+
+        if ($parsed['type'] === 'acc') {
+            $acc = Accommodation::find($parsed['id']);
             if (! $acc) {
                 return null;
             }

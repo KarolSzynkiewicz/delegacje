@@ -61,6 +61,13 @@ class WeeklyOverviewController extends Controller
             ->orderBy('event_date')
             ->get();
 
+        $allTransfers = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::TRANSFER)
+            ->where('status', '!=', \App\Enums\LogisticsEventStatus::CANCELLED)
+            ->whereBetween('event_date', [$weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay()])
+            ->with(['participants.employee', 'vehicle', 'fromLocation', 'toLocation'])
+            ->orderBy('event_date')
+            ->get();
+
         // Get ALL departures for the week (exclude CANCELLED) - for arrivals section
         // Use end_date (arrival date) to show arrivals in the correct week
         $allDepartures = \App\Models\LogisticsEvent::where('type', \App\Enums\LogisticsEventType::DEPARTURE)
@@ -149,7 +156,7 @@ class WeeklyOverviewController extends Controller
         $toSendStayingPeople = $toSend['staying_people'];
         $toSendLeavingPeople = $toSend['leaving_people'];
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel', 'housingOccupied', 'housingCapacity', 'housingHouses', 'vehicleOccupied', 'vehicleCapacity', 'fieldVehicles', 'benchWithRotation', 'benchWithoutRotation', 'benchWithPeople', 'benchWithoutPeople', 'benchDayLabel', 'toSendCount', 'toSendNextDemand', 'toSendStaying', 'toSendDemandByProject', 'toSendStayingPeople', 'toSendLeavingPeople'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'allTransfers', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel', 'housingOccupied', 'housingCapacity', 'housingHouses', 'vehicleOccupied', 'vehicleCapacity', 'fieldVehicles', 'benchWithRotation', 'benchWithoutRotation', 'benchWithPeople', 'benchWithoutPeople', 'benchDayLabel', 'toSendCount', 'toSendNextDemand', 'toSendStaying', 'toSendDemandByProject', 'toSendStayingPeople', 'toSendLeavingPeople'));
     }
 
     /**

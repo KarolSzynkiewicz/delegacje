@@ -14,6 +14,7 @@
     @include('weekly-overview.partials.week-summary', [
         'returnTrips' => $w['returnTrips'],
         'allDepartures' => $w['allDepartures'],
+        'allTransfers' => $w['allTransfers'] ?? collect(),
         'employeesInFieldCount' => $w['employeesInFieldCount'],
         'employeesNeededCount' => $w['employeesNeededCount'],
         'employeesInFieldByProject' => $w['employeesInFieldByProject'],

@@ -30,7 +30,7 @@
                         <div class="modal-header border-secondary">
                             <h5 class="modal-title">
                                 <i class="bi bi-signpost-split text-info me-2"></i>
-                                Edycja przebiegu trasy — wyjazd #{{ $departureId }}
+                                Edycja przebiegu trasy — {{ $this->eventKindLabel }} #{{ $departureId }}
                             </h5>
                             <button type="button" class="btn-close btn-close-white" wire:click="closeModal" aria-label="Zamknij"></button>
                         </div>

@@ -639,6 +639,16 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
                 ->name('transfers.cancel')
                 ->defaults('permission_type', 'action');
 
+            Route::post('transfers/{transfer}/participants/{employee}/remove', [\App\Http\Controllers\TransferController::class, 'removeParticipant'])
+                ->name('transfers.participants.remove')
+                ->defaults('permission_type', 'action');
+
+            Route::get('transfers/{transfer}/participants/create', [\App\Http\Controllers\TransferParticipantController::class, 'create'])
+                ->name('transfers.participants.create');
+            Route::post('transfers/{transfer}/participants', [\App\Http\Controllers\TransferParticipantController::class, 'store'])
+                ->name('transfers.participants.store')
+                ->defaults('permission_type', 'action');
+
             Route::get('transfers', [\App\Http\Controllers\TransferController::class, 'index'])
                 ->name('transfers.index');
             Route::get('transfers/create', [\App\Http\Controllers\TransferController::class, 'create'])

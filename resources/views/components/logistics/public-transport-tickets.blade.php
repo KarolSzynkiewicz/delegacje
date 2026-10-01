@@ -16,12 +16,14 @@
      */
     'attachmentFlatBindingKey' => null,
     'flatAttachmentUploads' => [],
+    'readOnly' => false,
 ])
 
 @php
     use App\Support\PublicTransportTicketCosts;
 
     $variant = in_array($variant, ['cards', 'table'], true) ? $variant : 'cards';
+    $readOnly = (bool) $readOnly;
     $currencyValues = $currencies === null
         ? ['PLN', 'EUR', 'USD']
         : collect($currencies)->map(function ($c) {
@@ -31,7 +33,7 @@
     $frameStyle = $variant === 'cards'
         ? 'border-top: 1px solid rgba(255,255,255,0.08);'
         : '';
-    if ($ticketsIncomplete) {
+    if (! $readOnly && $ticketsIncomplete) {
         $frameStyle .= ' border: 1px solid rgba(239,68,68,0.55) !important; background: rgba(239,68,68,0.07); box-shadow: 0 0 0 1px rgba(239,68,68,0.12);';
     }
 
@@ -43,11 +45,11 @@
 
 <div {{ $attributes->class($rootClasses) }} style="{{ $frameStyle }}">
     <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
-        <i class="bi bi-ticket-perforated {{ $ticketsIncomplete ? 'text-danger' : 'text-info' }}" style="font-size:0.9rem;"></i>
+        <i class="bi bi-ticket-perforated {{ (! $readOnly && $ticketsIncomplete) ? 'text-danger' : 'text-info' }}" style="font-size:0.9rem;"></i>
         @if($variant === 'table')
-            <h6 class="mb-0 fw-semibold {{ $ticketsIncomplete ? 'text-danger' : '' }}">{{ $sectionTitle }}</h6>
+            <h6 class="mb-0 fw-semibold {{ (! $readOnly && $ticketsIncomplete) ? 'text-danger' : '' }}">{{ $sectionTitle }}</h6>
         @else
-            <span class="small fw-semibold {{ $ticketsIncomplete ? 'text-danger' : '' }}">{{ $sectionTitle }}</span>
+            <span class="small fw-semibold {{ (! $readOnly && $ticketsIncomplete) ? 'text-danger' : '' }}">{{ $sectionTitle }}</span>
         @endif
     </div>
 
@@ -149,7 +151,7 @@
                     $ticketRowIncomplete = PublicTransportTicketCosts::isRowIncomplete($ticket, $requireAttachment);
                     $bind = $ticketCostsBindingKey;
                 @endphp
-                <div class="pt-ticket-card {{ $ticketRowIncomplete ? 'pt-ticket-card--incomplete' : '' }}" wire:key="{{ $wireKeyPrefix }}-{{ $employee->id }}">
+                <div class="pt-ticket-card {{ (! $readOnly && $ticketRowIncomplete) ? 'pt-ticket-card--incomplete' : '' }}" @unless($readOnly) wire:key="{{ $wireKeyPrefix }}-{{ $employee->id }}" @endunless>
                     <div class="pt-ticket-employee-name" title="{{ $employee->full_name }}">
                         <span class="pt-ticket-person-icon"><i class="bi bi-person-circle"></i></span>
                         <span class="text-truncate d-inline-block" style="max-width: 110px;">{{ $employee->full_name }}</span>
@@ -157,45 +159,78 @@
 
                     <div class="pt-ticket-form-row mt-2">
                         <div class="pt-ticket-amount">
-                            <input type="number" step="0.01" min="0"
-                                   wire:model.lazy="{{ $bind }}.{{ $employee->id }}.amount"
-                                   class="form-control form-control-sm @error($bind.'.'.$employee->id.'.amount') is-invalid @enderror"
-                                   placeholder="0.00">
-                            @error($bind.'.'.$employee->id.'.amount')
-                                <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div>
-                            @enderror
+                            @if($readOnly)
+                                <input type="text"
+                                       class="form-control form-control-sm"
+                                       value="{{ isset($ticket['amount']) && $ticket['amount'] !== '' && $ticket['amount'] !== null ? number_format((float) $ticket['amount'], 2, '.', '') : '—' }}"
+                                       disabled
+                                       tabindex="-1">
+                            @else
+                                <input type="number" step="0.01" min="0"
+                                       wire:model.lazy="{{ $bind }}.{{ $employee->id }}.amount"
+                                       class="form-control form-control-sm @error($bind.'.'.$employee->id.'.amount') is-invalid @enderror"
+                                       placeholder="0.00">
+                                @error($bind.'.'.$employee->id.'.amount')
+                                    <div class="invalid-feedback" style="font-size:.72rem;">{{ $message }}</div>
+                                @enderror
+                            @endif
                         </div>
                         <div class="pt-ticket-currency">
-                            <select wire:model.live="{{ $bind }}.{{ $employee->id }}.currency" class="form-select form-select-sm">
-                                @foreach($currencyValues as $val)
-                                    <option value="{{ $val }}" @selected(($ticket['currency'] ?? 'PLN') === $val)>{{ $val }}</option>
-                                @endforeach
-                            </select>
+                            @if($readOnly)
+                                <input type="text"
+                                       class="form-control form-control-sm"
+                                       value="{{ $ticket['currency'] ?? 'PLN' }}"
+                                       disabled
+                                       tabindex="-1">
+                            @else
+                                <select wire:model.live="{{ $bind }}.{{ $employee->id }}.currency" class="form-select form-select-sm">
+                                    @foreach($currencyValues as $val)
+                                        <option value="{{ $val }}" @selected(($ticket['currency'] ?? 'PLN') === $val)>{{ $val }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
                         </div>
                     </div>
 
-                    @if($requireAttachment)
+                    @if($requireAttachment || ($readOnly && $hasAttachment))
                         <div class="mt-2 d-flex align-items-center justify-content-between gap-2">
-                            <label class="pt-ticket-attach-btn {{ $hasAttachment ? 'is-attached' : '' }}"
-                                   for="{{ $fileInputId }}"
-                                   title="{{ $hasAttachment ? 'Załącznik dodany (kliknij aby zmienić)' : 'Dodaj załącznik' }}">
-                                <i class="bi bi-paperclip"></i>
-                            </label>
-                            <span class="small text-muted text-truncate" style="font-size:.72rem; max-width: 180px;">
-                                @if($hasAttachment)
-                                    Załącznik dodany
-                                @else
-                                    Dodaj bilet
-                                @endif
-                            </span>
-                            <input id="{{ $fileInputId }}"
-                                   type="file"
-                                   @if(! empty($attachmentFlatBindingKey))
-                                       wire:model.live="{{ $attachmentFlatBindingKey }}.{{ $employee->id }}"
-                                   @else
-                                       wire:model="{{ $bind }}.{{ $employee->id }}.attachment"
-                                   @endif
-                                   class="pt-ticket-file-input">
+                            @if($readOnly)
+                                @php $attachUrl = \App\Support\PublicDiskFileUrl::url($ticket['attachment_path'] ?? null); @endphp
+                                <span class="pt-ticket-attach-btn {{ $hasAttachment ? 'is-attached' : '' }} pe-none"
+                                      title="{{ $hasAttachment ? 'Załącznik' : 'Brak załącznika' }}">
+                                    <i class="bi bi-paperclip"></i>
+                                </span>
+                                <span class="small text-muted text-truncate" style="font-size:.72rem; max-width: 180px;">
+                                    @if($attachUrl)
+                                        <a href="{{ $attachUrl }}" target="_blank" rel="noopener" class="text-decoration-none">Załącznik</a>
+                                    @elseif($hasAttachment)
+                                        Załącznik
+                                    @else
+                                        Brak załącznika
+                                    @endif
+                                </span>
+                            @else
+                                <label class="pt-ticket-attach-btn {{ $hasAttachment ? 'is-attached' : '' }}"
+                                       for="{{ $fileInputId }}"
+                                       title="{{ $hasAttachment ? 'Załącznik dodany (kliknij aby zmienić)' : 'Dodaj załącznik' }}">
+                                    <i class="bi bi-paperclip"></i>
+                                </label>
+                                <span class="small text-muted text-truncate" style="font-size:.72rem; max-width: 180px;">
+                                    @if($hasAttachment)
+                                        Załącznik dodany
+                                    @else
+                                        Dodaj bilet
+                                    @endif
+                                </span>
+                                <input id="{{ $fileInputId }}"
+                                       type="file"
+                                       @if(! empty($attachmentFlatBindingKey))
+                                           wire:model.live="{{ $attachmentFlatBindingKey }}.{{ $employee->id }}"
+                                       @else
+                                           wire:model="{{ $bind }}.{{ $employee->id }}.attachment"
+                                       @endif
+                                       class="pt-ticket-file-input">
+                            @endif
                         </div>
                     @endif
                 </div>

@@ -124,6 +124,7 @@ final class DummyWorld
         return [
             'returnTrips' => collect([$mkEvent(41, $weekStart->copy()->addDays(4), [$people[3], $people[4]])]),
             'allDepartures' => collect([$mkEvent(42, $weekStart->copy()->addDays(1), [$people[0], $people[1], $people[2]], $location)]),
+            'allTransfers' => collect([$mkEvent(43, $weekStart->copy()->addDays(2), [$people[0], $people[2]], $location)]),
             'employeesInFieldCount' => 4,
             'employeesNeededCount' => 5,
             'employeesInFieldByProject' => collect([

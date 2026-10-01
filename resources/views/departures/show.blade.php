@@ -338,7 +338,7 @@
     @endphp
 
     @if($isPublicTransportDeparture && ($hasLinkedTransfers || $hasGroundLegTickets))
-        <x-ui.card label="Powiązane transfery" class="mb-0">
+        <x-ui.card label="Powiązane transporty" class="mb-0">
             <x-logistics.ground-transfer-tickets :rows="$groundLegTicketRows ?? []" />
 
             @if($hasLinkedTransfers)
@@ -351,7 +351,7 @@
                             <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
                                 <div>
                                     <a href="{{ route('transfers.show', $transfer) }}" class="fw-semibold text-decoration-none">
-                                        Transfer #{{ $transfer->id }}
+                                        Transport #{{ $transfer->id }}
                                     </a>
                                     @if($linkedTransfers->count() > 1)
                                         <span class="text-muted small ms-1">({{ $loop->iteration }}/{{ $linkedTransfers->count() }})</span>
@@ -401,20 +401,20 @@
             @endif
 
             <div class="mt-3 pt-3 border-top d-flex flex-wrap align-items-center gap-2" style="border-color: rgba(255,255,255,0.08) !important;">
-                <span class="small text-muted">Transfer na/z lotniska dodajesz osobno w kreatorze transferów.</span>
-                <a href="{{ route('transfers.create') }}" class="btn btn-sm btn-outline-info">
-                    <i class="bi bi-plus-lg me-1"></i>Nowy transfer
+                <span class="small text-muted">Transport na/z lotniska dodajesz osobno.</span>
+                <a href="{{ route('transfers.create', ['parent' => $departure->id]) }}" class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-plus-lg me-1"></i>Dodaj transport
                 </a>
             </div>
         </x-ui.card>
     @elseif($isPublicTransportDeparture)
-        <x-ui.card label="Transfery" class="mb-0">
+        <x-ui.card label="Transporty" class="mb-0">
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <p class="text-muted mb-0 small">
-                    Brak powiązanych transferów. Dojazd na lotnisko lub z lotniska do mieszkań planujesz w osobnym kreatorze — nie w wyjeździe.
+                    Brak powiązanych transportów. Dojazd na lotnisko lub z lotniska do mieszkań planujesz osobno.
                 </p>
-                <a href="{{ route('transfers.create') }}" class="btn btn-sm btn-outline-info flex-shrink-0">
-                    <i class="bi bi-plus-lg me-1"></i>Nowy transfer
+                <a href="{{ route('transfers.create', ['parent' => $departure->id]) }}" class="btn btn-sm btn-outline-info flex-shrink-0">
+                    <i class="bi bi-plus-lg me-1"></i>Dodaj transport
                 </a>
             </div>
         </x-ui.card>
