@@ -15346,6 +15346,47 @@ a.emp-rail__item { text-decoration: none; }
     font-weight: 650;
     letter-spacing: -0.02em;
 }
+.rax-period .btn {
+    color: var(--text-main);
+    border-color: var(--glass-border);
+    background: rgba(255, 255, 255, 0.03);
+}
+.rax-period .btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(148, 163, 184, 0.45);
+}
+.rax-period .btn.disabled,
+.rax-period .btn:disabled {
+    opacity: 0.75;
+}
+.rax-sort__select {
+    min-width: 13rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--glass-border);
+    color: var(--text-main);
+    font-size: 0.78rem;
+}
+.rax-menu__notes {
+    margin: 0.35rem 0 0.55rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    line-height: 1.4;
+}
+.rax-menu__notes-input {
+    background: rgba(0, 0, 0, 0.25);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: var(--text-main);
+    resize: vertical;
+    min-height: 4.5rem;
+}
+.rax-menu__notes-input:focus {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(59, 130, 246, 0.55);
+    color: var(--text-main);
+    box-shadow: 0 0 0 0.15rem rgba(59, 130, 246, 0.15);
+}
 .rax-legend {
     display: flex;
     flex-wrap: wrap;
@@ -15480,7 +15521,7 @@ a.emp-rail__item { text-decoration: none; }
 }
 .rax-person,
 .rax-lane {
-    height: 6.35rem;
+    height: 7.25rem;
     box-sizing: border-box;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
@@ -15627,22 +15668,48 @@ a.emp-rail__item { text-decoration: none; }
     height: auto;
     flex: none;
 }
-.rax-lane[data-can-delete="1"] .atl-bar {
+.rax-lane[data-can-delete="1"] .atl-bar:not(.rax-bar--context) {
     cursor: pointer;
 }
 .rax-lane .atl-bar,
 .rax-lane .atl-rubber {
-    top: 50%;
-    margin-top: -0.575rem;
-    height: 1.15rem;
+    top: calc(0.28rem + (var(--row, 0) * 1.65rem));
+    margin-top: 0;
+    height: 1.35rem;
 }
 .rax-lane .atl-bar {
-    padding: 0;
+    padding: 0 0.35rem;
     border-radius: 6px;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.rax-lane .atl-bar__label {
+    font-size: 0.62rem;
+    font-weight: 650;
+    line-height: 1.1;
+    color: #f8fafc;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.rax-lane .rax-bar--context {
+    pointer-events: none;
+    cursor: default;
+    z-index: 1;
+}
+.rax-lane .rax-bar--past,
+.rax-lane .rax-bar--active,
+.rax-lane .rax-bar--soon,
+.rax-lane .rax-bar--future {
+    z-index: 2;
 }
 .rax-lane .atl-bar.is-selected {
     outline: 2px solid rgba(255, 255, 255, 0.92);
     outline-offset: 1px;
+}
+.rax-lane .atl-rubber {
+    z-index: 3;
+    height: 1.35rem;
+    border-radius: 6px;
 }
 .rax .atl-popover {
     position: absolute;

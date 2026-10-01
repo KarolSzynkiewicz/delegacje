@@ -1,6 +1,7 @@
 <x-ui.card class="rax-card">
     <div
         class="rax"
+        wire:key="rax-axis-{{ $board['start'] }}-{{ $board['end'] }}"
         x-data="assignmentTimeline()"
         data-start="{{ $board['start'] }}"
         data-days="{{ $board['day_count'] }}"
@@ -9,25 +10,57 @@
         <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
             <div>
                 <div class="rax-heading">Rotacje · oś</div>
-                <div class="font-mono text-muted small">Oś przypisań · {{ $board['range_label'] }}</div>
-                <p class="rax-hint">Pusty tor rysujesz w bok, daty ciągniesz za krawędź, środek paska usuwa.</p>
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+                    <div class="rax-period btn-group" role="group" aria-label="Okres osi">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="previousPeriod" title="Poprzedni okres">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary font-mono {{ $periodOffset === 0 ? 'disabled' : '' }}"
+                            wire:click="resetPeriod"
+                            @disabled($periodOffset === 0)
+                            title="Wróć do bieżącego okna"
+                        >
+                            {{ $board['range_label'] }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="nextPeriod" title="Następny okres">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                    @if($periodOffset !== 0)
+                        <span class="small text-muted">przesunięcie {{ $periodOffset > 0 ? '+'.$periodOffset : $periodOffset }}</span>
+                    @endif
+                </div>
+                <p class="rax-hint">Pusty tor rysujesz w bok, daty ciągniesz za krawędź, środek paska — szczegóły / usuwanie. W torze: rotacja · projekt · dom · auto.</p>
             </div>
-            <div class="rax-legend">
-                @foreach([
-                    'past' => 'Historyczne',
-                    'active' => 'Aktywne',
-                    'soon' => 'Wygasają wkrótce',
-                    'future' => 'Przyszłe',
-                ] as $tone => $label)
-                    <button
-                        type="button"
-                        class="rax-legend__btn {{ in_array($tone, $tones, true) ? 'is-active' : '' }}"
-                        @if($tone === 'soon') title="Kończą się w ciągu 7 dni" @endif
-                        wire:click="toggleTone('{{ $tone }}')"
-                    >
-                        <i class="rax-dot rax-dot--{{ $tone }}"></i> {{ $label }}
-                    </button>
-                @endforeach
+            <div class="d-flex flex-column align-items-stretch align-items-md-end gap-2">
+                <div class="rax-legend">
+                    @foreach([
+                        'past' => 'Historyczne',
+                        'active' => 'Aktywne',
+                        'soon' => 'Wygasają wkrótce',
+                        'future' => 'Przyszłe',
+                    ] as $tone => $label)
+                        <button
+                            type="button"
+                            class="rax-legend__btn {{ in_array($tone, $tones, true) ? 'is-active' : '' }}"
+                            @if($tone === 'soon') title="Kończą się w ciągu 7 dni (nadal aktywne)" @endif
+                            @if($tone === 'active') title="Trwające teraz — w tym te, które wygasają wkrótce" @endif
+                            wire:click="toggleTone('{{ $tone }}')"
+                        >
+                            <i class="rax-dot rax-dot--{{ $tone }}"></i> {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
+                <label class="rax-sort small text-muted mb-0 d-flex align-items-center gap-2">
+                    <span class="text-nowrap">Sortuj</span>
+                    <select class="form-select form-select-sm rax-sort__select" wire:model.live="sort">
+                        <option value="ends_soon">Najszybciej kończące się</option>
+                        <option value="starts_soon">Najszybciej zaczynające się</option>
+                        <option value="name">Nazwisko A→Z</option>
+                    </select>
+                </label>
             </div>
         </div>
 
@@ -110,13 +143,24 @@
                                     data-can-create="{{ $board['can_create'] ? '1' : '0' }}"
                                     data-can-delete="{{ $board['can_delete'] ? '1' : '0' }}"
                                     data-gaps='@json($row['gaps'])'
+                                    style="--atl-rows: {{ (int) ($row['track_rows'] ?? 4) }}"
                                     wire:key="rax-lane-{{ $row['id'] }}"
                                 >
-                                    <div class="atl-track">
+                                    <div class="atl-track rax-track">
+                                        @foreach(($row['context'] ?? []) as $ctx)
+                                            <div
+                                                class="atl-bar rax-bar rax-bar--context atl-bar--{{ $ctx['kind'] }} {{ !empty($ctx['open']) ? 'is-open' : '' }}"
+                                                style="left: {{ $ctx['left'] }}px; width: {{ $ctx['width'] }}px; --row: {{ (int) $ctx['row'] }}"
+                                                title="{{ $ctx['title'] }}"
+                                                wire:key="rax-ctx-{{ $row['id'] }}-{{ $ctx['id'] }}"
+                                            >
+                                                <span class="atl-bar__label">{{ $ctx['label'] }}</span>
+                                            </div>
+                                        @endforeach
                                         @foreach($row['bars'] as $bar)
                                             <div
                                                 class="atl-bar rax-bar rax-bar--{{ $bar['tone'] }} {{ !empty($bar['pending']) ? 'is-pending' : '' }} {{ ($selection['id'] ?? null) === $bar['id'] && ($selection['employee_id'] ?? null) === $row['id'] ? 'is-selected' : '' }}"
-                                                style="left: {{ $bar['left'] }}px; width: {{ $bar['width'] }}px"
+                                                style="left: {{ $bar['left'] }}px; width: {{ $bar['width'] }}px; --row: {{ (int) ($bar['row'] ?? 0) }}"
                                                 data-id="{{ $bar['id'] }}"
                                                 data-start="{{ $bar['start'] }}"
                                                 data-end="{{ $bar['end'] }}"
@@ -130,6 +174,7 @@
                                                     <span class="atl-handle atl-handle--start" data-edge="start"></span>
                                                     <span class="atl-handle atl-handle--end" data-edge="end"></span>
                                                 @endif
+                                                <span class="atl-bar__label">{{ $bar['label'] ?? 'Rotacja' }}</span>
                                             </div>
                                         @endforeach
                                         <div class="atl-rubber" x-show="dragging && employeeId === {{ (int) $row['id'] }}" x-cloak :style="rubberStyle"></div>
@@ -153,16 +198,30 @@
         @if($proposal)
             @php
                 $person = collect($board['rows'])->firstWhere('id', $proposal['employee_id'] ?? null);
+                $personName = $proposal['employee_name'] ?? ($person['name'] ?? null);
+                $proposalNotes = trim((string) ($proposal['notes'] ?? ''));
+                $proposalShowUrl = $proposal['show_url'] ?? null;
             @endphp
             <div class="atl-popover rax-menu" style="{{ $menuCss }}">
                 <div class="atl-popover__dates font-mono">
-                    @if($person)
-                        {{ $person['name'] }} ·
+                    @if($personName)
+                        {{ $personName }} ·
                     @endif
                     {{ \Carbon\Carbon::parse($proposal['start'])->format('j.m.Y') }}
                     –
                     {{ \Carbon\Carbon::parse($proposal['end'])->format('j.m.Y') }}
                 </div>
+                @if($proposal['id'] ?? null)
+                    <div class="rax-menu__notes small {{ $proposalNotes !== '' ? '' : 'text-muted' }}">
+                        <span class="text-muted d-block" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;">Notatka</span>
+                        {{ $proposalNotes !== '' ? $proposalNotes : 'Brak notatki' }}
+                    </div>
+                    @if($proposalShowUrl)
+                        <a href="{{ $proposalShowUrl }}" class="btn btn-sm btn-outline-info w-100 text-start mb-2">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Otwórz kartę rotacji
+                        </a>
+                    @endif
+                @endif
                 @if($error)
                     <div class="atl-popover__error">{{ $error }}</div>
                 @endif
@@ -176,25 +235,76 @@
         @elseif($selection)
             @php
                 $person = collect($board['rows'])->firstWhere('id', $selection['employee_id']);
+                $personName = $selection['employee_name'] ?? ($person['name'] ?? null);
+                $showUrl = $selection['show_url'] ?? null;
+                $canDelete = ! empty($selection['can_delete']);
+                $canUpdate = ! empty($selection['can_update']);
             @endphp
             <div class="atl-popover rax-menu" style="{{ $menuCss }}">
                 <div class="atl-popover__dates font-mono">
-                    @if($person)
-                        {{ $person['name'] }} ·
+                    @if($personName)
+                        {{ $personName }} ·
                     @endif
                     {{ \Carbon\Carbon::parse($selection['start'])->format('j.m.Y') }}
                     –
                     {{ \Carbon\Carbon::parse($selection['end'])->format('j.m.Y') }}
                 </div>
-                <p class="text-muted small mb-0">Usunąć tę rotację?</p>
+                <div class="rax-menu__notes">
+                    <label class="text-muted d-block mb-1" style="font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em;" for="rax-selection-notes">
+                        Notatka
+                    </label>
+                    @if($canUpdate)
+                        <textarea
+                            id="rax-selection-notes"
+                            class="form-control form-control-sm rax-menu__notes-input"
+                            rows="3"
+                            placeholder="Dodaj notatkę do rotacji…"
+                            wire:model="selectionNotes"
+                            wire:keydown.ctrl.enter="saveSelectionNotes"
+                        ></textarea>
+                        <div class="d-flex align-items-center justify-content-between gap-2 mt-2">
+                            <span class="small {{ $notesSaved ? 'text-success' : 'text-muted' }}">
+                                @if($notesSaved)
+                                    <i class="bi bi-check2 me-1"></i>Zapisano
+                                @else
+                                    Ctrl+Enter zapisuje
+                                @endif
+                            </span>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-primary"
+                                wire:click="saveSelectionNotes"
+                                wire:loading.attr="disabled"
+                                wire:target="saveSelectionNotes"
+                            >
+                                <span wire:loading.remove wire:target="saveSelectionNotes">Zapisz notatkę</span>
+                                <span wire:loading wire:target="saveSelectionNotes">Zapisuję…</span>
+                            </button>
+                        </div>
+                    @else
+                        <div class="small {{ trim($selectionNotes) !== '' ? '' : 'text-muted' }}">
+                            {{ trim($selectionNotes) !== '' ? $selectionNotes : 'Brak notatki' }}
+                        </div>
+                    @endif
+                </div>
+                @if($showUrl)
+                    <a href="{{ $showUrl }}" class="btn btn-sm btn-outline-info w-100 text-start mb-2 mt-2">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Otwórz kartę rotacji
+                    </a>
+                @endif
+                @if($canDelete)
+                    <p class="text-muted small mb-0">Usunąć tę rotację?</p>
+                @endif
                 @if($error)
                     <div class="atl-popover__error">{{ $error }}</div>
                 @endif
                 <div class="rax-menu__actions d-flex gap-2 flex-wrap justify-content-end">
-                    <x-ui.button type="button" variant="ghost" wire:click="cancel">Cofnij</x-ui.button>
-                    <button type="button" class="btn btn-danger" wire:click="deleteSelected" wire:loading.attr="disabled">
-                        Usuń
-                    </button>
+                    <x-ui.button type="button" variant="ghost" wire:click="cancel">Zamknij</x-ui.button>
+                    @if($canDelete)
+                        <button type="button" class="btn btn-danger" wire:click="deleteSelected" wire:loading.attr="disabled">
+                            Usuń
+                        </button>
+                    @endif
                 </div>
             </div>
         @elseif($error)

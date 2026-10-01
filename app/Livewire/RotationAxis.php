@@ -13,7 +13,9 @@ use Livewire\Component;
 
 class RotationAxis extends Component
 {
-    use PresentsAssignmentTimeline;
+    use PresentsAssignmentTimeline {
+        cancel as protected timelineCancel;
+    }
 
     public string $search = '';
 
@@ -21,6 +23,17 @@ class RotationAxis extends Component
 
     /** @var list<string> */
     public array $tones = ['past', 'active', 'soon', 'future'];
+
+    /** 0 = domyślne okno (~6 tyg.); ±1 = przesunięcie o 3 tygodnie (połowa okna). */
+    public int $periodOffset = 0;
+
+    /** ends_soon | starts_soon | name */
+    public string $sort = 'ends_soon';
+
+    /** Edycja notatki w popoverze zaznaczonej rotacji. */
+    public string $selectionNotes = '';
+
+    public bool $notesSaved = false;
 
     public function setPlace(string $place): void
     {
@@ -30,6 +43,40 @@ class RotationAxis extends Component
 
         $this->cancel();
         $this->place = $place;
+    }
+
+    public function setSort(string $sort): void
+    {
+        if (! in_array($sort, ['ends_soon', 'starts_soon', 'name'], true)) {
+            return;
+        }
+
+        $this->sort = $sort;
+    }
+
+    public function updatedSort(): void
+    {
+        if (! in_array($this->sort, ['ends_soon', 'starts_soon', 'name'], true)) {
+            $this->sort = 'ends_soon';
+        }
+    }
+
+    public function previousPeriod(): void
+    {
+        $this->cancel();
+        $this->periodOffset--;
+    }
+
+    public function nextPeriod(): void
+    {
+        $this->cancel();
+        $this->periodOffset++;
+    }
+
+    public function resetPeriod(): void
+    {
+        $this->cancel();
+        $this->periodOffset = 0;
     }
 
     public function toggleTone(string $tone): void
@@ -53,15 +100,22 @@ class RotationAxis extends Component
         $this->cancel();
     }
 
+    public function cancel(): void
+    {
+        $this->selectionNotes = '';
+        $this->notesSaved = false;
+        $this->timelineCancel();
+    }
+
+    public function updatedSelectionNotes(): void
+    {
+        $this->notesSaved = false;
+    }
+
     public function selectBar(int $employeeId, int $barId, mixed $x = null, mixed $y = null, bool $above = true): void
     {
         $this->placeMenu($x, $y, $above);
-        if (! auth()->user()?->hasPermission('rotations.delete')) {
-            $this->selection = null;
-            $this->error = 'Brak uprawnień do usunięcia rotacji.';
-
-            return;
-        }
+        $this->notesSaved = false;
 
         if ($this->selection
             && (int) $this->selection['id'] === $barId
@@ -82,16 +136,77 @@ class RotationAxis extends Component
             return;
         }
 
+        $notes = $bar['notes'] ?? null;
+        $showUrl = $bar['show_url'] ?? null;
+        if ($notes === null || $showUrl === null) {
+            $rotation = Rotation::query()
+                ->where('employee_id', $employeeId)
+                ->find($barId);
+            if ($rotation) {
+                $notes = $notes ?? $rotation->notes;
+                $showUrl = $showUrl ?? route('employees.rotations.show', [$employeeId, $rotation]);
+            }
+        }
+
         $this->proposal = null;
         $this->options = [];
         $this->choice = null;
         $this->error = null;
+        $this->selectionNotes = (string) ($notes ?? '');
         $this->selection = [
             'employee_id' => $employeeId,
             'id' => $barId,
             'start' => $bar['start'],
             'end' => $bar['end'],
+            'notes' => $notes,
+            'show_url' => $showUrl,
+            'employee_name' => $row['name'] ?? null,
+            'can_delete' => (bool) auth()->user()?->hasPermission('rotations.delete'),
+            'can_update' => (bool) auth()->user()?->hasPermission('rotations.update'),
         ];
+    }
+
+    public function saveSelectionNotes(): void
+    {
+        if (! $this->selection) {
+            return;
+        }
+        if (! auth()->user()?->hasPermission('rotations.update')) {
+            $this->error = 'Brak uprawnień do edycji notatki.';
+
+            return;
+        }
+
+        $rotation = Rotation::query()
+            ->where('employee_id', $this->selection['employee_id'])
+            ->find($this->selection['id']);
+        if (! $rotation) {
+            $this->selection = null;
+            $this->error = 'Nie ma tej rotacji.';
+
+            return;
+        }
+
+        $notes = trim($this->selectionNotes);
+        $notes = $notes === '' ? null : $notes;
+
+        try {
+            app(RotationService::class)->updateRotation(
+                $rotation,
+                $rotation->start_date->copy()->startOfDay(),
+                $rotation->end_date->copy()->startOfDay(),
+                $notes,
+            );
+        } catch (ValidationException $exception) {
+            $this->error = $this->timelineError($exception);
+
+            return;
+        }
+
+        $this->selection['notes'] = $notes;
+        $this->selectionNotes = (string) ($notes ?? '');
+        $this->notesSaved = true;
+        $this->error = null;
     }
 
     public function deleteSelected(): void
@@ -143,6 +258,12 @@ class RotationAxis extends Component
         }
 
         $proposal['employee_id'] = $employeeId;
+        $existing = collect($row['bars'])->first(
+            fn (array $bar) => (int) ($bar['id'] ?? 0) === (int) ($proposal['id'] ?? 0) && empty($bar['pending'])
+        );
+        $proposal['notes'] = $existing['notes'] ?? null;
+        $proposal['show_url'] = $existing['show_url'] ?? null;
+        $proposal['employee_name'] = $row['name'] ?? null;
         $this->rememberProposal($proposal, []);
     }
 
@@ -179,11 +300,13 @@ class RotationAxis extends Component
 
     public function render(RotationAxisService $axis)
     {
-        $board = $this->paintProposal($this->withPermissions($axis->board($this->search, $this->place)));
+        $board = $this->paintProposal($this->withPermissions($axis->board($this->search, $this->place, $this->periodOffset)));
 
         return view('livewire.rotation-axis', [
-            'board' => $this->filterTones($this->paintTones($board)),
+            'board' => $this->sortRows($this->filterTones($this->paintTones($board))),
             'tones' => $this->tones,
+            'sort' => $this->sort,
+            'periodOffset' => $this->periodOffset,
         ]);
     }
 
@@ -241,6 +364,11 @@ class RotationAxis extends Component
         }
 
         $allowed = array_fill_keys($this->tones, true);
+        // „Aktywne” obejmuje też trwające rotacje, które wygasają w ≤7 dni (tone = soon).
+        if (isset($allowed['active'])) {
+            $allowed['soon'] = true;
+        }
+
         foreach ($board['rows'] as $index => $row) {
             $board['rows'][$index]['bars'] = array_values(array_filter(
                 $row['bars'],
@@ -248,11 +376,49 @@ class RotationAxis extends Component
             ));
         }
 
+        // Przy zawężonym filtrze tonów chowaj też puste wiersze (nie tylko paski).
+        $board['rows'] = array_values(array_filter(
+            $board['rows'],
+            fn (array $row): bool => count($row['bars']) > 0
+        ));
+
+        return $board;
+    }
+
+    /**
+     * @param  array<string, mixed>  $board
+     * @return array<string, mixed>
+     */
+    private function sortRows(array $board): array
+    {
+        $rows = collect($board['rows']);
+
+        $board['rows'] = match ($this->sort) {
+            'starts_soon' => $rows
+                ->sortBy([
+                    fn (array $row) => collect($row['bars'])->min('start') ?? '9999-99-99',
+                    fn (array $row) => mb_strtolower($row['name']),
+                ])
+                ->values()
+                ->all(),
+            'name' => $rows
+                ->sortBy(fn (array $row) => mb_strtolower($row['name']))
+                ->values()
+                ->all(),
+            default => $rows
+                ->sortBy([
+                    fn (array $row) => collect($row['bars'])->min('end') ?? '9999-99-99',
+                    fn (array $row) => mb_strtolower($row['name']),
+                ])
+                ->values()
+                ->all(),
+        };
+
         return $board;
     }
 
     private function preparedBoard(): array
     {
-        return $this->withPermissions(app(RotationAxisService::class)->board($this->search, $this->place));
+        return $this->withPermissions(app(RotationAxisService::class)->board($this->search, $this->place, $this->periodOffset));
     }
 }

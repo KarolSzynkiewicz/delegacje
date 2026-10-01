@@ -15,4 +15,19 @@ class RotationAxisToneTest extends TestCase
         $this->assertSame('active', RotationAxisService::tone('2026-09-20', '2026-10-20', '2026-09-30', '2026-10-07'));
         $this->assertSame('PJ', RotationAxisService::initials('Paweł', 'Jankowski'));
     }
+
+    public function test_window_offset_shifts_half_period(): void
+    {
+        $today = \Carbon\Carbon::parse('2026-10-01');
+        $base = RotationAxisService::windowForOffset(0, $today);
+        $next = RotationAxisService::windowForOffset(1, $today);
+        $prev = RotationAxisService::windowForOffset(-1, $today);
+
+        $this->assertSame(41, $base['start']->diffInDays($base['end']));
+        $this->assertSame(21, $base['start']->diffInDays($next['start']));
+        $this->assertSame(21, $prev['start']->diffInDays($base['start']));
+        // Okna nachodzą się o ~3 tygodnie
+        $this->assertTrue($next['start']->lt($base['end']));
+        $this->assertTrue($prev['end']->gt($base['start']));
+    }
 }

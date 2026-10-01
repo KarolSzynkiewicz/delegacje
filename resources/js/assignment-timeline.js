@@ -30,24 +30,30 @@ export function registerAssignmentTimeline(Alpine) {
 
         init() {
             this.root = this.$el;
-            this.axis = this.$el.dataset.start;
-            this.days = Number(this.$el.dataset.days || 1);
+            this.syncAxis();
             this._down = (event) => this.onPointerDown(event);
             this.root.addEventListener('pointerdown', this._down);
             this.$nextTick(() => this.bindAxisScroll());
         },
 
+        syncAxis() {
+            this.axis = this.root?.dataset?.start || this.axis;
+            this.days = Number(this.root?.dataset?.days || this.days || 1);
+        },
+
         bindAxisScroll() {
             const body = this.$refs.scroller;
-            if (!body || this._axisScroll) {
+            if (!body) {
                 return;
             }
-            this._axisScroll = true;
+            // Po remount / zmianie okna zawsze dociągnij „dziś”, jeśli jest w zakresie.
             const today = this.root.querySelector('.rax-line--today');
             const side = this.$refs.side;
             if (today) {
                 const chart = Math.max(160, body.clientWidth - (side?.offsetWidth || 0));
                 body.scrollLeft = Math.max(0, today.offsetLeft - chart * 0.22);
+            } else {
+                body.scrollLeft = 0;
             }
         },
 
@@ -109,7 +115,7 @@ export function registerAssignmentTimeline(Alpine) {
 
         armSelect(event, bar) {
             const lane = bar.closest('.atl-lane');
-            if (!lane || lane.dataset.canDelete !== '1' || !bar.dataset.id || bar.classList.contains('is-pending') || bar.dataset.locked === '1') {
+            if (!lane || !bar.dataset.id || bar.classList.contains('is-pending') || bar.dataset.locked === '1') {
                 return;
             }
             event.preventDefault();
@@ -191,6 +197,7 @@ export function registerAssignmentTimeline(Alpine) {
 
         begin(event, track, mode, lane, barId, anchor, moving, bound, keepOpen) {
             event.preventDefault();
+            this.syncAxis();
             if (event.pointerId != null) {
                 try {
                     this.root.setPointerCapture(event.pointerId);
@@ -364,10 +371,14 @@ export function registerAssignmentTimeline(Alpine) {
         },
 
         axisStart() {
+            this.syncAxis();
+
             return this.axis;
         },
 
         dayCount() {
+            this.syncAxis();
+
             return this.days;
         },
 

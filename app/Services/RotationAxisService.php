@@ -2,10 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\AccommodationAssignment;
 use App\Models\Employee;
+use App\Models\ProjectAssignment;
 use App\Models\Rotation;
+use App\Models\VehicleAssignment;
 use App\Support\AssignmentTimelineMath;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 class RotationAxisService
 {
@@ -13,19 +17,47 @@ class RotationAxisService
 
     public const SOON_DAYS = 7;
 
+    /** Długość okna osi (6 tygodni). */
+    public const WINDOW_DAYS = 41;
+
+    /** Przesunięcie strzałkami: połowa okna (3 tygodnie), żeby nachodziły się okresy. */
+    public const STEP_DAYS = 21;
+
     public function __construct(
         private LocationTrackingService $locations,
         private WeeklyOverviewService $weekly,
     ) {}
 
     /**
+     * Domyślny start okna: poniedziałek bieżącego tygodnia minus 3 tygodnie.
+     */
+    public static function defaultWindowStart(?Carbon $today = null): Carbon
+    {
+        $today = ($today ?? now())->copy()->startOfDay();
+
+        return $today->copy()->startOfWeek(Carbon::MONDAY)->subWeeks(3);
+    }
+
+    /**
+     * @return array{start: Carbon, end: Carbon}
+     */
+    public static function windowForOffset(int $periodOffset, ?Carbon $today = null): array
+    {
+        $start = self::defaultWindowStart($today)->addDays($periodOffset * self::STEP_DAYS);
+        $end = $start->copy()->addDays(self::WINDOW_DAYS);
+
+        return ['start' => $start, 'end' => $end];
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    public function board(string $search, string $place): array
+    public function board(string $search, string $place, int $periodOffset = 0): array
     {
         $today = now()->startOfDay();
-        $start = $today->copy()->startOfWeek(Carbon::MONDAY)->subWeeks(3);
-        $end = $start->copy()->addDays(41);
+        $window = self::windowForOffset($periodOffset, $today);
+        $start = $window['start'];
+        $end = $window['end'];
         $todayKey = $today->toDateString();
         $soonKey = $today->copy()->addDays(self::SOON_DAYS)->toDateString();
         $startKey = $start->toDateString();
@@ -59,23 +91,57 @@ class RotationAxisService
 
         $plannerDocuments = $this->weekly->loadPlannerDocumentsByEmployee($employees->pluck('id'));
 
+        $employeeIds = $employees->pluck('id');
+
         $rotations = $employees->isEmpty()
             ? collect()
             : Rotation::query()
                 ->where('status', '!=', 'cancelled')
-                ->whereIn('employee_id', $employees->pluck('id'))
+                ->whereIn('employee_id', $employeeIds)
                 ->overlappingWith($startKey, $endKey)
-                ->get(['id', 'employee_id', 'start_date', 'end_date'])
+                ->get(['id', 'employee_id', 'start_date', 'end_date', 'notes'])
+                ->groupBy('employee_id');
+
+        $projects = $employees->isEmpty()
+            ? collect()
+            : ProjectAssignment::query()
+                ->whereIn('employee_id', $employeeIds)
+                ->overlappingWith($startKey, $endKey)
+                ->with('project:id,name')
+                ->orderBy('start_date')
+                ->get(['id', 'employee_id', 'project_id', 'start_date', 'end_date'])
+                ->groupBy('employee_id');
+
+        $houses = $employees->isEmpty()
+            ? collect()
+            : AccommodationAssignment::query()
+                ->whereIn('employee_id', $employeeIds)
+                ->overlappingWith($startKey, $endKey)
+                ->with('accommodation:id,name')
+                ->orderBy('start_date')
+                ->get(['id', 'employee_id', 'accommodation_id', 'start_date', 'end_date'])
+                ->groupBy('employee_id');
+
+        $cars = $employees->isEmpty()
+            ? collect()
+            : VehicleAssignment::query()
+                ->whereIn('employee_id', $employeeIds)
+                ->overlappingWith($startKey, $endKey)
+                ->with('vehicle:id,registration_number,brand,model')
+                ->orderBy('start_date')
+                ->get(['id', 'employee_id', 'vehicle_id', 'start_date', 'end_date', 'position', 'is_return_trip'])
                 ->groupBy('employee_id');
 
         $rows = $employees
-            ->map(function (Employee $employee) use ($rotations, $plannerDocuments, $startKey, $endKey, $todayKey, $soonKey) {
+            ->map(function (Employee $employee) use ($rotations, $projects, $houses, $cars, $plannerDocuments, $startKey, $endKey, $todayKey, $soonKey) {
                 $ranges = ($rotations->get($employee->id) ?? collect())
                     ->filter(fn (Rotation $rotation) => $rotation->start_date && $rotation->end_date)
                     ->map(fn (Rotation $rotation) => [
                         'id' => $rotation->id,
                         'start' => $rotation->start_date->toDateString(),
                         'end' => $rotation->end_date->toDateString(),
+                        'notes' => $rotation->notes,
+                        'show_url' => route('employees.rotations.show', [$employee, $rotation]),
                     ])
                     ->sortBy('start')
                     ->values();
@@ -90,26 +156,39 @@ class RotationAxisService
                         ->map(fn (array $sibling) => ['start' => $sibling['start'], 'end' => $sibling['end']])
                         ->all();
                     $limits = AssignmentTimelineMath::resizeLimits($range['start'], $range['end'], $siblings, $startKey, $endKey);
-                    $visibleStart = $range['start'] < $startKey ? $startKey : $range['start'];
-                    $visibleEnd = $range['end'] > $endKey ? $endKey : $range['end'];
-                    $left = AssignmentTimelineMath::dayIndex($startKey, $visibleStart) * self::DAY_WIDTH;
-                    $width = (AssignmentTimelineMath::dayIndex($visibleStart, $visibleEnd) + 1) * self::DAY_WIDTH;
+                    $pixels = $this->visiblePixels($startKey, $endKey, $range['start'], $range['end']);
+                    if ($pixels === null) {
+                        return null;
+                    }
 
                     return [
                         'id' => $range['id'],
                         'start' => $range['start'],
                         'end' => $range['end'],
+                        'notes' => $range['notes'],
+                        'show_url' => $range['show_url'],
                         'min' => $limits['min'],
                         'max' => $limits['max'],
-                        'left' => $left,
-                        'width' => $width,
+                        'left' => $pixels['left'],
+                        'width' => $pixels['width'],
                         'open' => false,
                         'locked' => false,
                         'pending' => false,
+                        'row' => 0,
                         'tone' => self::tone($range['start'], $range['end'], $todayKey, $soonKey),
-                        'title' => Carbon::parse($range['start'])->format('j.m.Y').' – '.Carbon::parse($range['end'])->format('j.m.Y'),
+                        'label' => 'Rotacja',
+                        'title' => Carbon::parse($range['start'])->format('j.m.Y').' – '.Carbon::parse($range['end'])->format('j.m.Y')
+                            .($range['notes'] ? ' · '.$range['notes'] : ''),
                     ];
                 })->filter()->values();
+
+                $context = $this->contextBars(
+                    $projects->get($employee->id) ?? collect(),
+                    $houses->get($employee->id) ?? collect(),
+                    $cars->get($employee->id) ?? collect(),
+                    $startKey,
+                    $endKey,
+                );
 
                 return [
                     'id' => $employee->id,
@@ -119,15 +198,12 @@ class RotationAxisService
                     'score' => $employee->latestEvaluation?->average_score,
                     'evaluation' => $employee->latestEvaluation,
                     'documents' => ($plannerDocuments->get($employee->id) ?? collect())->unique('document_id')->values(),
-                    'sort' => $bars->min('start') ?? '9999-99-99',
                     'gaps' => AssignmentTimelineMath::gaps([['start' => $startKey, 'end' => $endKey]], $blocks),
                     'bars' => $bars->all(),
+                    'context' => $context,
+                    'track_rows' => 4,
                 ];
             })
-            ->sortBy([
-                ['sort', 'asc'],
-                ['name', 'asc'],
-            ])
             ->values();
 
         $days = [];
@@ -150,6 +226,7 @@ class RotationAxisService
             'end' => $endKey,
             'today' => $todayKey,
             'soon' => $soonKey,
+            'period_offset' => $periodOffset,
             'range_label' => self::rangeLabel($start, $end),
             'day_width' => self::DAY_WIDTH,
             'day_count' => count($days),
@@ -183,6 +260,110 @@ class RotationAxisService
         return mb_strtoupper($a.$b);
     }
 
+    /**
+     * Paski projektu / domu / auta (tylko podgląd) — jak na osi pracownika.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function contextBars(Collection $projects, Collection $houses, Collection $cars, string $startKey, string $endKey): array
+    {
+        $out = [];
+
+        foreach ($projects as $assignment) {
+            $start = $assignment->start_date?->toDateString();
+            $end = $assignment->end_date?->toDateString();
+            if (! $start) {
+                continue;
+            }
+            $pixels = $this->visiblePixels($startKey, $endKey, $start, $end);
+            if ($pixels === null) {
+                continue;
+            }
+            $label = $assignment->project?->name ?? 'Projekt';
+            $out[] = [
+                'id' => 'p-'.$assignment->id,
+                'kind' => 'project',
+                'label' => $label,
+                'title' => $label.' · '.Carbon::parse($start)->format('j.m.Y').($end ? ' – '.Carbon::parse($end)->format('j.m.Y') : ' →'),
+                'left' => $pixels['left'],
+                'width' => $pixels['width'],
+                'open' => $end === null,
+                'row' => 1,
+            ];
+        }
+
+        foreach ($houses as $assignment) {
+            $start = $assignment->start_date?->toDateString();
+            $end = $assignment->end_date?->toDateString();
+            if (! $start) {
+                continue;
+            }
+            $pixels = $this->visiblePixels($startKey, $endKey, $start, $end);
+            if ($pixels === null) {
+                continue;
+            }
+            $label = $assignment->accommodation?->name ?? 'Dom';
+            $out[] = [
+                'id' => 'a-'.$assignment->id,
+                'kind' => 'accommodation',
+                'label' => $label,
+                'title' => $label.' · '.Carbon::parse($start)->format('j.m.Y').($end ? ' – '.Carbon::parse($end)->format('j.m.Y') : ' →'),
+                'left' => $pixels['left'],
+                'width' => $pixels['width'],
+                'open' => $end === null,
+                'row' => 2,
+            ];
+        }
+
+        foreach ($cars as $assignment) {
+            $start = $assignment->start_date?->toDateString();
+            $end = $assignment->end_date?->toDateString();
+            if (! $start) {
+                continue;
+            }
+            $pixels = $this->visiblePixels($startKey, $endKey, $start, $end);
+            if ($pixels === null) {
+                continue;
+            }
+            $vehicle = $assignment->vehicle;
+            $label = trim(($vehicle->brand ?? '').' '.($vehicle->model ?? '').' '.($vehicle->registration_number ?? ''));
+            $label = $label !== '' ? $label : 'Auto';
+            $out[] = [
+                'id' => 'v-'.$assignment->id,
+                'kind' => 'vehicle',
+                'label' => $label,
+                'title' => $label.' · '.Carbon::parse($start)->format('j.m.Y').($end ? ' – '.Carbon::parse($end)->format('j.m.Y') : ' →'),
+                'left' => $pixels['left'],
+                'width' => $pixels['width'],
+                'open' => $end === null,
+                'row' => 3,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{left: int, width: int}|null
+     */
+    private function visiblePixels(string $windowStart, string $windowEnd, string $start, ?string $end): ?array
+    {
+        $visibleEnd = $end ?? $windowEnd;
+        if ($visibleEnd < $windowStart || $start > $windowEnd) {
+            return null;
+        }
+        $visibleStart = $start < $windowStart ? $windowStart : $start;
+        $visibleEnd = $visibleEnd > $windowEnd ? $windowEnd : $visibleEnd;
+        if ($visibleStart > $visibleEnd) {
+            return null;
+        }
+
+        return [
+            'left' => AssignmentTimelineMath::dayIndex($windowStart, $visibleStart) * self::DAY_WIDTH,
+            'width' => (AssignmentTimelineMath::dayIndex($visibleStart, $visibleEnd) + 1) * self::DAY_WIDTH,
+        ];
+    }
+
     private static function markerLeft(string $windowStart, string $windowEnd, string $day): ?int
     {
         if ($day < $windowStart || $day > $windowEnd) {
@@ -200,12 +381,12 @@ class RotationAxisService
         $from = mb_convert_case($months[$start->month], MB_CASE_TITLE, 'UTF-8');
         $to = mb_convert_case($months[$end->month], MB_CASE_TITLE, 'UTF-8');
         if ($start->year === $end->year && $start->month === $end->month) {
-            return $from.' '.$start->year;
+            return $start->format('j').'–'.$end->format('j').' '.$from.' '.$start->year;
         }
         if ($start->year === $end->year) {
-            return $from.'–'.$to.' '.$end->year;
+            return $start->format('j').' '.$from.' – '.$end->format('j').' '.$to.' '.$end->year;
         }
 
-        return $from.' '.$start->year.' – '.$to.' '.$end->year;
+        return $start->format('j').' '.$from.' '.$start->year.' – '.$end->format('j').' '.$to.' '.$end->year;
     }
 }
