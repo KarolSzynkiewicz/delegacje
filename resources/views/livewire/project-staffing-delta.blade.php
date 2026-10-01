@@ -63,7 +63,7 @@
                                             ],
                                             [
                                                 'key' => 'ending',
-                                                'title' => 'Koniec rotacji',
+                                                'title' => 'Nie będzie w przyszłym tyg.',
                                                 'tone' => 'ending',
                                                 'rows' => $delta['ending'],
                                             ],

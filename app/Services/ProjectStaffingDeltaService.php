@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
 use App\Models\Employee;
+use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\Rotation;
@@ -17,7 +20,8 @@ class ProjectStaffingDeltaService
     ) {}
 
     /**
-     * Delta obsady projektu względem tygodnia: odeszli, przybyli, koniec rotacji, przyjeżdżają.
+     * Delta obsady projektu względem tygodnia:
+     * 1) odeszli (zeszły → ten), 2) przybyli (ten), 3) jest, a nie będzie (ten → przyszły), 4) przyjeżdżają.
      *
      * @return array{
      *     left: Collection<int, array<string, mixed>>,
@@ -52,23 +56,32 @@ class ProjectStaffingDeltaService
 
         $leftIds = $lastIds->diff($thisIds)->values();
         $arrivedIds = $thisIds->diff($lastIds)->values();
+        $leavingIds = $thisIds->diff($nextIds)->values();
         $arrivingIds = $nextIds->diff($thisIds)->values();
 
-        $employeeIds = $leftIds->merge($arrivedIds)->merge($thisIds)->merge($arrivingIds)->unique()->values();
+        $employeeIds = $leftIds
+            ->merge($arrivedIds)
+            ->merge($leavingIds)
+            ->merge($arrivingIds)
+            ->unique()
+            ->values();
         $employees = $this->loadEmployees($employeeIds);
         $documents = $this->weeklyOverview->loadPlannerDocumentsByEmployee($employeeIds);
 
-        $rotations = $thisIds->isEmpty()
+        $rotationsEnding = $leavingIds->isEmpty()
             ? collect()
             : Rotation::query()
-                ->whereIn('employee_id', $thisIds)
+                ->whereIn('employee_id', $leavingIds)
                 ->whereNotNull('end_date')
                 ->whereDate('end_date', '>=', $weekStart->toDateString())
                 ->whereDate('end_date', '<=', $rotationHorizon->toDateString())
                 ->orderBy('end_date')
                 ->get()
                 ->unique('employee_id')
-                ->keyBy('employee_id');
+                ->keyBy(fn (Rotation $rotation) => (int) $rotation->employee_id);
+
+        $returnsByEmployee = $this->returnsByEmployee($leavingIds, $weekStart, $nextEnd);
+        $otherProjectNextIds = $this->employeeIdsOnOtherProjects($leavingIds, $project->id, $nextStart, $nextEnd);
 
         $left = $leftIds->map(function (int $id) use ($lastByEmployee, $employees, $documents) {
             $assignment = $lastByEmployee->get($id);
@@ -98,26 +111,68 @@ class ProjectStaffingDeltaService
             );
         })->filter()->values();
 
-        $ending = $rotations->map(function (Rotation $rotation) use ($thisByEmployee, $employees, $documents, $today) {
-            $id = (int) $rotation->employee_id;
+        $ending = $leavingIds->map(function (int $id) use (
+            $thisByEmployee,
+            $employees,
+            $documents,
+            $rotationsEnding,
+            $returnsByEmployee,
+            $otherProjectNextIds,
+            $today,
+        ) {
             $assignment = $thisByEmployee->get($id);
-            $end = $rotation->end_date->copy()->startOfDay();
-            $days = (int) $today->diffInDays($end, false);
-            $badge = $days < 0
-                ? (abs($days) === 1 ? 'wczoraj' : abs($days).' dni temu')
-                : ($days === 0
-                    ? 'dziś'
-                    : ($days === 1 ? 'za 1 dzień' : 'za '.$days.' dni'));
+            $return = $returnsByEmployee->get($id);
+            $rotation = $rotationsEnding->get($id);
 
-            return $this->row(
+            if ($return) {
+                $when = $return->event_date?->copy()->startOfDay();
+                $badge = 'zjazd';
+                $detail = $when ? 'zjazd '.$when->format('d.m') : 'zjazd zaplanowany';
+                $reason = 'return';
+                $sort = 0;
+            } elseif ($rotation) {
+                $end = $rotation->end_date->copy()->startOfDay();
+                $days = (int) $today->diffInDays($end, false);
+                $badge = $days < 0
+                    ? (abs($days) === 1 ? 'wczoraj' : abs($days).' dni temu')
+                    : ($days === 0
+                        ? 'dziś'
+                        : ($days === 1 ? 'za 1 dzień' : 'za '.$days.' dni'));
+                $detail = 'koniec rotacji '.$end->format('d.m');
+                $reason = 'rotation';
+                $sort = 1;
+            } else {
+                $end = $assignment?->end_date;
+                $elsewhere = isset($otherProjectNextIds[$id]);
+                $badge = $elsewhere ? 'inny projekt' : 'bez projektu';
+                $detail = $end
+                    ? 'koniec przypisania '.$end->format('d.m')
+                    : 'koniec przypisania';
+                $reason = 'assignment';
+                $sort = 2;
+            }
+
+            $row = $this->row(
                 $employees->get($id),
                 $assignment,
                 $documents->get($id, collect()),
                 $badge,
-                'koniec '.$end->format('d.m'),
+                $detail,
                 'ending',
+                $sort,
             );
-        })->filter()->sortBy(fn (array $row) => $row['sort'] ?? 0)->values();
+            if ($row === null) {
+                return null;
+            }
+            $row['reason'] = $reason;
+            $row['tone'] = 'ending-'.$reason;
+
+            return $row;
+        })->filter()->sortBy(function (array $row): string {
+            $name = mb_strtolower($row['employee']->last_name.' '.$row['employee']->first_name);
+
+            return sprintf('%d-%s', $row['sort'] ?? 9, $name);
+        })->values();
 
         $arriving = $arrivingIds->map(function (int $id) use ($nextByEmployee, $employees, $documents) {
             $assignment = $nextByEmployee->get($id);
@@ -145,6 +200,64 @@ class ProjectStaffingDeltaService
             'arriving' => $arriving,
             'week_label' => $weekStart->locale('pl')->isoFormat('D MMM').' – '.$weekEnd->locale('pl')->isoFormat('D MMM'),
         ];
+    }
+
+    /**
+     * @param  Collection<int, int>  $employeeIds
+     * @return Collection<int, LogisticsEvent>
+     */
+    private function returnsByEmployee(Collection $employeeIds, Carbon $from, Carbon $to): Collection
+    {
+        if ($employeeIds->isEmpty()) {
+            return collect();
+        }
+
+        $events = LogisticsEvent::query()
+            ->where('type', LogisticsEventType::RETURN)
+            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+            ->whereBetween('event_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->whereHas('participants', fn ($q) => $q->whereIn('employee_id', $employeeIds))
+            ->with(['participants' => fn ($q) => $q->whereIn('employee_id', $employeeIds)])
+            ->orderBy('event_date')
+            ->get();
+
+        $byEmployee = collect();
+        foreach ($events as $event) {
+            foreach ($event->participants as $participant) {
+                $id = (int) $participant->employee_id;
+                if (! $byEmployee->has($id)) {
+                    $byEmployee->put($id, $event);
+                }
+            }
+        }
+
+        return $byEmployee;
+    }
+
+    /**
+     * @param  Collection<int, int>  $employeeIds
+     * @return array<int, true>
+     */
+    private function employeeIdsOnOtherProjects(
+        Collection $employeeIds,
+        int $projectId,
+        Carbon $start,
+        Carbon $end,
+    ): array {
+        if ($employeeIds->isEmpty()) {
+            return [];
+        }
+
+        return ProjectAssignment::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->where('project_id', '!=', $projectId)
+            ->overlappingWith($start, $end)
+            ->pluck('employee_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->flip()
+            ->map(fn () => true)
+            ->all();
     }
 
     /**
