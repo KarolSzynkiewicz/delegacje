@@ -3,5 +3,5 @@
         <x-ui.page-header title="Rotacje" />
     </x-slot>
 
-    <livewire:rotation-axis />
+    <livewire:rotations-workspace />
 </x-app-layout>

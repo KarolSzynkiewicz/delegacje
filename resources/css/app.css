@@ -15670,3 +15670,43 @@ a.emp-rail__item { text-decoration: none; }
 .rax-line {
     z-index: 4;
 }
+
+/* Rotacje: przełącznik Oś / Tabela */
+.rot-view-switch {
+    display: inline-flex;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+}
+.rot-view-switch__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    font-weight: 650;
+    padding: 0.4rem 0.75rem;
+    line-height: 1.2;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+.rot-view-switch__btn:hover {
+    color: var(--text-main);
+}
+.rot-view-switch__btn.is-active {
+    color: var(--text-main);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(168, 85, 247, 0.35));
+}
+.rot-view-switch__btn i {
+    font-size: 0.95rem;
+}
+@media (max-width: 575.98px) {
+    .rot-view-switch__btn {
+        padding: 0.38rem 0.55rem;
+        font-size: 0.75rem;
+    }
+}
