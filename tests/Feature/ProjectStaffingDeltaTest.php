@@ -176,13 +176,16 @@ class ProjectStaffingDeltaTest extends TestCase
                 'projectName' => 'Piriou',
             ])
             ->assertSet('show', false)
-            ->assertDontSee('Odeszli ostatnio')
+            ->assertDontSee('Zeszły tydzień')
             ->call('openModal')
             ->assertSet('show', true)
             ->assertSee('Zmiany w obsadzie')
-            ->assertSee('Odeszli ostatnio')
+            ->assertSee('Odeszli')
             ->assertSee('Przybyli')
-            ->assertSee('Nie będzie w przyszłym tyg.')
-            ->assertSee('Przyjeżdżają w przyszłym tyg.');
+            ->assertSee('Nie będzie w przyszłym')
+            ->assertSee('Przyjeżdżają')
+            ->assertSee('Zeszły tydzień')
+            ->assertSee('Ten tydzień')
+            ->assertSee('Przyszły tydzień');
     }
 }

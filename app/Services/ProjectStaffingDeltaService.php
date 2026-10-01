@@ -42,9 +42,11 @@ class ProjectStaffingDeltaService
         $rotationHorizon = $this->kpis->rotationCutoffAfterWeek($weekEnd);
         $today = now()->startOfDay();
 
-        $thisWeek = $this->assignmentsFor($project->id, $weekStart, $weekEnd);
-        $lastWeek = $this->assignmentsFor($project->id, $prevStart, $prevEnd);
-        $nextWeek = $this->assignmentsFor($project->id, $nextStart, $nextEnd);
+        // Jedno zapytanie na 3 tygodnie zamiast trzech overlappingWith.
+        $assignments = $this->assignmentsFor($project->id, $prevStart, $nextEnd);
+        $thisWeek = $assignments->filter(fn (ProjectAssignment $row) => $this->overlaps($row, $weekStart, $weekEnd))->values();
+        $lastWeek = $assignments->filter(fn (ProjectAssignment $row) => $this->overlaps($row, $prevStart, $prevEnd))->values();
+        $nextWeek = $assignments->filter(fn (ProjectAssignment $row) => $this->overlaps($row, $nextStart, $nextEnd))->values();
 
         $thisByEmployee = $this->latestByEmployee($thisWeek);
         $lastByEmployee = $this->latestByEmployee($lastWeek);
@@ -76,7 +78,7 @@ class ProjectStaffingDeltaService
                 ->whereDate('end_date', '>=', $weekStart->toDateString())
                 ->whereDate('end_date', '<=', $rotationHorizon->toDateString())
                 ->orderBy('end_date')
-                ->get()
+                ->get(['id', 'employee_id', 'start_date', 'end_date'])
                 ->unique('employee_id')
                 ->keyBy(fn (Rotation $rotation) => (int) $rotation->employee_id);
 
@@ -198,8 +200,27 @@ class ProjectStaffingDeltaService
             'arrived' => $arrived,
             'ending' => $ending,
             'arriving' => $arriving,
-            'week_label' => $weekStart->locale('pl')->isoFormat('D MMM').' – '.$weekEnd->locale('pl')->isoFormat('D MMM'),
+            'week_label' => $this->weekSpanLabel($weekStart, $weekEnd),
+            'band_labels' => [
+                'past' => $this->weekSpanLabel($prevStart, $prevEnd),
+                'now' => $this->weekSpanLabel($weekStart, $weekEnd),
+                'next' => $this->weekSpanLabel($nextStart, $nextEnd),
+            ],
         ];
+    }
+
+    private function weekSpanLabel(Carbon $start, Carbon $end): string
+    {
+        return $start->locale('pl')->isoFormat('D MMM').' – '.$end->locale('pl')->isoFormat('D MMM');
+    }
+
+    private function overlaps(ProjectAssignment $assignment, Carbon $start, Carbon $end): bool
+    {
+        if ($assignment->start_date->gt($end)) {
+            return false;
+        }
+
+        return $assignment->end_date === null || ! $assignment->end_date->lt($start);
     }
 
     /**
@@ -216,10 +237,14 @@ class ProjectStaffingDeltaService
             ->where('type', LogisticsEventType::RETURN)
             ->where('status', '!=', LogisticsEventStatus::CANCELLED)
             ->whereBetween('event_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->whereHas('participants', fn ($q) => $q->whereIn('employee_id', $employeeIds))
-            ->with(['participants' => fn ($q) => $q->whereIn('employee_id', $employeeIds)])
+            ->whereIn('id', function ($query) use ($employeeIds) {
+                $query->select('logistics_event_id')
+                    ->from('logistics_event_participants')
+                    ->whereIn('employee_id', $employeeIds);
+            })
+            ->with(['participants' => fn ($q) => $q->whereIn('employee_id', $employeeIds)->select('id', 'logistics_event_id', 'employee_id')])
             ->orderBy('event_date')
-            ->get();
+            ->get(['id', 'event_date', 'end_date', 'type', 'status']);
 
         $byEmployee = collect();
         foreach ($events as $event) {
@@ -309,7 +334,10 @@ class ProjectStaffingDeltaService
 
         return Employee::query()
             ->whereIn('id', $ids)
-            ->with(['latestEvaluation', 'roles:id'])
+            ->with([
+                'latestEvaluation',
+                'roles' => fn ($query) => $query->select('roles.id'),
+            ])
             ->get()
             ->keyBy('id');
     }

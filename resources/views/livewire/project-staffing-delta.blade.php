@@ -48,49 +48,81 @@
                             <div wire:loading.remove wire:target="openModal">
                                 @if($loaded && $delta)
                                     @php
-                                        $columns = [
+                                        $bands = [
                                             [
-                                                'key' => 'left',
-                                                'title' => 'Odeszli ostatnio',
-                                                'tone' => 'left',
-                                                'rows' => $delta['left'],
+                                                'key' => 'past',
+                                                'label' => 'Zeszły tydzień',
+                                                'span' => $delta['band_labels']['past'] ?? null,
+                                                'columns' => [
+                                                    [
+                                                        'key' => 'left',
+                                                        'title' => 'Odeszli',
+                                                        'tone' => 'left',
+                                                        'rows' => $delta['left'],
+                                                    ],
+                                                ],
                                             ],
                                             [
-                                                'key' => 'arrived',
-                                                'title' => 'Przybyli',
-                                                'tone' => 'arrived',
-                                                'rows' => $delta['arrived'],
+                                                'key' => 'now',
+                                                'label' => 'Ten tydzień',
+                                                'span' => $delta['band_labels']['now'] ?? null,
+                                                'columns' => [
+                                                    [
+                                                        'key' => 'arrived',
+                                                        'title' => 'Przybyli',
+                                                        'tone' => 'arrived',
+                                                        'rows' => $delta['arrived'],
+                                                    ],
+                                                    [
+                                                        'key' => 'ending',
+                                                        'title' => 'Nie będzie w przyszłym',
+                                                        'tone' => 'ending',
+                                                        'rows' => $delta['ending'],
+                                                    ],
+                                                ],
                                             ],
                                             [
-                                                'key' => 'ending',
-                                                'title' => 'Nie będzie w przyszłym tyg.',
-                                                'tone' => 'ending',
-                                                'rows' => $delta['ending'],
-                                            ],
-                                            [
-                                                'key' => 'arriving',
-                                                'title' => 'Przyjeżdżają w przyszłym tyg.',
-                                                'tone' => 'arriving',
-                                                'rows' => $delta['arriving'],
+                                                'key' => 'next',
+                                                'label' => 'Przyszły tydzień',
+                                                'span' => $delta['band_labels']['next'] ?? null,
+                                                'columns' => [
+                                                    [
+                                                        'key' => 'arriving',
+                                                        'title' => 'Przyjeżdżają',
+                                                        'tone' => 'arriving',
+                                                        'rows' => $delta['arriving'],
+                                                    ],
+                                                ],
                                             ],
                                         ];
                                     @endphp
 
-                                    <div class="wo-delta-grid">
-                                        @foreach($columns as $column)
-                                            <section class="wo-delta-col wo-delta-col--{{ $column['tone'] }}">
-                                                <header class="wo-delta-col__head">
-                                                    <span class="wo-delta-col__dot" aria-hidden="true"></span>
-                                                    <span class="wo-delta-col__title">{{ $column['title'] }}</span>
-                                                    <span class="wo-delta-col__count font-mono">{{ $column['rows']->count() }}</span>
+                                    <div class="wo-delta-bands">
+                                        @foreach($bands as $band)
+                                            <section class="wo-delta-band wo-delta-band--{{ $band['key'] }}">
+                                                <header class="wo-delta-band__head">
+                                                    <span class="wo-delta-band__label">{{ $band['label'] }}</span>
+                                                    @if($band['span'])
+                                                        <span class="wo-delta-band__span font-mono">{{ $band['span'] }}</span>
+                                                    @endif
                                                 </header>
-
-                                                <div class="wo-delta-col__list">
-                                                    @forelse($column['rows'] as $row)
-                                                        @include('weekly-overview.partials.staffing-delta-person', ['row' => $row])
-                                                    @empty
-                                                        <p class="wo-delta-empty text-muted small mb-0">Brak zmian.</p>
-                                                    @endforelse
+                                                <div class="wo-delta-band__cols">
+                                                    @foreach($band['columns'] as $column)
+                                                        <div class="wo-delta-col wo-delta-col--{{ $column['tone'] }}">
+                                                            <header class="wo-delta-col__head">
+                                                                <span class="wo-delta-col__dot" aria-hidden="true"></span>
+                                                                <span class="wo-delta-col__title">{{ $column['title'] }}</span>
+                                                                <span class="wo-delta-col__count font-mono">{{ $column['rows']->count() }}</span>
+                                                            </header>
+                                                            <div class="wo-delta-col__list">
+                                                                @forelse($column['rows'] as $row)
+                                                                    @include('weekly-overview.partials.staffing-delta-person', ['row' => $row])
+                                                                @empty
+                                                                    <p class="wo-delta-empty text-muted small mb-0">Brak zmian.</p>
+                                                                @endforelse
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
                                                 </div>
                                             </section>
                                         @endforeach
