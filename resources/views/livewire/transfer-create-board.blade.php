@@ -124,6 +124,11 @@
     @if(session()->has('warning'))
         <div class="alert alert-warning py-2 small mb-3">{{ session('warning') }}</div>
     @endif
+    @if($boardWarning)
+        <div class="alert alert-warning py-2 small mb-3" wire:key="board-warning-{{ md5($boardWarning) }}">
+            <i class="bi bi-exclamation-triangle me-1"></i>{{ $boardWarning }}
+        </div>
+    @endif
 
     @if($showTransportSwitchModal && $pendingTransportMode)
         @teleport('body')
@@ -337,8 +342,8 @@
             Puste projekty też są widoczne — możesz na nie przeciągnąć osoby. Szkic doprecyzowujesz w kolejnych krokach; do bazy zapisujesz przyciskiem <strong>Zapisz transfer w systemie</strong> (na dole, gdy masz co najmniej jeden wiersz szkicu).
         </p>
 
-        <div wire:loading.delay class="alert alert-info py-2 small mb-3">
-            <i class="bi bi-arrow-repeat"></i> Ładowanie…
+        <div wire:loading.delay wire:target="startTransferDrop" class="alert alert-info py-2 small mb-3">
+            <i class="bi bi-arrow-repeat"></i> Otwieranie przeniesienia…
         </div>
 
         @if(count($this->columns) === 0)
@@ -361,14 +366,27 @@
                     <div
                         class="flex-shrink-0 rounded-3 border transfer-kanban-column d-flex flex-column"
                         style="width: 280px; min-height: 220px; border-color: var(--glass-border) !important; background: var(--bg-card); scroll-snap-align: start;"
-                        x-on:dragover.prevent="$el.classList.add('border-primary')"
-                        x-on:dragleave="$el.classList.remove('border-primary')"
-                        x-on:drop.prevent="
-                            $el.classList.remove('border-primary');
-                            const raw = $event.dataTransfer.getData('text/plain');
-                            const id = parseInt(raw, 10);
-                            if (id) { $wire.startTransferDrop(id, {{ $projectId }}) }
-                        "
+                        x-data="{
+                            onDragOver(e) {
+                                e.preventDefault();
+                                $el.classList.add('border-primary');
+                            },
+                            onDragLeave(e) {
+                                if (!$el.contains(e.relatedTarget)) {
+                                    $el.classList.remove('border-primary');
+                                }
+                            },
+                            onDrop(e) {
+                                e.preventDefault();
+                                $el.classList.remove('border-primary');
+                                const raw = e.dataTransfer.getData('text/plain');
+                                const id = parseInt(raw, 10);
+                                if (id) { $wire.startTransferDrop(id, {{ $projectId }}) }
+                            }
+                        }"
+                        x-on:dragover="onDragOver($event)"
+                        x-on:dragleave="onDragLeave($event)"
+                        x-on:drop="onDrop($event)"
                     >
                         <div class="px-3 py-2 border-bottom flex-shrink-0" style="border-color: var(--glass-border) !important;">
                             <div class="fw-semibold small text-truncate" title="{{ $project->name }}">
@@ -380,7 +398,12 @@
                                 </div>
                             @endif
                         </div>
-                        <div class="p-2 d-flex flex-column gap-2 flex-grow-1" style="min-height: 140px;">
+                        <div
+                            class="p-2 d-flex flex-column gap-2 flex-grow-1"
+                            style="min-height: 140px;"
+                            x-on:dragover.prevent
+                            x-on:drop="onDrop($event)"
+                        >
                             @forelse($column['assignments'] as $assignment)
                                 @php
                                     $employee = $assignment->employee;
@@ -463,6 +486,8 @@
                                         'opacity-75' => $isInPlan,
                                     ])
                                     style="cursor: {{ $isInPlan ? 'default' : 'grab' }}; border-color: {{ $isInPlan ? 'rgba(59,130,246,0.45)' : 'var(--glass-border)' }} !important;"
+                                    x-on:dragover.prevent
+                                    x-on:drop="onDrop($event)"
                                     @if(! $isInPlan)
                                     x-on:dragstart="
                                         $event.dataTransfer.setData('text/plain', '{{ $assignment->id }}');

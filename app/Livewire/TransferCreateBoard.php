@@ -112,6 +112,9 @@ class TransferCreateBoard extends Component
 
     public array $draftAssignmentDetails = [];
 
+    /** Komunikat błędu/ostrzeżenia przy dropie (session flash bywa niewidoczny w tym samym ticku Livewire). */
+    public ?string $boardWarning = null;
+
     // --- Modal: braki ról ---
     public bool $showGapsModal = false;
 
@@ -1881,85 +1884,98 @@ class TransferCreateBoard extends Component
 
     public function startTransferDrop(int $assignmentId, int $targetProjectId): void
     {
-        $date = Carbon::parse($this->transferDate)->startOfDay();
+        $this->boardWarning = null;
 
-        $assignment = ProjectAssignment::query()
-            ->activeAtDate($date)
-            ->with(['employee.roles', 'project', 'role'])
-            ->find($assignmentId);
+        try {
+            $date = Carbon::parse($this->transferDate)->startOfDay();
 
-        if (! $assignment || ! $assignment->employee) {
-            return;
-        }
+            $assignment = ProjectAssignment::query()
+                ->activeAtDate($date)
+                ->with(['employee.roles', 'project', 'role'])
+                ->find($assignmentId);
 
-        if (
-            $this->extendPlanId
-            && in_array((int) $assignment->employee_id, $this->planEmployeeIds, true)
-        ) {
-            session()->flash('warning', 'Ta osoba jest już w planie — przeciągnij kogoś innego.');
-
-            return;
-        }
-
-        $project = Project::query()
-            ->where('status', ProjectStatus::ACTIVE)
-            ->activeAtDate($date)
-            ->whereKey($targetProjectId)
-            ->first();
-
-        if (! $project) {
-            return;
-        }
-
-        $effectiveFromId = (int) ($this->draftProjectByAssignment[$assignmentId] ?? $assignment->project_id);
-        if ($effectiveFromId === $targetProjectId) {
-            unset($this->draftProjectByAssignment[$assignmentId], $this->draftAssignmentDetails[$assignmentId]);
-
-            return;
-        }
-
-        $this->pendingAssignmentId = $assignmentId;
-        $this->pendingTargetProjectId = $targetProjectId;
-        $this->pendingEmployeeId = $assignment->employee_id;
-        $this->pendingEmployeeRoleIds = $assignment->employee->roles
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
-
-        $arrival = $date->copy();
-        $gapsAll = $this->departurePlannerService->getProjectGapsForTwoWeeks(
-            $arrival,
-            [],
-            [],
-            [$targetProjectId]
-        );
-        $slice = $gapsAll[$targetProjectId] ?? null;
-
-        $project->loadMissing('location');
-        $this->gapsModalProject = [
-            'id' => $project->id,
-            'name' => $project->name,
-            'location' => $project->location?->name,
-        ];
-
-        $this->gapsModalRoles = ($slice && ! empty($slice['roles']))
-            ? $slice['roles']
-            : $this->fallbackRolesFromDemands($project, $arrival);
-
-        if ($this->gapsModalRoles === []) {
-            if ($assignment->role_id) {
-                $this->openCalendarForRole((int) $assignment->role_id);
+            if (! $assignment || ! $assignment->employee) {
+                $this->boardWarning = 'Nie znaleziono aktywnego przypisania do przeciągnięcia (odśwież tablicę albo zmień datę).';
 
                 return;
             }
-            session()->flash('warning', 'Brak ról (zapotrzebowania) dla tego projektu w okresie 14 dni — ustaw zapotrzebowanie w projekcie.');
+
+            if (
+                $this->extendPlanId
+                && in_array((int) $assignment->employee_id, $this->planEmployeeIds, true)
+            ) {
+                $this->boardWarning = 'Ta osoba jest już w planie — przeciągnij kogoś innego.';
+
+                return;
+            }
+
+            $project = Project::query()
+                ->where('status', ProjectStatus::ACTIVE)
+                ->activeAtDate($date)
+                ->whereKey($targetProjectId)
+                ->first();
+
+            if (! $project) {
+                $this->boardWarning = 'Docelowy projekt nie jest aktywny w wybranym dniu transferu.';
+
+                return;
+            }
+
+            $effectiveFromId = (int) ($this->draftProjectByAssignment[$assignmentId] ?? $assignment->project_id);
+            if ($effectiveFromId === $targetProjectId) {
+                unset($this->draftProjectByAssignment[$assignmentId], $this->draftAssignmentDetails[$assignmentId]);
+                $this->boardWarning = 'Ta osoba jest już na tym projekcie w szkicu — upuszczono bez zmian.';
+
+                return;
+            }
+
+            $this->pendingAssignmentId = $assignmentId;
+            $this->pendingTargetProjectId = $targetProjectId;
+            $this->pendingEmployeeId = $assignment->employee_id;
+            $this->pendingEmployeeRoleIds = $assignment->employee->roles
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            $arrival = $date->copy();
+            $gapsAll = $this->departurePlannerService->getProjectGapsForTwoWeeks(
+                $arrival,
+                [],
+                [],
+                [$targetProjectId]
+            );
+            $slice = $gapsAll[$targetProjectId] ?? null;
+
+            $project->loadMissing('location');
+            $this->gapsModalProject = [
+                'id' => $project->id,
+                'name' => $project->name,
+                'location' => $project->location?->name,
+            ];
+
+            $this->gapsModalRoles = ($slice && ! empty($slice['roles']))
+                ? $slice['roles']
+                : $this->fallbackRolesFromDemands($project, $arrival);
+
+            if ($this->gapsModalRoles === []) {
+                if ($assignment->role_id) {
+                    $this->openCalendarForRole((int) $assignment->role_id);
+
+                    return;
+                }
+                $this->boardWarning = 'Brak ról (zapotrzebowania) dla tego projektu w okresie 14 dni — ustaw zapotrzebowanie w projekcie.';
+                $this->resetPendingDrop();
+
+                return;
+            }
+
+            $this->showGapsModal = true;
+        } catch (\Throwable $e) {
+            report($e);
             $this->resetPendingDrop();
-
-            return;
+            $this->boardWarning = 'Nie udało się otworzyć przeniesienia na ten projekt. Odśwież stronę i spróbuj ponownie.';
         }
-
-        $this->showGapsModal = true;
     }
 
     public function employeeHasRole(int $roleId): bool
@@ -2002,6 +2018,8 @@ class TransferCreateBoard extends Component
     {
         $employee = $this->pendingEmployeeId ? Employee::find($this->pendingEmployeeId) : null;
         if (! $employee || ! $employee->hasRole($roleId)) {
+            $this->boardWarning = 'Pracownik nie ma tej roli w profilu — wybierz inną rolę.';
+
             return;
         }
         $this->openCalendarForRole($roleId);
