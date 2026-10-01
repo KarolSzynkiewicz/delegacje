@@ -290,6 +290,177 @@ body {
     flex-shrink: 0;
 }
 
+.wo-delta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    padding: 0.28rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 650;
+    line-height: 1;
+}
+.wo-delta-btn:hover {
+    color: var(--text-main);
+    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(59, 130, 246, 0.12);
+}
+.wo-delta-btn__label {
+    letter-spacing: 0.02em;
+}
+.wo-delta-modal {
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 2000;
+}
+.wo-delta-panel {
+    background: rgba(13, 18, 30, 0.96);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+}
+.wo-delta-panel__head {
+    border-color: var(--glass-border);
+    align-items: flex-start;
+}
+.wo-delta-panel__sub {
+    margin-top: 0.2rem;
+}
+.wo-delta-panel__foot {
+    border-color: var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.wo-delta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+.wo-delta-col {
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-top-width: 3px;
+    min-height: 12rem;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.wo-delta-col--left { border-top-color: #f87171; }
+.wo-delta-col--arrived { border-top-color: #34d399; }
+.wo-delta-col--ending { border-top-color: #fbbf24; }
+.wo-delta-col--arriving { border-top-color: #60a5fa; }
+.wo-delta-col__head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.7rem 0.8rem 0.55rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.wo-delta-col__dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    flex: none;
+}
+.wo-delta-col--left .wo-delta-col__dot { background: #f87171; }
+.wo-delta-col--arrived .wo-delta-col__dot { background: #34d399; }
+.wo-delta-col--ending .wo-delta-col__dot { background: #fbbf24; }
+.wo-delta-col--arriving .wo-delta-col__dot { background: #60a5fa; }
+.wo-delta-col__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.8rem;
+    font-weight: 650;
+    line-height: 1.25;
+}
+.wo-delta-col__count {
+    flex: none;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+}
+.wo-delta-col__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.7rem 0.75rem 0.85rem;
+    overflow: auto;
+    max-height: min(28rem, 55vh);
+}
+.wo-delta-empty {
+    padding: 0.35rem 0.1rem;
+}
+.wo-delta-person {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.wo-delta-person:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+.wo-delta-person__side {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+.wo-delta-person__detail {
+    font-size: 0.72rem;
+    width: 100%;
+}
+.wo-delta-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.68rem;
+    font-weight: 650;
+    line-height: 1.2;
+    border: 1px solid transparent;
+}
+.wo-delta-pill--left {
+    color: #fecaca;
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.28);
+}
+.wo-delta-pill--arrived {
+    color: #a7f3d0;
+    background: rgba(52, 211, 153, 0.12);
+    border-color: rgba(52, 211, 153, 0.28);
+}
+.wo-delta-pill--ending {
+    color: #fde68a;
+    background: rgba(251, 191, 36, 0.12);
+    border-color: rgba(251, 191, 36, 0.28);
+}
+.wo-delta-pill--arriving {
+    color: #bfdbfe;
+    background: rgba(96, 165, 250, 0.12);
+    border-color: rgba(96, 165, 250, 0.28);
+}
+@media (max-width: 1199.98px) {
+    .wo-delta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 767.98px) {
+    .wo-delta-grid {
+        grid-template-columns: 1fr;
+    }
+    .wo-delta-btn__label {
+        display: none;
+    }
+}
+
 .weekly-overview-assigned-table tr.is-site-lead td:first-child {
     box-shadow: inset 3px 0 0 #f59e0b;
     padding-left: 0.9rem;

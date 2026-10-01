@@ -1,6 +1,7 @@
 @php
     $dateRange = $employeeData['date_range'] ?? 'cały tydzień';
     $isFullWeek = ($dateRange === 'cały tydzień' || $dateRange === 'pon-nie');
+    $timelineUrl = route('employees.show', ['employee' => $employeeData['employee'], 'tab' => 'timeline']);
 @endphp
 <tr @class(['wo-assigned-row', 'is-site-lead' => $employeeData['is_site_lead'] ?? false])>
     <td data-label="Pracownik" data-sort-value="{{ mb_strtolower($employeeData['employee']->last_name.' '.$employeeData['employee']->first_name) }}">
@@ -30,14 +31,10 @@
                 <i class="bi bi-arrow-left-right"></i> Zmienna
             </x-ui.badge>
         @elseif(($employeeData['role'] ?? null) && ($employeeData['assignment'] ?? null))
-            @php
-                $assignment = $employeeData['assignment'];
-                $assignmentId = is_object($assignment) ? $assignment->id : $assignment;
-            @endphp
             <x-role-seniority-badge
                 :role="$employeeData['role']"
                 :seniority="$employeeData['seniority'] ?? null"
-                :href="route('project-assignments.edit', $assignmentId)"
+                :href="$timelineUrl"
             />
         @elseif($employeeData['role'] ?? null)
             <x-role-seniority-badge
@@ -51,7 +48,7 @@
     </td>
     <td data-label="Auto" data-sort-value="{{ mb_strtolower($employeeData['vehicle']->registration_number ?? '') }}">
         @if(isset($employeeData['vehicle']) && $employeeData['vehicle'])
-            <x-ui.clickable-badge variant="success" route="vehicle-assignments.show" :routeParams="['vehicle_assignment' => $employeeData['vehicle_assignment']]" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
+            <x-ui.clickable-badge variant="success" :href="$timelineUrl" title="{{ $employeeData['vehicle']->brand }} {{ $employeeData['vehicle']->model }}">
                 <i class="bi bi-car-front"></i> {{ $employeeData['vehicle']->registration_number }}
             </x-ui.clickable-badge>
         @elseif($employeeData['has_vehicle_in_week'] ?? false)
@@ -70,7 +67,7 @@
                 $accommodationName = $employeeData['accommodation']->name;
                 $accommodationDisplay = Str::limit($accommodationName, 32);
             @endphp
-            <x-ui.clickable-badge variant="info" route="accommodation-assignments.show" :routeParams="['accommodation_assignment' => $employeeData['accommodation_assignment']]" title="{{ $accommodationName }}" class="wo-cell-truncate">
+            <x-ui.clickable-badge variant="info" :href="$timelineUrl" title="{{ $accommodationName }}" class="wo-cell-truncate">
                 <i class="bi bi-house"></i> {{ $accommodationDisplay }}
             </x-ui.clickable-badge>
         @else

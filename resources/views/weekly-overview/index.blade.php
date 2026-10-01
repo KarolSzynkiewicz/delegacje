@@ -345,6 +345,11 @@
                         <div class="d-flex align-items-center gap-3 ms-auto flex-wrap">
                             <!-- Ludzie -->
                             <div class="d-flex align-items-center gap-2">
+                                @livewire('project-staffing-delta', [
+                                    'projectId' => $project->id,
+                                    'weekStart' => $weeks[0]['start']->toDateString(),
+                                    'projectName' => $project->name,
+                                ], key('staffing-delta-'.$project->id.'-'.$weeks[0]['start']->toDateString()))
                                 <x-tooltip title="Ilu jest przypisanych do projektu / na ilu było zapotrzebowanie">
                                     <i class="bi bi-people text-primary fs-5"></i>
                                 </x-tooltip>
