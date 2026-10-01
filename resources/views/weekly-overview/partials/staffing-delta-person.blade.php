@@ -29,7 +29,9 @@
                 :href="$row['timeline_url'] ?? null"
             />
         @endif
-        <span class="wo-delta-pill wo-delta-pill--{{ $tone }}">{{ $row['badge'] }}</span>
+        @if(!empty($row['badge']))
+            <span class="wo-delta-pill wo-delta-pill--{{ $tone }}">{{ $row['badge'] }}</span>
+        @endif
         @if(!empty($row['detail']))
             <span class="wo-delta-person__detail text-muted">{{ $row['detail'] }}</span>
         @endif

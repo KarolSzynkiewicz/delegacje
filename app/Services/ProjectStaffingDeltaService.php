@@ -93,8 +93,8 @@ class ProjectStaffingDeltaService
                 $employees->get($id),
                 $assignment,
                 $documents->get($id, collect()),
-                'zeszły tydzień',
-                $end ? 'do '.$end->format('d.m') : 'zeszły tydzień',
+                '',
+                $end ? 'do '.$end->format('d.m') : '',
                 'left',
             );
         })->filter()->values();
@@ -107,8 +107,8 @@ class ProjectStaffingDeltaService
                 $employees->get($id),
                 $assignment,
                 $documents->get($id, collect()),
-                'od tego tyg.',
-                $start ? 'od '.$start->format('d.m') : 'od tego tyg.',
+                '',
+                $start ? 'od '.$start->format('d.m') : '',
                 'arrived',
             );
         })->filter()->values();

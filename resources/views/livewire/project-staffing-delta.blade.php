@@ -21,7 +21,7 @@
                 wire:keydown.escape.window="closeModal"
                 wire:key="staffing-delta-{{ $projectId }}"
             >
-                <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+                <div class="modal-dialog wo-delta-dialog modal-dialog-scrollable modal-dialog-centered">
                     <div class="modal-content wo-delta-panel">
                         <div class="modal-header wo-delta-panel__head">
                             <div>

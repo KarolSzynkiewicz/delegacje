@@ -315,10 +315,19 @@ body {
     background: rgba(0, 0, 0, 0.75);
     z-index: 2000;
 }
+.wo-delta-dialog {
+    width: min(96vw, 1680px);
+    max-width: min(96vw, 1680px);
+    margin: 1rem auto;
+}
 .wo-delta-panel {
     background: rgba(13, 18, 30, 0.96);
     border: 1px solid var(--glass-border);
     color: var(--text-main);
+    overflow-x: hidden;
+}
+.wo-delta-panel .modal-body {
+    overflow-x: hidden;
 }
 .wo-delta-panel__head {
     border-color: var(--glass-border);
@@ -336,8 +345,10 @@ body {
 }
 .wo-delta-bands {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr) minmax(0, 1fr);
     gap: 0.85rem;
+    min-width: 0;
+    width: 100%;
 }
 .wo-delta-band {
     display: flex;
@@ -467,6 +478,10 @@ body {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
+    min-width: 0;
+}
+.wo-delta-person__side .role-ribbon {
+    max-width: 100%;
 }
 .wo-delta-person__detail {
     font-size: 0.72rem;
