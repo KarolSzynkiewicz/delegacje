@@ -96,6 +96,26 @@
     padding: 10px 12px;
     display: flex; flex-direction: column; gap: 8px;
 }
+.s1-role-card--planned {
+    background: rgba(56, 189, 248, 0.08);
+    border-color: rgba(56, 189, 248, 0.45);
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.15);
+}
+.s1-planned-note {
+    font-size: .72rem;
+    font-weight: 600;
+    color: #7dd3fc;
+    margin-top: 2px;
+}
+.s1-planned-pill {
+    font-size: .68rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    background: rgba(56, 189, 248, 0.14);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #7dd3fc;
+}
 .s1-role-header { display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .s1-role-name { font-size:.82rem; font-weight:700; }
 .s1-gap-pill {

@@ -704,7 +704,11 @@ class Step1ProjectAssignments extends Component
 
         // Filter from all available employees (not just current page)
         $filtered = collect($this->allAvailableEmployees)->filter(function ($employee) use ($assignedIds, $employeesWithDbAssignments, $notInBaseIds, $alwaysAllow) {
-            if (in_array((int) $employee['id'], $assignedIds, true)) {
+            $isEditTarget = $this->participantPlannerEmbed && isset($alwaysAllow[(int) $employee['id']]);
+
+            // Edycja: osoba zostaje na liście, żeby dało się ją przeciągnąć na inny projekt,
+            // nawet gdy szkic nadal trzyma jej dotychczasową rolę.
+            if (! $isEditTarget && in_array((int) $employee['id'], $assignedIds, true)) {
                 return false;
             }
 
@@ -988,6 +992,17 @@ class Step1ProjectAssignments extends Component
         $monthStart = $this->calendarMonthStart->copy();
         $monthEnd = $monthStart->copy()->endOfMonth();
 
+        // Edycja uczestnika: dotychczasowa rola w szkicu nie może blokować kalendarza,
+        // bo drop na inny projekt ma ją zastąpić, a nie dokładać drugie przypisanie.
+        $rangesForAvailability = $this->assignmentRanges;
+        if ($this->participantPlannerEmbed) {
+            $editingId = (int) $this->selectedEmployee['id'];
+            $rangesForAvailability = array_filter(
+                $this->assignmentRanges,
+                fn ($range) => (int) ($range['employee_id'] ?? 0) !== $editingId
+            );
+        }
+
         // Load availability for the month range
         // minDate is set to arrival date to block dates before arrival
         $newAvailability = $this->departurePlannerService->getEmployeeAvailabilityForMonthRange(
@@ -997,7 +1012,7 @@ class Step1ProjectAssignments extends Component
             $monthStart,
             $monthEnd,
             $this->assignments,
-            $this->assignmentRanges,
+            $rangesForAvailability,
             $arrivalDate, // minDate - block dates before arrival / transfer
             $this->forTransfer // przeniesienie: nie blokuj przez stare ProjectAssignment w bazie
         );
@@ -1151,14 +1166,15 @@ class Step1ProjectAssignments extends Component
         $employeesById = $this->buildEmployeesById();
         $assignedMap = $this->buildAssignedMap();
         $vehicleFlags = $this->computeVehicleFlags();
+        $projects = $this->buildProjectsWithChips($employeesById, $assignedMap);
 
         return view('livewire.steps.step1-project-assignments', [
             'isVehicleFull' => $vehicleFlags['is_vehicle_full'],
             'showFullBanner' => $vehicleFlags['show_full_banner'],
             'employees' => $this->buildEmployeeRows(),
             'pagination' => $this->buildPaginationData(),
-            'projects' => $this->buildProjectsWithChips($employeesById, $assignedMap),
-            'projectsEmpty' => empty($this->filteredProjectGapsTwoWeeks),
+            'projects' => $projects,
+            'projectsEmpty' => $projects === [],
             'projectsEmptyMsg' => filled($this->projectSearch)
                                   ? 'Brak braków dla filtrów'
                                   : 'Brak braków w rolach na najbliższe 2 tygodnie',
@@ -1200,7 +1216,12 @@ class Step1ProjectAssignments extends Component
 
     private function buildProjectsWithChips(array $employeesById, array $assignedMap): array
     {
-        return collect($this->filteredProjectGapsTwoWeeks)
+        $gaps = $this->filteredProjectGapsTwoWeeks;
+        if ($this->participantPlannerEmbed) {
+            $gaps = $this->includePlannedAssignmentTargets($gaps);
+        }
+
+        return collect($gaps)
             ->map(function ($project, $projectId) use ($employeesById, $assignedMap) {
                 $roles = collect($project['roles'])
                     ->map(function ($role, $roleId) use ($employeesById, $assignedMap, $projectId) {
@@ -1218,15 +1239,70 @@ class Step1ProjectAssignments extends Component
                                                 ? "{$role['min_gaps']} brak."
                                                 : "{$role['min_gaps']}–{$role['max_gaps']} brak.",
                             'assigned_chips' => $chips,
+                            'planned_here' => ! empty($role['planned_here']),
                         ]);
                     })
                     ->values()
                     ->all();
 
-                return array_merge($project, ['id' => $projectId, 'roles' => $roles]);
+                $plannedHere = collect($roles)->contains(fn ($role) => ! empty($role['planned_here']));
+
+                return array_merge($project, [
+                    'id' => $projectId,
+                    'roles' => $roles,
+                    'planned_here' => $plannedHere || ! empty($project['planned_here']),
+                ]);
             })
+            ->sortByDesc(fn ($project) => ! empty($project['planned_here']))
             ->values()
             ->all();
+    }
+
+    /**
+     * Rola obsadzona tą osobą nie ma braków, więc znika z listy „kogo brakuje”.
+     * Przy edycji uczestnika i tak ma być widoczna — inaczej nie da się jej zdjąć ani przenieść.
+     *
+     * @param  array<int|string, array<string, mixed>>  $gaps
+     * @return array<int|string, array<string, mixed>>
+     */
+    private function includePlannedAssignmentTargets(array $gaps): array
+    {
+        foreach ($this->assignmentRanges as $range) {
+            $projectId = (int) ($range['project_id'] ?? 0);
+            $roleId = (int) ($range['role_id'] ?? 0);
+            if ($projectId <= 0 || $roleId <= 0) {
+                continue;
+            }
+
+            if (! isset($gaps[$projectId])) {
+                $project = Project::query()->with('location')->find($projectId);
+                if (! $project) {
+                    continue;
+                }
+                $gaps[$projectId] = [
+                    'id' => $project->id,
+                    'name' => $project->name,
+                    'location' => $project->location?->name,
+                    'roles' => [],
+                    'planned_here' => true,
+                ];
+            }
+
+            if (! isset($gaps[$projectId]['roles'][$roleId])) {
+                $role = Role::query()->find($roleId);
+                $gaps[$projectId]['roles'][$roleId] = [
+                    'id' => $roleId,
+                    'name' => $role?->name ?? 'Rola',
+                    'min_gaps' => 0,
+                    'max_gaps' => 0,
+                ];
+            }
+
+            $gaps[$projectId]['roles'][$roleId]['planned_here'] = true;
+            $gaps[$projectId]['planned_here'] = true;
+        }
+
+        return $gaps;
     }
 
     private function buildChip(int $empId, array $employeesById, $projectId, $roleId): ?array

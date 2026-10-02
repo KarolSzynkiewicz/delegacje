@@ -191,6 +191,9 @@
                             <div class="s1-project-block">
                                 <div class="s1-project-header">
                                     <div class="s1-project-name">{{ $project['name'] }}</div>
+                                    @if(!empty($project['planned_here']))
+                                        <div class="s1-planned-note">Tu jest zaplanowany ten wyjazd</div>
+                                    @endif
                                     @if($project['location'])
                                         <div class="s1-project-loc">
                                             <i class="bi bi-geo-alt-fill s1-project-loc-icon"></i>
@@ -201,12 +204,19 @@
 
                                 <div class="s1-roles-grid">
                                     @foreach($project['roles'] as $role)
-                                        <div class="s1-role-card">
+                                        <div @class(['s1-role-card', 's1-role-card--planned' => !empty($role['planned_here'])])>
                                             <div class="s1-role-header">
                                                 <span class="s1-role-name">{{ $role['name'] }}</span>
-                                                <span class="s1-gap-pill">
-                                                    <i class="bi bi-person-dash"></i>
-                                                    {{ $role['gap_label'] }}
+                                                <span class="d-flex align-items-center gap-1">
+                                                    @if(!empty($role['planned_here']))
+                                                        <span class="s1-planned-pill">Ten wyjazd</span>
+                                                    @endif
+                                                    @if(empty($role['planned_here']) || (int) ($role['min_gaps'] ?? 0) > 0)
+                                                        <span class="s1-gap-pill">
+                                                            <i class="bi bi-person-dash"></i>
+                                                            {{ $role['gap_label'] }}
+                                                        </span>
+                                                    @endif
                                                 </span>
                                             </div>
 

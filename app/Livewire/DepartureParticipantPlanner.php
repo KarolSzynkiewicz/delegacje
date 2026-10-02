@@ -204,6 +204,16 @@ class DepartureParticipantPlanner extends Component
         }
 
         $key = $data['employee_id'].'_'.$data['project_id'].'_'.$data['role_id'];
+        $employeeId = (int) $data['employee_id'];
+        foreach ($this->assignmentRanges as $existingKey => $range) {
+            if ($existingKey === $key) {
+                continue;
+            }
+            if ((int) ($range['employee_id'] ?? 0) === $employeeId) {
+                unset($this->assignmentRanges[$existingKey]);
+            }
+        }
+
         $this->assignmentRanges[$key] = [
             'employee_id' => $data['employee_id'],
             'project_id' => $data['project_id'],

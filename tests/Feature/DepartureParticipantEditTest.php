@@ -213,6 +213,105 @@ class DepartureParticipantEditTest extends TestCase
             ->assertSee('Wybierz projekt i rolę');
     }
 
+    public function test_edit_shows_the_filled_role_and_keeps_the_person_draggable(): void
+    {
+        $bundle = $this->seedAssignableEmployee('2026-07-01', '2026-07-31');
+        ProjectDemand::query()
+            ->where('project_id', $bundle['project']->id)
+            ->update(['required_count' => 1]);
+
+        Livewire::test(Step1ProjectAssignments::class, [
+            'departureDate' => '2026-07-09',
+            'endDate' => '2026-07-10',
+            'vehicleId' => null,
+            'assignmentRanges' => [
+                $bundle['employee']->id.'_'.$bundle['project']->id.'_'.$bundle['role']->id => [
+                    'employee_id' => $bundle['employee']->id,
+                    'project_id' => $bundle['project']->id,
+                    'role_id' => $bundle['role']->id,
+                    'start_date' => '2026-07-10',
+                    'end_date' => '2026-07-31',
+                ],
+            ],
+            'forTransfer' => true,
+            'allowedEmployeeIds' => [$bundle['employee']->id],
+            'alwaysAllowEmployeeIds' => [$bundle['employee']->id],
+            'participantPlannerEmbed' => true,
+        ])
+            ->assertSee($bundle['employee']->full_name)
+            ->assertSee($bundle['project']->name)
+            ->assertSee('Tu jest zaplanowany ten wyjazd')
+            ->assertDontSee('Brak osoby do przeciągnięcia');
+    }
+
+    public function test_dropping_edited_person_onto_another_project_replaces_the_old_role(): void
+    {
+        $departure = $this->makeDeparture();
+        $bundle = $this->seedAssignableEmployee('2026-07-01', '2026-07-31');
+        $this->addExistingParticipant($departure, $bundle['employee'], $bundle['role'], $bundle['project']);
+
+        $otherProject = Project::factory()->create(['location_id' => $this->field->id]);
+        $otherRole = Role::factory()->create();
+
+        Livewire::test(DepartureParticipantPlanner::class, [
+            'departureId' => $departure->id,
+            'employeeId' => $bundle['employee']->id,
+        ])
+            ->call('handleAssignmentRangeAdded', [
+                'employee_id' => $bundle['employee']->id,
+                'project_id' => $otherProject->id,
+                'role_id' => $otherRole->id,
+                'start_date' => '2026-07-10',
+                'end_date' => '2026-07-31',
+            ])
+            ->assertSet('assignmentRanges', [
+                $bundle['employee']->id.'_'.$otherProject->id.'_'.$otherRole->id => [
+                    'employee_id' => $bundle['employee']->id,
+                    'project_id' => $otherProject->id,
+                    'role_id' => $otherRole->id,
+                    'start_date' => '2026-07-10',
+                    'end_date' => '2026-07-31',
+                ],
+            ]);
+    }
+
+    public function test_edit_calendar_lets_the_person_move_onto_another_project(): void
+    {
+        $bundle = $this->seedAssignableEmployee('2026-07-01', '2026-07-31');
+        $other = Project::factory()->create(['location_id' => $this->field->id]);
+        ProjectDemand::create([
+            'project_id' => $other->id,
+            'role_id' => $bundle['role']->id,
+            'required_count' => 2,
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-07-31',
+        ]);
+
+        $component = Livewire::test(Step1ProjectAssignments::class, [
+            'departureDate' => '2026-07-09',
+            'endDate' => '2026-07-10',
+            'vehicleId' => null,
+            'assignmentRanges' => [
+                $bundle['employee']->id.'_'.$bundle['project']->id.'_'.$bundle['role']->id => [
+                    'employee_id' => $bundle['employee']->id,
+                    'project_id' => $bundle['project']->id,
+                    'role_id' => $bundle['role']->id,
+                    'start_date' => '2026-07-10',
+                    'end_date' => '2026-07-31',
+                ],
+            ],
+            'forTransfer' => true,
+            'allowedEmployeeIds' => [$bundle['employee']->id],
+            'alwaysAllowEmployeeIds' => [$bundle['employee']->id],
+            'participantPlannerEmbed' => true,
+        ]);
+
+        $component->call('openEmployeeModal', $bundle['employee']->id, $other->id, $bundle['role']->id);
+
+        $availability = $component->get('employeeAvailability');
+        $this->assertTrue($availability['2026-07-10']['can_assign'] ?? false);
+    }
+
     public function test_saving_participant_edit_does_not_select_missing_full_name_column(): void
     {
         $departure = $this->makeDeparture();
