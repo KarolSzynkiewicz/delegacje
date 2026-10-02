@@ -70,6 +70,9 @@ class Step2AccommodationAssignments extends Component
 
     public ?string $assignmentModalError = null;
 
+    /** Ostrzeżenia przy „Dalej” w kreatorze transferu — bez blokującego confirm() w JS. */
+    public array $transferStepIssues = [];
+
     protected $departurePlannerService;
 
     protected AccommodationAssignmentService $accommodationAssignmentService;
@@ -717,6 +720,20 @@ class Step2AccommodationAssignments extends Component
             ->orderByDesc('id')
             ->value('id');
 
+        // Transfer ucina kwaterę aktywną w dniu transferu (do dnia wcześniejszego) i zakłada nową od tego dnia.
+        // To przypisanie nie jest kolizją — zniknie zanim nowy zakres zacznie obowiązywać.
+        $ignoreOverlapIds = [];
+        $transferDay = $this->arrivalDate?->copy()->startOfDay();
+        if ($this->forTransfer && $transferDay && $startDate->gte($transferDay)) {
+            $ignoreOverlapIds = AccommodationAssignment::query()
+                ->where('employee_id', $employeeId)
+                ->where('start_date', '<=', $transferDay)
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $transferDay))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
         try {
             $this->accommodationAssignmentService->assertCanAssign(
                 $employee,
@@ -724,7 +741,8 @@ class Step2AccommodationAssignments extends Component
                 $startDate,
                 $endDate,
                 $excludeAssignmentId ? (int) $excludeAssignmentId : null,
-                $this->arrivalDate?->copy()->startOfDay()
+                $transferDay,
+                $ignoreOverlapIds
             );
         } catch (ValidationException $e) {
             $this->assignmentModalError = collect($e->errors())->flatten()->first() ?: 'Nie można zapisać tego zakresu dat.';
@@ -742,6 +760,13 @@ class Step2AccommodationAssignments extends Component
             }
             $day->addDay();
         }
+
+        $this->accommodationAssignments[$employeeId] = [
+            'accommodation_id' => $this->selectedAccommodation->id,
+            'start_date' => $startDate->format('Y-m-d'),
+            'end_date' => $endDate->format('Y-m-d'),
+        ];
+        $this->transferStepIssues = [];
 
         $this->dispatch('accommodation-assigned', [
             'employee_id' => $employeeId,
@@ -891,12 +916,21 @@ class Step2AccommodationAssignments extends Component
             }
         }
 
-        // If there are issues, dispatch event with issues for JavaScript confirmation
+        // Kreator transferu jest wstawiany później — listener na livewire:initialized już nie żyje,
+        // więc confirm() w JS nigdy się nie pokazywał i „Dalej” zostawało na kwaterach.
         if (! empty($issues)) {
+            if ($this->transferWizardEmbed) {
+                $this->transferStepIssues = array_values($issues);
+
+                return;
+            }
+
             $this->dispatch('step3-validation-issues', issues: $issues);
 
             return;
         }
+
+        $this->transferStepIssues = [];
 
         if ($this->transferWizardEmbed) {
             $this->dispatch('transfer-wizard-accommodation-done');
@@ -909,6 +943,8 @@ class Step2AccommodationAssignments extends Component
 
     public function confirmGoToNextStep()
     {
+        $this->transferStepIssues = [];
+
         if ($this->transferWizardEmbed) {
             $this->dispatch('transfer-wizard-accommodation-done');
 

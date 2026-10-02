@@ -146,4 +146,30 @@ class AccommodationAssignmentCapacityTest extends TestCase
             $this->assertStringContainsString('Dom A', $message);
         }
     }
+
+    public function test_transfer_can_ignore_the_stay_that_will_be_shortened(): void
+    {
+        $employee = Employee::factory()->create();
+        $current = Accommodation::factory()->create(['name' => 'SAINT MALO', 'capacity' => 4]);
+        $next = Accommodation::factory()->create(['name' => 'Nowy dom', 'capacity' => 4]);
+
+        $old = $this->service->createAssignment(
+            $employee,
+            $current,
+            Carbon::parse('2026-09-21'),
+            Carbon::parse('2026-10-03')
+        );
+
+        $this->service->assertCanAssign(
+            $employee,
+            $next,
+            Carbon::parse('2026-10-03'),
+            Carbon::parse('2026-10-20'),
+            null,
+            Carbon::parse('2026-10-03'),
+            [$old->id]
+        );
+
+        $this->assertTrue(true);
+    }
 }

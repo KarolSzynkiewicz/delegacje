@@ -269,6 +269,20 @@
         </div>
     </div>
 
+    @if($transferWizardEmbed && count($transferStepIssues) > 0)
+        <div class="alert alert-warning mt-4 mb-0">
+            <div class="fw-semibold mb-2">Można iść dalej do aut, ale:</div>
+            <ul class="mb-3 ps-3">
+                @foreach($transferStepIssues as $issue)
+                    <li>{{ $issue }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn btn-warning" wire:click="confirmGoToNextStep">
+                Przejdź do aut mimo to
+            </button>
+        </div>
+    @endif
+
     <!-- Footer: Navigation -->
     <div class="row mt-4">
         <div class="col-12">
@@ -552,23 +566,18 @@
         });
     });
     
-    // Handle step 3 validation issues
-    document.addEventListener('livewire:initialized', () => {
-        Livewire.on('step3-validation-issues', (data) => {
-            const issues = data.issues || [];
-            if (issues.length > 0) {
-                const message = 'Uwaga! Znalazłem następujące problemy:\n\n' + 
-                              issues.map((issue, idx) => `${idx + 1}. ${issue}`).join('\n') + 
-                              '\n\nCzy na pewno chcesz kontynuować do kroku 3?';
-                
-                if (confirm(message)) {
-                    // User confirmed, proceed to step 3
-                    if (typeof $wire !== 'undefined') {
-                        $wire.confirmGoToNextStep();
-                    }
-                }
+    $wire.on('step3-validation-issues', (event) => {
+        const data = event && event.issues ? event : (Array.isArray(event) ? (event[0] ?? {}) : {});
+        const issues = data.issues || [];
+        if (issues.length > 0) {
+            const message = 'Uwaga! Znalazłem następujące problemy:\n\n' +
+                          issues.map((issue, idx) => `${idx + 1}. ${issue}`).join('\n') +
+                          '\n\nCzy na pewno chcesz kontynuować do kroku 3?';
+
+            if (confirm(message)) {
+                $wire.confirmGoToNextStep();
             }
-        });
+        }
     });
 </script>
 @endscript

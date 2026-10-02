@@ -81,14 +81,22 @@ class AccommodationAssignmentService
         Carbon $startDate,
         Carbon $endDate,
         ?int $excludeAssignmentId = null,
-        ?Carbon $arrivalDate = null
+        ?Carbon $arrivalDate = null,
+        array $ignoreOverlapAssignmentIds = []
     ): void {
         if ($arrivalDate) {
             $this->validateStartDateAfterArrival($startDate, $arrivalDate);
         }
 
         $this->validateLeaseCoversRange($accommodation, $startDate, $endDate);
-        $this->validateNoOverlappingAssignment($employee, $accommodation, $startDate, $endDate, $excludeAssignmentId);
+        $this->validateNoOverlappingAssignment(
+            $employee,
+            $accommodation,
+            $startDate,
+            $endDate,
+            $excludeAssignmentId,
+            $ignoreOverlapAssignmentIds
+        );
         $this->validateAccommodationCapacity($accommodation, $startDate, $endDate, $excludeAssignmentId);
     }
 
@@ -102,11 +110,20 @@ class AccommodationAssignmentService
         Accommodation $accommodation,
         Carbon $startDate,
         Carbon $endDate,
-        ?int $excludeAssignmentId = null
+        ?int $excludeAssignmentId = null,
+        array $ignoreOverlapAssignmentIds = []
     ): void {
+        $excludeIds = array_values(array_unique(array_filter(array_map(
+            'intval',
+            array_merge(
+                $excludeAssignmentId ? [$excludeAssignmentId] : [],
+                $ignoreOverlapAssignmentIds
+            )
+        ))));
+
         $query = $employee->accommodationAssignments()->with('accommodation');
-        if ($excludeAssignmentId) {
-            $query->where('id', '!=', $excludeAssignmentId);
+        if ($excludeIds !== []) {
+            $query->whereNotIn('id', $excludeIds);
         }
 
         $overlapping = $query->overlappingWith($startDate, $endDate)->first();
