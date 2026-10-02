@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\VehicleAssignment;
 use App\Services\AssignmentTimelineService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -272,6 +273,120 @@ class AssignmentTimelinePickerTest extends TestCase
         $assignment->refresh();
         $this->assertSame('2026-07-10', $assignment->start_date->toDateString());
         $this->assertNull($assignment->end_date);
+    }
+
+    public function test_painted_stay_follows_the_latest_departure_or_reassignment_until_return(): void
+    {
+        $employee = Employee::factory()->create();
+        $role = Role::factory()->create();
+        $employee->roles()->attach($role->id);
+        $base = Location::factory()->create(['is_base' => true, 'name' => 'Baza']);
+        $field = Location::factory()->create(['is_base' => false, 'name' => 'Budowa']);
+        $actor = User::factory()->create();
+
+        Rotation::factory()->create([
+            'employee_id' => $employee->id,
+            'start_date' => '2026-07-01',
+            'end_date' => '2026-08-31',
+        ]);
+
+        $fieldProject = Project::factory()->create([
+            'location_id' => $field->id,
+            'status' => 'active',
+            'name' => 'Pole',
+        ]);
+        $baseProject = Project::factory()->create([
+            'location_id' => $base->id,
+            'status' => 'active',
+            'name' => 'Przy bazie',
+        ]);
+        foreach ([$fieldProject, $baseProject] as $project) {
+            ProjectDemand::factory()->create([
+                'project_id' => $project->id,
+                'role_id' => $role->id,
+                'required_count' => 2,
+                'start_date' => '2026-07-01',
+                'end_date' => '2026-08-31',
+            ]);
+        }
+
+        $departure = $this->trip($actor, $employee, LogisticsEventType::DEPARTURE, '2026-07-01', '2026-07-03', $base, $field);
+        $this->trip($actor, $employee, LogisticsEventType::TRANSFER, '2026-07-10', '2026-07-10', $field, $field, false);
+        $transfer = $this->trip($actor, $employee, LogisticsEventType::TRANSFER, '2026-07-15', '2026-07-15', $field, $field, true, $departure->id);
+        $this->trip($actor, $employee, LogisticsEventType::RETURN, '2026-07-27', '2026-07-28', $field, $base);
+
+        $service = app(AssignmentTimelineService::class);
+        $paint = function (Project $project, string $start, string $end) use ($service, $employee, $role): void {
+            $service->commitEmployee($employee, [
+                'lane' => 'project',
+                'id' => null,
+                'start' => $start,
+                'end' => $end,
+                'keep_open' => false,
+            ], $project->id.':'.$role->id, 'passenger');
+        };
+
+        $paint($fieldProject, '2026-07-10', '2026-07-12');
+        $paint($fieldProject, '2026-07-16', '2026-07-20');
+        $paint($baseProject, '2026-07-29', '2026-07-31');
+
+        $rows = ProjectAssignment::query()->where('employee_id', $employee->id)->orderBy('start_date')->get();
+        $this->assertCount(3, $rows);
+        $this->assertSame($departure->id, (int) $rows[0]->logistics_event_id);
+        $this->assertSame($transfer->id, (int) $rows[1]->logistics_event_id);
+        $this->assertNull($rows[2]->logistics_event_id);
+
+        $house = Accommodation::factory()->create(['capacity' => 2]);
+        $service->commitEmployee($employee, [
+            'lane' => 'accommodation',
+            'id' => null,
+            'start' => '2026-07-16',
+            'end' => '2026-07-20',
+            'keep_open' => false,
+        ], (string) $house->id, 'passenger');
+
+        $this->assertSame(
+            $transfer->id,
+            (int) AccommodationAssignment::query()->where('employee_id', $employee->id)->value('logistics_event_id')
+        );
+
+        $board = $service->employeeBoard($employee, Carbon::parse('2026-07-01'), Carbon::parse('2026-08-15'), [
+            'rotation' => ['view' => false, 'create' => false, 'update' => false],
+            'project' => ['view' => true, 'create' => true, 'update' => true],
+            'accommodation' => ['view' => false, 'create' => false, 'update' => false],
+            'vehicle' => ['view' => false, 'create' => false, 'update' => false],
+        ]);
+        $transferMarkers = collect($board['markers'])->where('kind', 'transfer')->values();
+        $this->assertCount(1, $transferMarkers);
+        $this->assertSame('2026-07-15', $transferMarkers[0]['date']);
+        $this->assertSame('Transfer', $transferMarkers[0]['label']);
+    }
+
+    private function trip(
+        User $actor,
+        Employee $employee,
+        LogisticsEventType $type,
+        string $start,
+        string $end,
+        Location $from,
+        Location $to,
+        bool $reassignment = false,
+        ?int $relatedDepartureId = null,
+    ): LogisticsEvent {
+        $event = LogisticsEvent::query()->create([
+            'type' => $type,
+            'event_date' => $start,
+            'end_date' => $end,
+            'from_location_id' => $from->id,
+            'to_location_id' => $to->id,
+            'status' => LogisticsEventStatus::COMPLETED,
+            'has_reassignment' => $reassignment,
+            'related_departure_id' => $relatedDepartureId,
+            'created_by' => $actor->id,
+        ]);
+        $event->participants()->create(['employee_id' => $employee->id]);
+
+        return $event;
     }
 
     private function putEmployeeInField(Employee $employee, string $start, string $end): void

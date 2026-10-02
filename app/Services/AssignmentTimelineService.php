@@ -288,6 +288,8 @@ class AssignmentTimelineService
                 Accommodation::query()->findOrFail((int) $choice),
                 $start,
                 $end,
+                null,
+                $this->logisticsEventIdForPaintedStart($employee, $start),
             ),
             'vehicle' => $this->createVehicleForEmployee(
                 $employee,
@@ -372,6 +374,8 @@ class AssignmentTimelineService
                 Role::query()->findOrFail((int) $roleId),
                 $start,
                 $end,
+                null,
+                $this->logisticsEventIdForPaintedStart($employee, $start),
             );
 
             return;
@@ -384,6 +388,8 @@ class AssignmentTimelineService
                 Accommodation::query()->findOrFail($resourceId),
                 $start,
                 $end,
+                null,
+                $this->logisticsEventIdForPaintedStart($employee, $start),
             );
 
             return;
@@ -805,7 +811,15 @@ class AssignmentTimelineService
             ]);
         }
 
-        $this->vehicles->createAssignment($employee, $vehicle, $position, $start, $end);
+        $this->vehicles->createAssignment(
+            $employee,
+            $vehicle,
+            $position,
+            $start,
+            $end,
+            null,
+            $this->logisticsEventIdForPaintedStart($employee, $start),
+        );
     }
 
     private function resizeEmployee(Employee $employee, string $lane, int $id, Carbon $start, ?Carbon $end, bool $keepOpen): void
@@ -917,6 +931,8 @@ class AssignmentTimelineService
             Role::query()->findOrFail((int) $roleId),
             $start,
             $end,
+            null,
+            $this->logisticsEventIdForPaintedStart($employee, $start),
         );
     }
 
@@ -931,6 +947,76 @@ class AssignmentTimelineService
         return $rotation
             ? Carbon::parse($rotation->end_date)->startOfDay()
             : $start->copy();
+    }
+
+    /**
+     * Nowy pasek z osi dostaje ostatnie cięcie po lewej: przyjazd wyjazdu albo dzień
+     * transferu ze zmianą przypisań. Sam transport i pobyt po zjeździe do bazy zostają bez powiązania.
+     */
+    private function logisticsEventIdForPaintedStart(Employee $employee, Carbon $start): ?int
+    {
+        $day = $start->copy()->startOfDay();
+
+        $events = LogisticsEvent::query()
+            ->whereHas('participants', fn ($query) => $query->where('employee_id', $employee->id))
+            ->whereIn('status', [LogisticsEventStatus::PLANNED, LogisticsEventStatus::COMPLETED])
+            ->where(function ($query) {
+                $query->whereIn('type', [LogisticsEventType::DEPARTURE, LogisticsEventType::RETURN])
+                    ->orWhere(function ($query) {
+                        $query->where('type', LogisticsEventType::TRANSFER)
+                            ->where('has_reassignment', true);
+                    });
+            })
+            ->orderBy('event_date')
+            ->orderBy('id')
+            ->get(['id', 'type', 'event_date', 'end_date', 'has_reassignment']);
+
+        $best = null;
+        $bestAnchor = null;
+
+        foreach ($events as $event) {
+            if ($event->type === LogisticsEventType::RETURN) {
+                continue;
+            }
+
+            $anchor = $event->type === LogisticsEventType::DEPARTURE
+                ? ($event->end_date ?? $event->event_date)
+                : $event->event_date;
+            $anchorDay = $anchor->copy()->startOfDay();
+            if ($anchorDay->gt($day)) {
+                continue;
+            }
+
+            $laterCut = $best === null
+                || $anchorDay->gt($bestAnchor)
+                || ($anchorDay->equalTo($bestAnchor) && (
+                    $event->event_date->gt($best->event_date)
+                    || ($event->event_date->equalTo($best->event_date) && $event->id > $best->id)
+                ));
+            if ($laterCut) {
+                $best = $event;
+                $bestAnchor = $anchorDay;
+            }
+        }
+
+        if ($best === null) {
+            return null;
+        }
+
+        $homeBeforePaint = $events->contains(function (LogisticsEvent $event) use ($best, $day): bool {
+            if ($event->type !== LogisticsEventType::RETURN) {
+                return false;
+            }
+            if ($event->event_date->copy()->startOfDay()->lt($best->event_date->copy()->startOfDay())) {
+                return false;
+            }
+
+            $home = ($event->end_date ?? $event->event_date)->copy()->startOfDay();
+
+            return $home->lte($day);
+        });
+
+        return $homeBeforePaint ? null : (int) $best->id;
     }
 
     /**
@@ -1300,7 +1386,35 @@ class AssignmentTimelineService
             ->orderBy('event_date')
             ->get(['id', 'type', 'event_date', 'end_date']);
 
-        return $this->dedupeMarkers($events);
+        $markers = $this->dedupeMarkers($events);
+
+        $transfers = LogisticsEvent::query()
+            ->where('type', LogisticsEventType::TRANSFER)
+            ->where('has_reassignment', true)
+            ->where('status', '!=', LogisticsEventStatus::CANCELLED)
+            ->whereBetween('event_date', [$start->toDateString(), $end->toDateString()])
+            ->whereHas('participants', fn ($query) => $query->whereIn('employee_id', $employeeIds))
+            ->orderBy('event_date')
+            ->orderBy('id')
+            ->get(['id', 'event_date']);
+
+        $seenTransferDays = [];
+        foreach ($transfers as $transfer) {
+            $date = $transfer->event_date->toDateString();
+            if (isset($seenTransferDays[$date])) {
+                continue;
+            }
+            $seenTransferDays[$date] = true;
+            $markers[] = [
+                'date' => $date,
+                'kind' => 'transfer',
+                'label' => 'Transfer',
+            ];
+        }
+
+        usort($markers, fn (array $a, array $b): int => $a['date'] <=> $b['date']);
+
+        return $markers;
     }
 
     /**

@@ -92,5 +92,13 @@ class AssignmentTimelineMathTest extends TestCase
         $this->assertSame([], AssignmentTimelineMath::onSiteBands([
             ['date' => '2026-09-18', 'kind' => 'arrival'],
         ], '2026-09-01', '2026-09-10'));
+
+        $this->assertSame([
+            ['start' => '2026-09-18', 'end' => '2026-10-02'],
+        ], AssignmentTimelineMath::onSiteBands([
+            ['date' => '2026-09-18', 'kind' => 'arrival'],
+            ['date' => '2026-09-25', 'kind' => 'transfer'],
+            ['date' => '2026-10-02', 'kind' => 'return'],
+        ], '2026-09-01', '2026-10-31'));
     }
 }

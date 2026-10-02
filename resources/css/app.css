@@ -15145,6 +15145,11 @@ a.emp-rail__item { text-decoration: none; }
 .atl-marker--arrival {
     border-left-color: rgba(59, 130, 246, 0.9);
 }
+.atl-marker--transfer {
+    border-left-style: solid;
+    border-left-width: 2px;
+    border-left-color: rgba(168, 85, 247, 0.95);
+}
 .atl-marker__label {
     position: absolute;
     top: 0.15rem;

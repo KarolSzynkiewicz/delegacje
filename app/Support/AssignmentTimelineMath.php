@@ -201,6 +201,9 @@ final class AssignmentTimelineMath
         $open = null;
         $bands = [];
         foreach ($markers as $marker) {
+            if (($marker['kind'] ?? '') === 'transfer') {
+                continue;
+            }
             if ($marker['kind'] === 'arrival') {
                 if ($marker['date'] <= $windowEnd) {
                     $open ??= $marker['date'];
