@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\ForumPost;
 use App\Models\Location;
 use App\Models\LogisticsEvent;
+use App\Models\PlanningWeek;
 use App\Models\Project;
 use App\Models\ProjectTask;
 use App\Models\RecruitmentCandidate;
@@ -32,6 +33,7 @@ enum CommentableType: string
     case SPRINT = 'sprint';
     case APPROVAL_REQUEST = 'approval_request';
     case FORUM_POST = 'forum_post';
+    case PLANNING_WEEK = 'planning_week';
 
     public function modelClass(): string
     {
@@ -49,6 +51,7 @@ enum CommentableType: string
             self::SPRINT => Sprint::class,
             self::APPROVAL_REQUEST => ApprovalRequest::class,
             self::FORUM_POST => ForumPost::class,
+            self::PLANNING_WEEK => PlanningWeek::class,
         };
     }
 
@@ -68,6 +71,7 @@ enum CommentableType: string
             Sprint::class => self::SPRINT,
             ApprovalRequest::class => self::APPROVAL_REQUEST,
             ForumPost::class => self::FORUM_POST,
+            PlanningWeek::class => self::PLANNING_WEEK,
             default => throw new \InvalidArgumentException('Model '.$model::class.' is not commentable'),
         };
     }

@@ -100,6 +100,15 @@
         'projectsEndingThisMonth' => $projectsEndingThisMonth,
     ])
 
+    <div class="mb-4" id="week-comments">
+        <x-comments
+            :commentable="$planningWeek"
+            label="Komentarze tygodnia"
+            input-label="Dodaj komentarz do tygodnia"
+            button-text="Dodaj komentarz"
+        />
+    </div>
+
     <!-- Sekcja: Pracownicy bez projektu, ale z autem lub domem -->
     @if(isset($employeesWithoutProject) && $employeesWithoutProject->isNotEmpty())
         <div class="mt-4">

@@ -201,6 +201,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof Sprint => 'bi-kanban',
             $morph instanceof ApprovalRequest => 'bi-check2-circle',
             $morph instanceof ForumPost => 'bi-chat-square-text',
+            $morph instanceof PlanningWeek => 'bi-calendar-week',
             default => 'bi-chat-dots',
         };
     }
@@ -258,6 +259,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof Sprint => route('sprints.show', $morph),
             $morph instanceof ForumPost => route('dashboard.posts.show', $morph),
             $morph instanceof ApprovalRequest => route('approval-requests.show', $morph),
+            $morph instanceof PlanningWeek => $morph->showUrl(),
             $morph instanceof LogisticsEvent => match ($morph->type) {
                 LogisticsEventType::DEPARTURE => route('departures.show', $morph),
                 LogisticsEventType::TRANSFER => route('transfers.show', $morph),
@@ -291,6 +293,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof Sprint => filled($morph->name) ? (string) $morph->name : 'Sprint #'.$morph->id,
             $morph instanceof ForumPost => filled($morph->title) ? (string) $morph->title : 'Wątek #'.$morph->id,
             $morph instanceof ApprovalRequest => filled($morph->name) ? (string) $morph->name : 'Zatwierdzenie #'.$morph->id,
+            $morph instanceof PlanningWeek => $morph->label(),
             default => class_basename($morph).' #'.$morph->id,
         };
     }

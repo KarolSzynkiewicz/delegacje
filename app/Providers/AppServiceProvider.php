@@ -155,6 +155,7 @@ class AppServiceProvider extends ServiceProvider
             'work_item' => \App\Models\WorkItem::class,
             'approval_request' => \App\Models\ApprovalRequest::class,
             'forum_post' => \App\Models\ForumPost::class,
+            'planning_week' => \App\Models\PlanningWeek::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PlanningWeek;
 use App\Models\Project;
 use App\Services\ExpiringDocumentsService;
 use App\Services\WeeklyDashboardKpiService;
@@ -156,7 +157,9 @@ class WeeklyOverviewController extends Controller
         $toSendStayingPeople = $toSend['staying_people'];
         $toSendLeavingPeople = $toSend['leaving_people'];
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'allTransfers', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel', 'housingOccupied', 'housingCapacity', 'housingHouses', 'vehicleOccupied', 'vehicleCapacity', 'fieldVehicles', 'benchWithRotation', 'benchWithoutRotation', 'benchWithPeople', 'benchWithoutPeople', 'benchDayLabel', 'toSendCount', 'toSendNextDemand', 'toSendStaying', 'toSendDemandByProject', 'toSendStayingPeople', 'toSendLeavingPeople'));
+        $planningWeek = PlanningWeek::forDate($weekStart);
+
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'allTransfers', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel', 'housingOccupied', 'housingCapacity', 'housingHouses', 'vehicleOccupied', 'vehicleCapacity', 'fieldVehicles', 'benchWithRotation', 'benchWithoutRotation', 'benchWithPeople', 'benchWithoutPeople', 'benchDayLabel', 'toSendCount', 'toSendNextDemand', 'toSendStaying', 'toSendDemandByProject', 'toSendStayingPeople', 'toSendLeavingPeople', 'planningWeek'));
     }
 
     /**
