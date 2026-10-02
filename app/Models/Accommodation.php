@@ -167,6 +167,111 @@ class Accommodation extends Model
         return $this->activeLease?->end_date;
     }
 
+    /**
+     * Koniec ciągłego najmu od podanego dnia. Kolejna umowa przedłuża licznik tylko wtedy,
+     * gdy startuje najpóźniej dzień po końcu poprzedniej — przerwa w środku ucina odliczanie.
+     *
+     * @return array{state: string, date: ?Carbon}
+     */
+    public function rentalCoverageFrom(CarbonInterface|string|null $from = null): array
+    {
+        $today = Carbon::parse($from ?? now())->startOfDay();
+        $todayKey = $today->toDateString();
+
+        $leases = ($this->relationLoaded('leases') ? $this->leases : $this->leases()->get())
+            ->filter(fn (AccommodationLease $lease) => $lease->type === 'wynajmowany')
+            ->values();
+
+        $covers = function (AccommodationLease $lease, string $day): bool {
+            $start = $lease->start_date?->toDateString();
+            $end = $lease->end_date?->toDateString();
+            if ($start && $start > $day) {
+                return false;
+            }
+
+            return ! ($end && $end < $day);
+        };
+
+        $current = $leases->first(fn (AccommodationLease $lease) => $covers($lease, $todayKey));
+        if (! $current) {
+            $future = $leases
+                ->filter(fn (AccommodationLease $lease) => $lease->start_date && $lease->start_date->toDateString() > $todayKey)
+                ->sortBy(fn (AccommodationLease $lease) => $lease->start_date->toDateString())
+                ->first();
+            $hadEarlier = $leases->contains(function (AccommodationLease $lease) use ($todayKey) {
+                $start = $lease->start_date?->toDateString();
+
+                return ! $start || $start <= $todayKey;
+            });
+
+            if ($future && $hadEarlier) {
+                return ['state' => 'gap', 'date' => $future->start_date->copy()->startOfDay()];
+            }
+            if ($future) {
+                return ['state' => 'upcoming', 'date' => $future->start_date->copy()->startOfDay()];
+            }
+
+            return ['state' => $leases->isEmpty() ? 'owned' : 'ended', 'date' => null];
+        }
+
+        $end = $current->end_date?->copy()->startOfDay();
+        if ($end === null) {
+            return ['state' => 'open', 'date' => null];
+        }
+
+        for ($guard = 0; $guard < 50; $guard++) {
+            $nextDay = $end->copy()->addDay()->toDateString();
+            $extension = null;
+            foreach ($leases as $lease) {
+                if (! $covers($lease, $nextDay)) {
+                    continue;
+                }
+                if ($lease->end_date === null) {
+                    return ['state' => 'open', 'date' => null];
+                }
+                $leaseEnd = $lease->end_date->copy()->startOfDay();
+                if ($extension === null || $leaseEnd->gt($extension)) {
+                    $extension = $leaseEnd;
+                }
+            }
+            if ($extension === null || $extension->lte($end)) {
+                break;
+            }
+            $end = $extension;
+        }
+
+        return ['state' => 'until', 'date' => $end];
+    }
+
+    public function leaseCountdownCaption(CarbonInterface|string|null $from = null): ?string
+    {
+        $coverage = $this->rentalCoverageFrom($from);
+
+        return match ($coverage['state']) {
+            'owned' => 'Mieszkanie własne',
+            'gap' => 'Przerwa w najmie',
+            'upcoming' => 'Najem od '.$coverage['date']->format('d.m.Y'),
+            'ended' => 'Najem zakończony',
+            'open' => 'Wynajem — brak daty końca',
+            'until' => $this->countdownUntil($coverage['date'], $from),
+            default => null,
+        };
+    }
+
+    private function countdownUntil(Carbon $end, CarbonInterface|string|null $from): string
+    {
+        $today = Carbon::parse($from ?? now())->startOfDay();
+        $days = (int) $today->diffInDays($end->copy()->startOfDay(), false);
+        if ($days < 0) {
+            return 'Najem zakończony';
+        }
+        if ($days === 0) {
+            return 'Ostatni dzień najmu';
+        }
+
+        return 'Koniec najmu: '.$days.' '.($days === 1 ? 'dzień' : 'dni');
+    }
+
     public function getIsRentedAttribute(): bool
     {
         return $this->getTypeAttribute() === 'wynajmowany';

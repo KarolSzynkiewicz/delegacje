@@ -3,23 +3,7 @@
     $progressVariant = $usagePercentage == 100 ? 'success' : ($usagePercentage >= 70 ? 'warning' : 'danger');
     $progressColor   = $usagePercentage == 100 ? '#10b981' : ($usagePercentage >= 70 ? '#f59e0b' : '#ef4444');
 
-    $accType = $accommodation->type ?? '';
-    if ($accType === 'własny') {
-        $leaseCaption = 'Mieszkanie własne';
-    } elseif ($accType === 'wynajmowany' && $accommodation->lease_end_date) {
-        $days = (int) now()->startOfDay()->diffInDays($accommodation->lease_end_date->copy()->startOfDay(), false);
-        if ($days < 0) {
-            $leaseCaption = 'Najem zakończony';
-        } elseif ($days === 0) {
-            $leaseCaption = 'Ostatni dzień najmu';
-        } else {
-            $leaseCaption = 'Koniec najmu: ' . $days . ' ' . ($days === 1 ? 'dzień' : 'dni');
-        }
-    } elseif ($accType === 'wynajmowany') {
-        $leaseCaption = 'Wynajem — brak daty końca';
-    } else {
-        $leaseCaption = null;
-    }
+    $leaseCaption = $accommodation->leaseCountdownCaption();
 
     $accommodationEmployeeIds = collect($accommodationData['assignments'] ?? [])->pluck('employee_id')->unique()->filter();
     $otherProjects = collect();

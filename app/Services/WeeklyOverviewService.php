@@ -171,7 +171,7 @@ class WeeklyOverviewService
 
         $accommodations = $accommodationIds->isEmpty()
             ? collect()
-            : Accommodation::whereIn('id', $accommodationIds)->with('activeLease')->get()->keyBy('id');
+            : Accommodation::whereIn('id', $accommodationIds)->with(['activeLease', 'leases'])->get()->keyBy('id');
 
         $allAccommodationAssignments = $accommodationIds->isEmpty()
             ? collect()
