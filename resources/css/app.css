@@ -14947,6 +14947,7 @@ body:has(.xuiv2-tasks.is-edi-review) .ui-page-header:not(.ui-page-header--has-le
     gap: 0.45rem;
 }
 .doc-icon-picker__opt {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;

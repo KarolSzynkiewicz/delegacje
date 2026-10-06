@@ -62,6 +62,22 @@ class Document extends Model
         return $this->name;
     }
 
+    /**
+     * Podpowiedź na formularzu wpisu u pracownika — flagi słownika sterują polami.
+     */
+    public function entryHint(): string
+    {
+        $company = $this->is_company_scoped
+            ? 'Na spółkę — wybierz spółkę.'
+            : 'Bez spółki — nie przypisujesz spółki.';
+        $period = $this->is_periodic
+            ? 'Okresowy — podaj datę ważności do.'
+            : 'Bezterminowy — bez daty końca.';
+        $required = $this->is_required ? 'Wymagany.' : 'Niewymagany.';
+
+        return $company.' '.$period.' '.$required;
+    }
+
     public function isRequiredForEmployeeDuring(Employee $employee, $startDate, $endDate): bool
     {
         if (! $this->is_required) {

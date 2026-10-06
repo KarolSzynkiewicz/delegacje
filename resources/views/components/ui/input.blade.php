@@ -63,7 +63,8 @@
         $isChecked = false;
         if ($attributes->has('checked')) {
             $c = $attributes->get('checked');
-            $isChecked = ! in_array($c, [false, 'false', '0', 0, 'off'], true);
+            // `checked="{{ false }}"` renderuje pusty atrybut — sama obecność nie znaczy „zaznaczony”.
+            $isChecked = ! in_array($c, [false, 'false', '0', 0, 'off', '', null], true);
         } elseif (is_bool($value)) {
             $isChecked = $value;
         } elseif (old($name ?? '')) {

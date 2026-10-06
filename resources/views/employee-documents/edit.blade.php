@@ -17,6 +17,13 @@
                             @csrf
                             @method('PUT')
 
+                            @php
+                                $pickedId = old('document_id', $employeeDocument->document_id);
+                                $picked = $documents->first(fn ($document) => (string) $document->id === (string) $pickedId);
+                                $showCompany = (bool) $picked?->is_company_scoped;
+                                $showValidTo = (bool) $picked?->is_periodic;
+                            @endphp
+
                             <div class="mb-3">
                                 <x-ui.input 
                                     type="select" 
@@ -30,23 +37,28 @@
                                         <option
                                             value="{{ $document->id }}"
                                             data-company-scoped="{{ $document->is_company_scoped ? '1' : '0' }}"
-                                            {{ old('document_id', $employeeDocument->document_id) == $document->id ? 'selected' : '' }}
+                                            data-periodic="{{ $document->is_periodic ? '1' : '0' }}"
+                                            data-hint="{{ $document->entryHint() }}"
+                                            {{ (string) old('document_id', $employeeDocument->document_id) === (string) $document->id ? 'selected' : '' }}
                                         >
                                             {{ $document->name }}
                                         </option>
                                     @endforeach
                                 </x-ui.input>
+                                <small class="text-muted d-block mt-1" id="type-rules-hint">{{ $picked?->entryHint() ?? 'Wybierz typ — spółka i data końca zależą od wymagań formalnych.' }}</small>
                                 <small class="text-muted d-block mt-1">
                                     <a href="{{ route('documents.create') }}" target="_blank" class="text-primary">Dodaj nowy typ dokumentu</a>
                                 </small>
                             </div>
 
-                            <div class="mb-3" id="company-field">
+                            <div class="{{ $showCompany ? 'mb-3' : 'mb-3 d-none' }}" id="company-field">
                                 <x-ui.input
                                     type="select"
                                     name="company_id"
                                     label="Spółka"
                                     id="company_id"
+                                    :disabled="! $showCompany"
+                                    :required="$showCompany"
                                 >
                                     <option value="">-- Wybierz spółkę --</option>
                                     @foreach($companies as $company)
@@ -55,7 +67,6 @@
                                         </option>
                                     @endforeach
                                 </x-ui.input>
-                                <small class="text-muted d-block mt-1">Wymagane dla umowy o pracę, A1 i innych typów „na spółkę”.</small>
                             </div>
 
                             <div class="row">
@@ -68,26 +79,15 @@
                                         required
                                     />
                                 </div>
-                                <div class="col-md-6">
+                                <div class="{{ $showValidTo ? 'col-md-6' : 'col-md-6 d-none' }}" id="valid-to-field">
                                     <x-ui.input 
                                         type="date" 
                                         name="valid_to" 
                                         label="Dokument ważny do"
                                         value="{{ old('valid_to', $employeeDocument->valid_to?->format('Y-m-d')) }}"
+                                        :required="$showValidTo"
                                     />
-                                    <small class="text-muted d-block mt-1">Wymagane dla dokumentów okresowych</small>
                                 </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <x-ui.input 
-                                    type="checkbox" 
-                                    name="is_okresowy" 
-                                    label="Dokument okresowy (z datą ważności do)"
-                                    value="1"
-                                    :checked="old('is_okresowy', $employeeDocument->kind === 'okresowy')"
-                                />
-                                <small class="text-muted d-block mt-1">Odznacz, jeśli dokument jest bezokresowy</small>
                             </div>
 
                             <div class="mb-3">
@@ -140,29 +140,5 @@
         </div>
     </div>
 
-    <script>
-        // Automatycznie wyczyść pole valid_to gdy odznaczono checkbox
-        document.getElementById('is_okresowy').addEventListener('change', function() {
-            const validToField = document.getElementById('valid_to');
-            if (!this.checked) {
-                validToField.value = '';
-                validToField.disabled = true;
-            } else {
-                validToField.disabled = false;
-            }
-        });
-
-        // Wywołaj przy załadowaniu strony
-        document.getElementById('is_okresowy').dispatchEvent(new Event('change'));
-
-        const documentSelect = document.getElementById('document_id');
-        const companySelect = document.getElementById('company_id');
-        const syncCompanyRequired = function () {
-            const option = documentSelect.options[documentSelect.selectedIndex];
-            const scoped = option && option.dataset.companyScoped === '1';
-            companySelect.required = scoped;
-        };
-        documentSelect.addEventListener('change', syncCompanyRequired);
-        syncCompanyRequired();
-    </script>
+    @include('employee-documents.partials.type-rules-script')
 </x-app-layout>

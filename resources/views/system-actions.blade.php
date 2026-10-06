@@ -20,6 +20,52 @@
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
                 <div>
                     <h5 class="mb-2">
+                        <i class="bi bi-files text-warning"></i>
+                        Połącz dokumenty
+                    </h5>
+                    <p class="text-muted mb-0 small">
+                        Kopiuje wpisy ze starych typów na nowy typ i przypisuje spółkę.
+                        Oryginały zostają. Plik dostaje drugą nazwę, więc późniejsze usunięcie źródła go nie zabiera.
+                    </p>
+                </div>
+                <x-ui.button
+                    variant="warning"
+                    href="{{ route('system-actions.documents.merge') }}"
+                    routeName="system-actions.documents.merge"
+                    class="flex-shrink-0"
+                >
+                    Połącz dokumenty
+                </x-ui.button>
+            </div>
+        </x-ui.card>
+
+        <x-ui.card class="mb-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+                <div>
+                    <h5 class="mb-2">
+                        <i class="bi bi-trash text-danger"></i>
+                        Usuń dokument i dzieci
+                    </h5>
+                    <p class="text-muted mb-0 small">
+                        Kasuje typ ze słownika razem z wpisami pracowników i ich plikami.
+                        Kopie na innym typie zostają.
+                    </p>
+                </div>
+                <x-ui.button
+                    variant="danger"
+                    href="{{ route('system-actions.documents.destroy') }}"
+                    routeName="system-actions.documents.destroy"
+                    class="flex-shrink-0"
+                >
+                    Usuń dokument i dzieci
+                </x-ui.button>
+            </div>
+        </x-ui.card>
+
+        <x-ui.card class="mb-4">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+                <div>
+                    <h5 class="mb-2">
                         <i class="bi bi-person-badge text-warning"></i>
                         Backfill «Utworzono przez»
                     </h5>

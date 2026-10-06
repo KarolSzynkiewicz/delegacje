@@ -25,20 +25,41 @@ class StoreEmployeeDocumentRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        return array_merge([
             'employee_id' => ['required', 'exists:employees,id'],
+        ], self::attributeRules($this));
+    }
+
+    /**
+     * Reguły wpisu u pracownika. Spółka i data końca wynikają z typu w wymaganiach formalnych.
+     *
+     * @return array<string, mixed>
+     */
+    public static function attributeRules(\Illuminate\Http\Request $request): array
+    {
+        $document = Document::find($request->input('document_id'));
+        $scoped = (bool) $document?->is_company_scoped;
+        $periodic = (bool) $document?->is_periodic;
+
+        return [
             'document_id' => ['required', 'exists:documents,id'],
             'company_id' => [
-                Rule::requiredIf(fn () => (bool) Document::find($this->input('document_id'))?->is_company_scoped),
+                Rule::excludeIf(! $scoped),
+                Rule::requiredIf($scoped),
                 'nullable',
                 'integer',
                 'exists:companies,id',
             ],
             'valid_from' => ['required', 'date'],
-            'valid_to' => ['nullable', 'date', 'after_or_equal:valid_from'],
-            'is_okresowy' => ['nullable', 'boolean'],
+            'valid_to' => [
+                Rule::excludeIf(! $periodic),
+                Rule::requiredIf($periodic),
+                'nullable',
+                'date',
+                'after_or_equal:valid_from',
+            ],
             'notes' => ['nullable', 'string'],
-            'file' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,odt,txt', 'max:10240'], // 10MB max
+            'file' => ['nullable', 'file', 'mimes:pdf,doc,docx,xls,xlsx,odt,txt', 'max:10240'],
         ];
     }
 
@@ -55,6 +76,7 @@ class StoreEmployeeDocumentRequest extends FormRequest
             'document_id.required' => 'Dokument jest wymagany.',
             'document_id.exists' => 'Wybrany dokument nie istnieje.',
             'company_id.required' => 'Wybierz spółkę dla tego dokumentu.',
+            'valid_to.required' => 'Data ważności do jest wymagana dla dokumentu okresowego.',
             'valid_from.required' => 'Data ważności od jest wymagana.',
             'valid_from.date' => 'Data ważności od musi być poprawną datą.',
             'valid_to.date' => 'Data ważności do musi być poprawną datą.',

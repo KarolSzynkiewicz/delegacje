@@ -106,6 +106,22 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('/system-actions/backup-database', [SystemActionsController::class, 'backupDatabase'])
             ->name('system-actions.backup-database')
             ->defaults('resource', 'system-actions');
+
+        Route::get('/system-actions/documents/merge', [\App\Http\Controllers\DocumentSystemActionController::class, 'mergeForm'])
+            ->name('system-actions.documents.merge')
+            ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/documents/merge/plan', [\App\Http\Controllers\DocumentSystemActionController::class, 'mergePlan'])
+            ->name('system-actions.documents.merge.plan')
+            ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/documents/merge/chunk', [\App\Http\Controllers\DocumentSystemActionController::class, 'mergeChunk'])
+            ->name('system-actions.documents.merge.chunk')
+            ->defaults('resource', 'system-actions');
+        Route::get('/system-actions/documents/destroy', [\App\Http\Controllers\DocumentSystemActionController::class, 'destroyForm'])
+            ->name('system-actions.documents.destroy')
+            ->defaults('resource', 'system-actions');
+        Route::post('/system-actions/documents/destroy', [\App\Http\Controllers\DocumentSystemActionController::class, 'destroy'])
+            ->name('system-actions.documents.destroy.store')
+            ->defaults('resource', 'system-actions');
         // Return Trips Actions - MUST BE BEFORE resource routes to avoid route conflict
         Route::post('return-trips/prepare', [\App\Http\Controllers\ReturnTripController::class, 'prepareFromForm'])
             ->name('return-trips.prepare-form')

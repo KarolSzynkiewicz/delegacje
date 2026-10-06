@@ -61,7 +61,7 @@
                             type="checkbox" 
                             name="is_required" 
                             label="Dokument wymagany"
-                            checked="{{ old('is_required', $document->is_required) ? true : false }}"
+                            :checked="session()->hasOldInput() ? (bool) old('is_required') : (bool) $document->is_required"
                         />
                         <small class="form-text text-muted d-block mt-1">Bez „na spółkę”: wszyscy. Z „na spółkę”: tylko gdy pracownik ma wtedy spółkę — i musi mieć wpis na tę spółkę.</small>
                     </div>
@@ -71,7 +71,7 @@
                             type="checkbox"
                             name="is_company_scoped"
                             label="Na spółkę pracownika"
-                            checked="{{ old('is_company_scoped', $document->is_company_scoped) ? true : false }}"
+                            :checked="session()->hasOldInput() ? (bool) old('is_company_scoped') : (bool) $document->is_company_scoped"
                         />
                         <small class="form-text text-muted d-block mt-1">Umowa o pracę, A1 — jedna pozycja w słowniku. Spółkę wybierasz przy wpisie u człowieka (jak seniority przy zawodzie).</small>
                     </div>

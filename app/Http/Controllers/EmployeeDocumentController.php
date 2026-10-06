@@ -10,7 +10,6 @@ use App\Models\EmployeeDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -84,20 +83,8 @@ class EmployeeDocumentController extends Controller
         try {
             $employee = Employee::findOrFail($request->input('employee_id'));
 
-            $validated = $request->validated();
+            $validated = $this->shapeFromDictionary($request->validated());
             unset($validated['employee_id']);
-            $validated['company_id'] = $request->filled('company_id') ? (int) $request->input('company_id') : null;
-
-            // Ustaw kind na podstawie checkboxa
-            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy')
-                ? 'okresowy'
-                : 'bezokresowy';
-            unset($validated['is_okresowy']);
-
-            // Jeśli dokument jest bezokresowy, ustaw valid_to na null
-            if ($validated['kind'] === 'bezokresowy') {
-                $validated['valid_to'] = null;
-            }
 
             // Upload pliku jeśli został przesłany
             if ($request->hasFile('file')) {
@@ -144,27 +131,14 @@ class EmployeeDocumentController extends Controller
         try {
             $employee = $employeeDocument->employee;
 
-            $validated = $request->validate([
-                'document_id' => 'required|exists:documents,id',
-                'company_id' => $this->companyIdRules($request),
-                'valid_from' => 'required|date',
-                'valid_to' => 'nullable|date|after_or_equal:valid_from',
-                'is_okresowy' => 'nullable|boolean',
-                'notes' => 'nullable|string',
-                'file' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx,odt,txt|max:10240', // 10MB max
-                'remove_file' => 'nullable|boolean',
-            ], [
-                'company_id.required' => 'Wybierz spółkę dla tego dokumentu.',
-            ]);
+            $validated = $request->validate(
+                array_merge(StoreEmployeeDocumentRequest::attributeRules($request), [
+                    'remove_file' => 'nullable|boolean',
+                ]),
+                (new StoreEmployeeDocumentRequest)->messages(),
+            );
 
-            // Ustaw kind na podstawie checkboxa
-            $validated['kind'] = $request->has('is_okresowy') && $request->boolean('is_okresowy') ? 'okresowy' : 'bezokresowy';
-            unset($validated['is_okresowy']);
-
-            // Jeśli dokument jest bezokresowy, ustaw valid_to na null
-            if ($validated['kind'] === 'bezokresowy') {
-                $validated['valid_to'] = null;
-            }
+            $validated = $this->shapeFromDictionary($validated);
 
             // Usuń plik jeśli zaznaczono checkbox
             if ($request->has('remove_file') && $request->boolean('remove_file') && $employeeDocument->file_path) {
@@ -189,7 +163,6 @@ class EmployeeDocumentController extends Controller
             }
 
             unset($validated['remove_file']);
-            $validated['company_id'] = $request->filled('company_id') ? (int) $request->input('company_id') : null;
             $employeeDocument->update($validated);
 
             return redirect()->route('employees.show', $employee)
@@ -278,17 +251,26 @@ class EmployeeDocumentController extends Controller
     }
 
     /**
-     * @return array<int, mixed>
+     * Spółka i okresowość biorą się z typu w wymaganiach formalnych, nie z pól formularza.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
      */
-    protected function companyIdRules(Request $request): array
+    protected function shapeFromDictionary(array $validated): array
     {
-        $document = Document::find($request->input('document_id'));
+        $document = Document::findOrFail($validated['document_id']);
 
-        return [
-            Rule::requiredIf(fn () => (bool) $document?->is_company_scoped),
-            'nullable',
-            'integer',
-            'exists:companies,id',
-        ];
+        if (! $document->is_company_scoped) {
+            $validated['company_id'] = null;
+        }
+
+        if ($document->is_periodic) {
+            $validated['kind'] = 'okresowy';
+        } else {
+            $validated['kind'] = 'bezokresowy';
+            $validated['valid_to'] = null;
+        }
+
+        return $validated;
     }
 }

@@ -72,6 +72,10 @@ class DocumentController extends Controller
 
         $document->update($validated);
 
+        if (! $document->is_company_scoped) {
+            $document->employeeDocuments()->whereNotNull('company_id')->update(['company_id' => null]);
+        }
+
         return redirect()->route('documents.index')
             ->with('success', 'Dokument został zaktualizowany.');
     }
@@ -93,7 +97,7 @@ class DocumentController extends Controller
             ->with('success', 'Dokument został usunięty.');
     }
 
-    protected function validatedDocument(Request $request, ?Document $document = null): array
+    public function validatedDocument(Request $request, ?Document $document = null): array
     {
         $nameRule = Rule::unique('documents', 'name');
 
@@ -113,8 +117,8 @@ class DocumentController extends Controller
         ]);
 
         $validated['is_periodic'] = (bool) $validated['is_periodic'];
-        $validated['is_required'] = isset($validated['is_required']) ? (bool) $validated['is_required'] : false;
-        $validated['is_company_scoped'] = isset($validated['is_company_scoped']) ? (bool) $validated['is_company_scoped'] : false;
+        $validated['is_required'] = $request->boolean('is_required');
+        $validated['is_company_scoped'] = $request->boolean('is_company_scoped');
         $validated['planner_icon'] = ($validated['planner_icon'] ?? null) ?: null;
 
         return $validated;
