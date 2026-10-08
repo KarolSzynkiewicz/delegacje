@@ -544,6 +544,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('warehouse-dispatches/{warehouseDispatch}/cancel', [\App\Http\Controllers\EquipmentIssueController::class, 'cancelDispatch'])
             ->name('warehouse-dispatches.cancel')
             ->defaults('resource', 'equipment-issues');
+        Route::post('warehouse-dispatches/{warehouseDispatch}/reverse', [\App\Http\Controllers\EquipmentIssueController::class, 'reverseDispatch'])
+            ->name('warehouse-dispatches.reverse')
+            ->defaults('resource', 'equipment-issues');
         Route::resource('equipment-issues', \App\Http\Controllers\EquipmentIssueController::class);
         Route::get('warehouses', [\App\Http\Controllers\WarehouseController::class, 'index'])
             ->name('warehouses.index')

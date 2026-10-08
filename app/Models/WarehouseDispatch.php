@@ -170,6 +170,11 @@ class WarehouseDispatch extends Model implements TaskSubject
         return $this->isIssued() || $this->isPartial() || $this->isCancelled();
     }
 
+    public function canReverseIssues(): bool
+    {
+        return $this->isIssued() || $this->isPartial();
+    }
+
     public function statusLabel(): string
     {
         return match ($this->status) {

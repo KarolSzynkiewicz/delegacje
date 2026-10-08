@@ -219,9 +219,7 @@ class EmployeeTabs extends Component
             'evaluations',
             'adjustments',
             'bankAccounts',
-            'equipmentIssues' => fn ($issues) => $issues->whereNotIn('status', [
-                EquipmentIssue::STATUS_UNFULFILLED,
-            ]),
+            'equipmentIssues' => fn ($issues) => $issues->whereNotIn('status', EquipmentIssue::hiddenFromEmployee()),
         ]);
 
         $this->employee->load([

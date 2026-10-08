@@ -6,6 +6,25 @@
         $reservedIssues = $warehouseDispatch->issues->where('status', \App\Models\EquipmentIssue::STATUS_RESERVED)->values();
         $selectedInit = $reservedIssues->mapWithKeys(fn ($issue) => [(string) $issue->id => false])->all();
         $grouped = $reservedIssues->groupBy('employee_id');
+        $reversibleIssues = $warehouseDispatch->issues->filter(fn ($issue) => $issue->canBeReversed())->values();
+        $reversing = ! $picking && $reversibleIssues->isNotEmpty();
+        $reverseSelectedInit = $reversibleIssues->mapWithKeys(fn ($issue) => [(string) $issue->id => false])->all();
+        $reversePeople = $reversibleIssues
+            ->groupBy('employee_id')
+            ->map(fn ($group) => $group->pluck('id')->map(fn ($id) => (string) $id)->values()->all())
+            ->all();
+        $reverseGroups = $warehouseDispatch->issues
+            ->where('status', '!=', \App\Models\EquipmentIssue::STATUS_CANCELLED)
+            ->sortBy(fn ($issue) => ($issue->employee?->last_name ?? '').' '.($issue->employee?->first_name ?? ''))
+            ->groupBy('employee_id');
+        $reverseCancelsDocument = $warehouseDispatch->issues->whereIn('status', [
+            \App\Models\EquipmentIssue::STATUS_RETURNED,
+            \App\Models\EquipmentIssue::STATUS_DAMAGED,
+            \App\Models\EquipmentIssue::STATUS_LOST,
+        ])->isEmpty();
+        $reverseAllConfirm = $reverseCancelsDocument
+            ? 'Cofnąć całe zlecenie? Pozycje wrócą na magazyn jako nieodebrane, a dokument zostanie anulowany.'
+            : 'Cofnąć wszystkie pozycje, które nadal są wydane? Wrócą na magazyn jako nieodebrane.';
         $backRoute = $picking
             ? route('equipment.tab.orders', $warehouse ? ['warehouse_id' => $warehouse->id] : [])
             : route('equipment.tab.issues');
@@ -31,6 +50,22 @@
                         @csrf
                         <x-ui.button variant="outline-danger" type="submit" action="delete">
                             Anuluj zlecenie
+                        </x-ui.button>
+                    </form>
+                </x-slot>
+            @elseif($reversing)
+                <x-slot name="right">
+                    <form
+                        method="POST"
+                        action="{{ route('warehouse-dispatches.reverse', $warehouseDispatch) }}"
+                        onsubmit="return confirm({{ \Illuminate\Support\Js::from($reverseAllConfirm) }});"
+                    >
+                        @csrf
+                        @foreach($reversibleIssues as $issue)
+                            <input type="hidden" name="issue_ids[]" value="{{ $issue->id }}">
+                        @endforeach
+                        <x-ui.button variant="danger" type="submit" action="delete">
+                            {{ $reverseCancelsDocument ? 'Cofnij całe zlecenie' : 'Cofnij wydane pozycje' }}
                         </x-ui.button>
                     </form>
                 </x-slot>
@@ -220,6 +255,152 @@
                 <div class="d-flex justify-content-end mt-4">
                     <x-ui.button variant="primary" type="submit" action="save" x-bind:disabled="checked === 0">
                         Wydaj odhaczone
+                    </x-ui.button>
+                </div>
+            </x-ui.card>
+        </form>
+    @elseif($reversing)
+        <style>
+            .form-check.form-check-table {
+                padding: 0;
+                margin: 0;
+                background: transparent;
+                border: none;
+                gap: 0;
+            }
+        </style>
+        <form
+            method="POST"
+            action="{{ route('warehouse-dispatches.reverse', $warehouseDispatch) }}"
+            x-data="{
+                selected: {{ \Illuminate\Support\Js::from($reverseSelectedInit) }},
+                people: {{ \Illuminate\Support\Js::from($reversePeople) }},
+                cancelsDocument: {{ $reverseCancelsDocument ? 'true' : 'false' }},
+                get checked() { return Object.values(this.selected).filter(Boolean).length },
+                get total() { return Object.keys(this.selected).length },
+                personOn(id) {
+                    const ids = this.people[id] || [];
+                    return ids.length > 0 && ids.every((lineId) => this.selected[lineId]);
+                },
+                togglePerson(id) {
+                    const ids = this.people[id] || [];
+                    const next = ! this.personOn(id);
+                    ids.forEach((lineId) => { this.selected[lineId] = next; });
+                },
+                confirmReverse(event) {
+                    if (this.checked === 0) {
+                        event.preventDefault();
+                        return;
+                    }
+                    const all = this.checked === this.total;
+                    let message = 'Cofniesz tylko odhaczone pozycje. Wrócą na magazyn jako nieodebrane.';
+                    if (all && this.cancelsDocument) {
+                        message = 'Cofnąć całe zlecenie? Pozycje wrócą na magazyn jako nieodebrane, a dokument zostanie anulowany.';
+                    } else if (all) {
+                        message = 'Cofnąć wszystkie pozycje, które nadal są wydane? Wrócą na magazyn jako nieodebrane.';
+                    }
+                    if (! confirm(message)) {
+                        event.preventDefault();
+                    }
+                }
+            }"
+            @submit="confirmReverse($event)"
+        >
+            @csrf
+            <x-ui.card label="Cofnięcie wydania" class="mb-4">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Numer</h6>
+                        <p class="fw-semibold mb-0">{{ $warehouseDispatch->number }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Magazyn</h6>
+                        <p class="fw-semibold mb-0">{{ $warehouseDispatch->warehouse?->display_name ?? '—' }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h6 class="text-muted small mb-1">Status</h6>
+                        <p class="fw-semibold mb-0">{{ $warehouseDispatch->statusLabel() }}</p>
+                    </div>
+                </div>
+
+                <p class="text-muted small mb-3">
+                    Odhacz to, czego nie odebrano — całe zlecenie, jedną osobę albo wybrane pozycje. Do zwrotu i bezzwrotne wrócą na ten sam magazyn jako nieodebrane.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:2.75rem;"></th>
+                                <th>Pracownik</th>
+                                <th>Pozycja</th>
+                                <th>Rodzaj</th>
+                                <th class="text-end">Ilość</th>
+                                <th>Typ</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($reverseGroups as $employeeId => $employeeIssues)
+                                @php
+                                    $first = $employeeIssues->first();
+                                    $personReversible = collect($reversePeople[$employeeId] ?? [])->isNotEmpty();
+                                @endphp
+                                @foreach($employeeIssues as $index => $issue)
+                                    <tr>
+                                        <td>
+                                            @if($issue->canBeReversed())
+                                                <x-ui.input
+                                                    type="checkbox"
+                                                    class="form-check-table"
+                                                    name="issue_ids[]"
+                                                    :id="'reverse-issue-'.$issue->id"
+                                                    :value="$issue->id"
+                                                    x-model="selected['{{ $issue->id }}']"
+                                                />
+                                            @endif
+                                        </td>
+                                        @if($index === 0)
+                                            <td rowspan="{{ $employeeIssues->count() }}">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    @if($personReversible)
+                                                        <input
+                                                            type="checkbox"
+                                                            class="form-check-input m-0"
+                                                            aria-label="Zaznacz pozycje tej osoby"
+                                                            :checked="personOn('{{ $employeeId }}')"
+                                                            @change="togglePerson('{{ $employeeId }}')"
+                                                        >
+                                                    @endif
+                                                    @if($first?->employee)
+                                                        <x-employee-cell :employee="$first->employee" :show-phone="false" avatar-size="32px" />
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        @endif
+                                        <td>{{ $issue->equipment?->name ?? '—' }}</td>
+                                        <td>{{ $issue->variant?->kind_label ?? '—' }}</td>
+                                        <td class="text-end" style="font-variant-numeric:tabular-nums;">{{ $issue->quantity_issued }}</td>
+                                        <td>
+                                            <x-ui.badge variant="{{ $issue->equipment?->returnable ? 'info' : 'accent' }}">
+                                                {{ $issue->equipment?->returnable ? 'Do zwrotu' : 'Bezzwrotne' }}
+                                            </x-ui.badge>
+                                        </td>
+                                        <td>
+                                            <x-ui.badge variant="{{ $issue->statusBadgeVariant() }}">{{ $issue->statusLabel() }}</x-ui.badge>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <x-ui.button variant="danger" type="submit" action="delete" x-bind:disabled="checked === 0">
+                        Cofnij odhaczone
                     </x-ui.button>
                 </div>
             </x-ui.card>

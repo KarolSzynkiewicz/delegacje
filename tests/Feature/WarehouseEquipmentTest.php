@@ -2280,4 +2280,268 @@ class WarehouseEquipmentTest extends TestCase
         $this->assertDatabaseMissing('warehouses', ['id' => $other->id]);
         $this->assertSame(7, $variant->fresh()->quantityIn($this->warehouse));
     }
+
+    public function test_reverse_issued_dispatch_restores_returnable_and_permanent_lines(): void
+    {
+        $anna = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $pants = Equipment::factory()->create(['name' => 'Spodnie BHP', 'variant_label' => 'Rozmiar']);
+        $pantsM = EquipmentVariant::factory()->inStock(4, 0, $this->warehouse)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'M',
+        ]);
+        $gloves = Equipment::factory()->notReturnable()->withoutKinds()->create(['name' => 'Rękawice']);
+        $glovesVariant = EquipmentVariant::factory()->unnamed()->inStock(6, 0, $this->warehouse)->create([
+            'equipment_id' => $gloves->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->set('employeeIds', [$anna->id])
+            ->call('addToCart', $pantsM->id, 'returnable', 1)
+            ->call('addToCart', $glovesVariant->id, 'given', 2)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $this->fulfillDispatch($dispatch)->assertRedirect();
+
+        $this->assertSame(3, $pantsM->fresh()->quantityIn($this->warehouse));
+        $this->assertSame(4, $glovesVariant->fresh()->quantityIn($this->warehouse));
+
+        $this->actingAs($this->user)
+            ->get(route('warehouse-dispatches.show', $dispatch))
+            ->assertOk()
+            ->assertSee('Cofnij całe zlecenie')
+            ->assertSee('Cofnij odhaczone');
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.reverse', $dispatch), [
+                'issue_ids' => $dispatch->issues()->pluck('id')->all(),
+            ])
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch))
+            ->assertSessionHas('success');
+
+        $dispatch->refresh();
+        $this->assertTrue($dispatch->isCancelled());
+        $this->assertNotNull($dispatch->cancelled_at);
+        $this->assertSame($this->user->id, $dispatch->cancelled_by);
+        $this->assertTrue($dispatch->issues->every(
+            fn (EquipmentIssue $issue) => $issue->status === EquipmentIssue::STATUS_UNCOLLECTED
+        ));
+        $this->assertSame(4, $pantsM->fresh()->quantityIn($this->warehouse));
+        $this->assertSame(0, $pantsM->fresh()->issuedOutstandingIn($this->warehouse));
+        $this->assertSame(6, $glovesVariant->fresh()->quantityIn($this->warehouse));
+
+        $this->actingAs($this->user)
+            ->get(route('warehouse-dispatches.show', $dispatch))
+            ->assertOk()
+            ->assertSee('Anulowane')
+            ->assertSee('Nieodebrane')
+            ->assertDontSee('Cofnij całe zlecenie');
+
+        $this->actingAs($this->user)
+            ->get(route('employees.show', ['employee' => $anna, 'tab' => 'equipment']))
+            ->assertOk()
+            ->assertDontSee('Spodnie BHP')
+            ->assertDontSee('Rękawice');
+
+        $chart = app(EquipmentService::class)->stockMovementChart($pants);
+        $this->assertSame(0, $chart['outbound_total']);
+        $this->assertSame(4, $chart['stock_total']);
+
+        $issue = $dispatch->issues()->first();
+        $this->actingAs($this->user)
+            ->get(route('equipment-issues.return', $issue))
+            ->assertRedirect(route('equipment-issues.show', $issue))
+            ->assertSessionHas('error');
+    }
+
+    public function test_reverse_can_target_one_person_and_leaves_the_document_issued(): void
+    {
+        $anna = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $jan = Employee::factory()->create(['first_name' => 'Jan', 'last_name' => 'Kowalski']);
+        $pants = Equipment::factory()->create(['name' => 'Spodnie BHP', 'variant_label' => 'Rozmiar']);
+        $pantsM = EquipmentVariant::factory()->inStock(10, 0, $this->warehouse)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'M',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->call('onEmployeesUpdated', [$anna->id, $jan->id])
+            ->call('addToCart', $pantsM->id, 'returnable')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $this->fulfillDispatch($dispatch)->assertRedirect();
+        $this->assertSame(8, $pantsM->fresh()->quantityIn($this->warehouse));
+
+        $annasIssue = EquipmentIssue::query()->where('employee_id', $anna->id)->first();
+        $jansIssue = EquipmentIssue::query()->where('employee_id', $jan->id)->first();
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.reverse', $dispatch), [
+                'issue_ids' => [$annasIssue->id],
+            ])
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch));
+
+        $dispatch->refresh();
+        $this->assertTrue($dispatch->isIssued());
+        $this->assertSame(EquipmentIssue::STATUS_UNCOLLECTED, $annasIssue->fresh()->status);
+        $this->assertSame(EquipmentIssue::STATUS_ISSUED, $jansIssue->fresh()->status);
+        $this->assertSame(9, $pantsM->fresh()->quantityIn($this->warehouse));
+        $this->assertSame(1, $pantsM->fresh()->issuedOutstandingIn($this->warehouse));
+
+        $this->actingAs($this->user)
+            ->get(route('employees.show', ['employee' => $anna, 'tab' => 'equipment']))
+            ->assertOk()
+            ->assertDontSee('Spodnie BHP');
+
+        $this->actingAs($this->user)
+            ->get(route('employees.show', ['employee' => $jan, 'tab' => 'equipment']))
+            ->assertOk()
+            ->assertSee('Spodnie BHP')
+            ->assertSee('Do zwrotu');
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.reverse', $dispatch), [
+                'issue_ids' => [$jansIssue->id],
+            ])
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch));
+
+        $this->assertTrue($dispatch->fresh()->isCancelled());
+        $this->assertSame(10, $pantsM->fresh()->quantityIn($this->warehouse));
+    }
+
+    public function test_reverse_skips_already_returned_lines_and_does_not_double_stock(): void
+    {
+        $anna = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $pants = Equipment::factory()->create(['name' => 'Spodnie BHP', 'variant_label' => 'Rozmiar']);
+        $pantsM = EquipmentVariant::factory()->inStock(10, 0, $this->warehouse)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'M',
+        ]);
+        $gloves = Equipment::factory()->notReturnable()->withoutKinds()->create(['name' => 'Rękawice']);
+        $glovesVariant = EquipmentVariant::factory()->unnamed()->inStock(5, 0, $this->warehouse)->create([
+            'equipment_id' => $gloves->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->set('employeeIds', [$anna->id])
+            ->call('addToCart', $pantsM->id, 'returnable', 2)
+            ->call('addToCart', $glovesVariant->id, 'given', 1)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $this->fulfillDispatch($dispatch)->assertRedirect();
+
+        $pantsIssue = EquipmentIssue::query()->where('equipment_variant_id', $pantsM->id)->first();
+        $glovesIssue = EquipmentIssue::query()->where('equipment_variant_id', $glovesVariant->id)->first();
+
+        $this->actingAs($this->user)
+            ->post(route('equipment-issues.return.store', $pantsIssue), [
+                'return_date' => now()->toDateString(),
+                'status' => 'returned',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(10, $pantsM->fresh()->quantityIn($this->warehouse));
+        $this->assertSame(4, $glovesVariant->fresh()->quantityIn($this->warehouse));
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.reverse', $dispatch), [
+                'issue_ids' => [$pantsIssue->id, $glovesIssue->id],
+            ])
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch))
+            ->assertSessionHas('error');
+
+        $this->assertSame(EquipmentIssue::STATUS_RETURNED, $pantsIssue->fresh()->status);
+        $this->assertSame(EquipmentIssue::STATUS_GIVEN, $glovesIssue->fresh()->status);
+        $this->assertSame(10, $pantsM->fresh()->quantityIn($this->warehouse));
+        $this->assertSame(4, $glovesVariant->fresh()->quantityIn($this->warehouse));
+        $this->assertTrue($dispatch->fresh()->isIssued());
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.reverse', $dispatch), [
+                'issue_ids' => [$glovesIssue->id],
+            ])
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch))
+            ->assertSessionHas('success');
+
+        $this->assertSame(EquipmentIssue::STATUS_UNCOLLECTED, $glovesIssue->fresh()->status);
+        $this->assertSame(5, $glovesVariant->fresh()->quantityIn($this->warehouse));
+        $this->assertTrue($dispatch->fresh()->isIssued());
+    }
+
+    public function test_cannot_reverse_a_dispatch_that_is_still_being_picked(): void
+    {
+        $employee = Employee::factory()->create();
+        $item = Equipment::factory()->withoutKinds()->create(['name' => 'Kask']);
+        $variant = EquipmentVariant::factory()->unnamed()->inStock(3, 0, $this->warehouse)->create([
+            'equipment_id' => $item->id,
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->call('onEmployeesUpdated', [$employee->id])
+            ->call('addTypeToCart', $item->id)
+            ->call('confirmSizePanel')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $issue = $dispatch->issues()->first();
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.reverse', $dispatch), [
+                'issue_ids' => [$issue->id],
+            ])
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch))
+            ->assertSessionHas('error');
+
+        $this->assertTrue($dispatch->fresh()->isReserved());
+        $this->assertSame(EquipmentIssue::STATUS_RESERVED, $issue->fresh()->status);
+        $this->assertSame(3, $variant->fresh()->quantityIn($this->warehouse));
+    }
+
+    public function test_reversing_the_issued_part_of_a_partial_dispatch_cancels_the_document(): void
+    {
+        $anna = Employee::factory()->create(['first_name' => 'Anna', 'last_name' => 'Nowak']);
+        $jan = Employee::factory()->create(['first_name' => 'Jan', 'last_name' => 'Kowalski']);
+        $pants = Equipment::factory()->create(['name' => 'Spodnie BHP', 'variant_label' => 'Rozmiar']);
+        $pantsM = EquipmentVariant::factory()->inStock(10, 0, $this->warehouse)->create([
+            'equipment_id' => $pants->id,
+            'value' => 'M',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(WarehouseIssueForm::class, ['warehouse' => $this->warehouse])
+            ->call('onEmployeesUpdated', [$anna->id, $jan->id])
+            ->call('addToCart', $pantsM->id, 'returnable')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $dispatch = $this->latestDispatch();
+        $annasIssue = EquipmentIssue::query()->where('employee_id', $anna->id)->first();
+        $jansIssue = EquipmentIssue::query()->where('employee_id', $jan->id)->first();
+
+        $this->fulfillDispatch($dispatch, [$annasIssue->id])->assertRedirect();
+        $this->assertSame(9, $pantsM->fresh()->quantityIn($this->warehouse));
+
+        $this->actingAs($this->user)
+            ->post(route('warehouse-dispatches.reverse', $dispatch), [
+                'issue_ids' => [$annasIssue->id],
+            ])
+            ->assertRedirect(route('warehouse-dispatches.show', $dispatch));
+
+        $dispatch->refresh();
+        $this->assertTrue($dispatch->isCancelled());
+        $this->assertSame(EquipmentIssue::STATUS_UNCOLLECTED, $annasIssue->fresh()->status);
+        $this->assertSame(EquipmentIssue::STATUS_UNFULFILLED, $jansIssue->fresh()->status);
+        $this->assertSame(10, $pantsM->fresh()->quantityIn($this->warehouse));
+        $this->assertSame(10, $pantsM->fresh()->availableIn($this->warehouse));
+    }
 }

@@ -24,6 +24,8 @@ class EquipmentIssue extends Model
 
     public const STATUS_UNFULFILLED = 'unfulfilled';
 
+    public const STATUS_UNCOLLECTED = 'uncollected';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
@@ -113,6 +115,11 @@ class EquipmentIssue extends Model
         return $this->status === self::STATUS_GIVEN;
     }
 
+    public function canBeReversed(): bool
+    {
+        return in_array($this->status, [self::STATUS_ISSUED, self::STATUS_GIVEN], true);
+    }
+
     public function statusLabel(): string
     {
         return self::labelForStatus($this->status);
@@ -122,7 +129,7 @@ class EquipmentIssue extends Model
     {
         return match ($this->status) {
             self::STATUS_RESERVED => 'warning',
-            self::STATUS_UNFULFILLED, self::STATUS_CANCELLED => 'secondary',
+            self::STATUS_UNFULFILLED, self::STATUS_UNCOLLECTED, self::STATUS_CANCELLED => 'secondary',
             self::STATUS_ISSUED => 'info',
             self::STATUS_GIVEN => 'accent',
             self::STATUS_RETURNED => 'success',
@@ -136,6 +143,10 @@ class EquipmentIssue extends Model
     {
         if ($this->status === self::STATUS_UNFULFILLED) {
             return 'Nie wydano';
+        }
+
+        if ($this->status === self::STATUS_UNCOLLECTED) {
+            return 'Nieodebrane';
         }
 
         if ($this->isReserved()) {
@@ -154,6 +165,7 @@ class EquipmentIssue extends Model
         return match ($status) {
             self::STATUS_RESERVED => 'Zarezerwowane',
             self::STATUS_UNFULFILLED => 'Nie wydano',
+            self::STATUS_UNCOLLECTED => 'Nieodebrane',
             self::STATUS_CANCELLED => 'Anulowane',
             self::STATUS_ISSUED => 'Do zwrotu',
             self::STATUS_GIVEN => 'Bezzwrotne',
@@ -176,6 +188,33 @@ class EquipmentIssue extends Model
             self::STATUS_DAMAGED,
             self::STATUS_LOST,
             self::STATUS_UNFULFILLED,
+            self::STATUS_UNCOLLECTED,
+        ];
+    }
+
+    /**
+     * Linie, które nie zeszły ze stanu albo zostały wycofane, zanim ktoś je zabrał.
+     *
+     * @return list<string>
+     */
+    public static function excludedFromStockLedger(): array
+    {
+        return [
+            self::STATUS_RESERVED,
+            self::STATUS_UNFULFILLED,
+            self::STATUS_UNCOLLECTED,
+            self::STATUS_CANCELLED,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function hiddenFromEmployee(): array
+    {
+        return [
+            self::STATUS_UNFULFILLED,
+            self::STATUS_UNCOLLECTED,
         ];
     }
 

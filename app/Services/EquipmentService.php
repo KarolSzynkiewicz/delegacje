@@ -483,6 +483,124 @@ class EquipmentService
         });
     }
 
+    /**
+     * Towar wyszedł na ZW, ale nie został odebrany. Cofa wybrane linie — do zwrotu i bezzwrotne —
+     * na magazyn zlecenia. Dokument anuluje się dopiero, gdy nie zostało żadne realne wydanie.
+     *
+     * @param  list<int>  $issueIds
+     */
+    public function reverseDispatch(WarehouseDispatch $dispatch, array $issueIds): WarehouseDispatch
+    {
+        if ($dispatch->isReserved()) {
+            throw ValidationException::withMessages([
+                'dispatch' => 'To zlecenie jest jeszcze w kompletacji. Anuluj je, zamiast cofać wydanie.',
+            ]);
+        }
+
+        if (! $dispatch->canReverseIssues()) {
+            throw ValidationException::withMessages([
+                'dispatch' => 'Tego zlecenia nie można już cofnąć.',
+            ]);
+        }
+
+        $issueIds = collect($issueIds)->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+
+        if ($issueIds === []) {
+            throw ValidationException::withMessages([
+                'issue_ids' => 'Odhacz co najmniej jedną pozycję do cofnięcia.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($dispatch, $issueIds) {
+            /** @var WarehouseDispatch $dispatch */
+            $dispatch = WarehouseDispatch::query()
+                ->whereKey($dispatch->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $dispatch->canReverseIssues()) {
+                throw ValidationException::withMessages([
+                    'dispatch' => 'Tego zlecenia nie można już cofnąć.',
+                ]);
+            }
+
+            $issues = $dispatch->issues()
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $selected = $issues->whereIn('id', $issueIds)->values();
+
+            if ($selected->count() !== count($issueIds)) {
+                throw ValidationException::withMessages([
+                    'issue_ids' => 'Wybrane pozycje nie należą do tego zlecenia.',
+                ]);
+            }
+
+            if ($selected->contains(fn (EquipmentIssue $issue) => ! $issue->canBeReversed())) {
+                throw ValidationException::withMessages([
+                    'issue_ids' => 'Można cofnąć tylko pozycje, które nadal są wydane i nie zostały zwrócone.',
+                ]);
+            }
+
+            $neededByVariant = $selected
+                ->groupBy('equipment_variant_id')
+                ->map(fn (Collection $group) => (int) $group->sum('quantity_issued'));
+
+            $stocks = EquipmentStock::query()
+                ->where('warehouse_id', $dispatch->warehouse_id)
+                ->whereIn('equipment_variant_id', $neededByVariant->keys()->sort()->values())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('equipment_variant_id');
+
+            foreach ($neededByVariant as $variantId => $quantity) {
+                $stock = $stocks->get((int) $variantId);
+
+                if ($stock) {
+                    $stock->increment('quantity_in_stock', $quantity);
+
+                    continue;
+                }
+
+                EquipmentStock::query()->create([
+                    'warehouse_id' => $dispatch->warehouse_id,
+                    'equipment_variant_id' => (int) $variantId,
+                    'quantity_in_stock' => $quantity,
+                    'min_quantity' => 0,
+                ]);
+            }
+
+            foreach ($selected as $issue) {
+                $issue->update([
+                    'status' => EquipmentIssue::STATUS_UNCOLLECTED,
+                ]);
+            }
+
+            $stillHandedOver = $dispatch->issues()
+                ->whereIn('status', [
+                    EquipmentIssue::STATUS_RESERVED,
+                    EquipmentIssue::STATUS_ISSUED,
+                    EquipmentIssue::STATUS_GIVEN,
+                    EquipmentIssue::STATUS_RETURNED,
+                    EquipmentIssue::STATUS_DAMAGED,
+                    EquipmentIssue::STATUS_LOST,
+                ])
+                ->exists();
+
+            if (! $stillHandedOver) {
+                $dispatch->update([
+                    'status' => WarehouseDispatch::STATUS_CANCELLED,
+                    'cancelled_at' => now(),
+                    'cancelled_by' => auth()->id(),
+                ]);
+            }
+
+            return $dispatch->fresh(['warehouse.location', 'creator', 'issuer', 'canceller', 'issues.employee', 'issues.equipment', 'issues.variant']);
+        });
+    }
+
     private function createDispatchTask(WarehouseDispatch $dispatch, int $assigneeId): ProjectTask
     {
         $task = ProjectTask::query()->create([
@@ -1189,7 +1307,7 @@ class EquipmentService
 
         EquipmentIssue::query()
             ->where('equipment_id', $equipment->id)
-            ->whereNotIn('status', [EquipmentIssue::STATUS_RESERVED, EquipmentIssue::STATUS_UNFULFILLED, EquipmentIssue::STATUS_CANCELLED])
+            ->whereNotIn('status', EquipmentIssue::excludedFromStockLedger())
             ->with('dispatch')
             ->get()
             ->each(function (EquipmentIssue $issue) use (&$inbound, &$outbound, $add): void {
@@ -1310,7 +1428,7 @@ class EquipmentService
     {
         $issues = EquipmentIssue::query()
             ->where('equipment_id', $equipment->id)
-            ->whereNotIn('status', [EquipmentIssue::STATUS_RESERVED, EquipmentIssue::STATUS_UNFULFILLED, EquipmentIssue::STATUS_CANCELLED])
+            ->whereNotIn('status', EquipmentIssue::excludedFromStockLedger())
             ->with(['variant.equipment', 'warehouse.location', 'employee', 'dispatch.issuer', 'issuer', 'returner'])
             ->get();
 

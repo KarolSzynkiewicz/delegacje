@@ -99,7 +99,7 @@ class EmployeeEquipmentHistory extends Component
 
         $query = EquipmentIssue::query()
             ->where('equipment_issues.employee_id', $employee->id)
-            ->where('equipment_issues.status', '!=', EquipmentIssue::STATUS_UNFULFILLED)
+            ->whereNotIn('equipment_issues.status', EquipmentIssue::hiddenFromEmployee())
             ->with(['equipment.variants', 'variant', 'warehouse.location', 'dispatch'])
             ->select('equipment_issues.*');
 

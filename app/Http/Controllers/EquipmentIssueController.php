@@ -98,6 +98,33 @@ class EquipmentIssueController extends Controller
             ->with('success', "Anulowano zlecenie {$dispatch->number}.");
     }
 
+    public function reverseDispatch(Request $request, WarehouseDispatch $warehouseDispatch)
+    {
+        $validated = $request->validate([
+            'issue_ids' => 'required|array|min:1',
+            'issue_ids.*' => 'integer',
+        ], [
+            'issue_ids.required' => 'Odhacz co najmniej jedną pozycję do cofnięcia.',
+            'issue_ids.min' => 'Odhacz co najmniej jedną pozycję do cofnięcia.',
+        ]);
+
+        try {
+            $dispatch = $this->equipmentService->reverseDispatch($warehouseDispatch, $validated['issue_ids']);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()
+                ->route('warehouse-dispatches.show', $warehouseDispatch)
+                ->with('error', collect($e->errors())->flatten()->first() ?: 'Nie można cofnąć wydania.');
+        }
+
+        $message = $dispatch->isCancelled()
+            ? "Cofnięto wydanie. Zlecenie {$dispatch->number} zostało anulowane, a pozycje wróciły na magazyn."
+            : 'Cofnięto odhaczone pozycje. Wróciły na magazyn jako nieodebrane.';
+
+        return redirect()
+            ->route('warehouse-dispatches.show', $dispatch)
+            ->with('success', $message);
+    }
+
     public function returnForm(EquipmentIssue $equipmentIssue)
     {
         if ($equipmentIssue->isReserved()) {
@@ -110,6 +137,12 @@ class EquipmentIssueController extends Controller
             return redirect()
                 ->route('equipment-issues.show', $equipmentIssue)
                 ->with('error', 'Wydanie bezzwrotne nie podlega zwrotowi.');
+        }
+
+        if ($equipmentIssue->status === EquipmentIssue::STATUS_UNCOLLECTED) {
+            return redirect()
+                ->route('equipment-issues.show', $equipmentIssue)
+                ->with('error', 'To wydanie zostało cofnięte jako nieodebrane.');
         }
 
         if ($equipmentIssue->status !== EquipmentIssue::STATUS_ISSUED) {
