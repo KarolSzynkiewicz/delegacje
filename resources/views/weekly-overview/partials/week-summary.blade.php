@@ -70,6 +70,71 @@
         padding-bottom: 0;
         margin-bottom: 0;
     }
+    .wo-dep-hero {
+        display: flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        line-height: 1;
+        letter-spacing: -0.02em;
+    }
+    .wo-dep-hero__n {
+        font-size: 2.15rem;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+    }
+    .wo-dep-hero__verb {
+        font-size: 1.15rem;
+        font-weight: 650;
+    }
+    .wo-dep-table-wrap {
+        overflow: hidden;
+    }
+    .wo-dep-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .wo-dep-table th {
+        font-size: 0.65rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        padding: 0.15rem 0.45rem 0.55rem;
+        border-bottom: 1px solid var(--glass-border);
+        white-space: nowrap;
+    }
+    .wo-dep-table td {
+        padding: 0.7rem 0.45rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        vertical-align: middle;
+    }
+    .wo-dep-table tr:last-child td {
+        border-bottom: 0;
+    }
+    .wo-dep-mode {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.55rem;
+        border: 1px solid var(--glass-border);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.04);
+    }
+    .wo-dep-people {
+        font-size: 1rem;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+    .weekly-logistics-popover-panel.wo-dep-panel {
+        width: min(720px, calc(100vw - 24px)) !important;
+        max-width: min(720px, calc(100vw - 24px)) !important;
+        /* Pięć wierszy (dzień + awatar 42px + status) mieści się bez scrolla. */
+        max-height: min(92vh, 780px) !important;
+    }
 </style>
 
 @php
@@ -350,6 +415,7 @@
             <div
                 x-ref="panel"
                 class="weekly-logistics-popover-panel rounded-3 border p-3"
+                :class="active === 'departures' || active === 'returns' ? 'wo-dep-panel' : ''"
                 style="
                     width: min(420px, calc(100vw - 24px));
                     max-height: min(70vh, 560px);
@@ -361,8 +427,8 @@
             >
                 <div class="d-flex justify-content-between align-items-start gap-2 border-bottom pb-2 mb-2" style="border-color: var(--glass-border) !important;">
                     {{-- Jeden tytuł: x-show + Bootstrap d-inline-flex psowało ukrywanie (display !important) --}}
-                    <h6 class="fw-semibold mb-0 small d-flex align-items-center gap-2 flex-wrap" style="letter-spacing: 0.02em;">
-                        <i class="bi flex-shrink-0" :class="panelIconClass()"></i>
+                    <h6 class="fw-semibold mb-0 d-flex align-items-center gap-2 flex-wrap" :class="active === 'departures' || active === 'returns' ? 'fs-6' : 'small'" style="letter-spacing: 0.02em;">
+                        <i class="bi flex-shrink-0" :class="panelIconClass()" x-show="active !== 'departures' && active !== 'returns'"></i>
                         <span x-text="panelTitle()"></span>
                     </h6>
                     <button type="button" class="btn-close flex-shrink-0" aria-label="Zamknij" @click="close()"></button>
@@ -561,21 +627,128 @@
 
                 <div x-show="active === 'returns'" x-cloak>
                     @if($returnTrips->isNotEmpty())
-                        <ul class="mb-0 small list-unstyled">
-                            @foreach($returnTrips as $returnTrip)
-                                @php
-                                    $uniqueParticipantsCount = $returnTrip->participants->pluck('employee_id')->unique()->count();
-                                @endphp
-                                <li class="mb-1">
-                                    <a href="{{ route('return-trips.show', $returnTrip) }}" class="text-decoration-none">
-                                        <strong>{{ $returnTrip->event_date->format('d.m.Y') }}</strong>
-                                        @if($uniqueParticipantsCount > 0)
-                                            ({{ $uniqueParticipantsCount }} {{ $uniqueParticipantsCount === 1 ? 'osoba' : 'osób' }})
-                                        @endif
-                                    </a>
-                                </li>
-                            @endforeach
-                        </ul>
+                        @php
+                            $returnSeatCount = 0;
+                            $returnPeopleByStatus = [
+                                'oczekuje' => 0,
+                                'w trakcie' => 0,
+                                'zakończone' => 0,
+                            ];
+                            foreach ($returnTrips as $returnRow) {
+                                $seats = $returnRow->participants
+                                    ->filter(fn ($participant) => $participant->employee !== null)
+                                    ->unique('employee_id')
+                                    ->count();
+                                $returnSeatCount += $seats;
+                                $rowStatus = $returnRow->getVisualStatus();
+                                if (array_key_exists($rowStatus, $returnPeopleByStatus)) {
+                                    $returnPeopleByStatus[$rowStatus] += $seats;
+                                }
+                            }
+                            $returnVerb = match (true) {
+                                $returnSeatCount === 1 => 'osoba zjeżdża',
+                                $returnSeatCount % 10 >= 2 && $returnSeatCount % 10 <= 4 && ($returnSeatCount % 100 < 12 || $returnSeatCount % 100 > 14) => 'osoby zjeżdżają',
+                                default => 'osób zjeżdża',
+                            };
+                        @endphp
+                        <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap mb-3">
+                            <div>
+                                <div class="wo-dep-hero">
+                                    <span class="wo-dep-hero__n">{{ $returnSeatCount }}</span>
+                                    <span class="wo-dep-hero__verb">{{ $returnVerb }}</span>
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    w {{ $returnEventsCount }} {{ $pl($returnEventsCount, 'zjeździe', 'zjazdach', 'zjazdach') }}
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                @if($returnPeopleByStatus['w trakcie'] > 0)
+                                    <x-ui.badge variant="warning">{{ $returnPeopleByStatus['w trakcie'] }} w trakcie</x-ui.badge>
+                                @endif
+                                @if($returnPeopleByStatus['oczekuje'] > 0)
+                                    <x-ui.badge variant="info">{{ $returnPeopleByStatus['oczekuje'] }} {{ $pl($returnPeopleByStatus['oczekuje'], 'zaplanowany', 'zaplanowane', 'zaplanowanych') }}</x-ui.badge>
+                                @endif
+                                @if($returnPeopleByStatus['zakończone'] > 0)
+                                    <x-ui.badge variant="success">{{ $returnPeopleByStatus['zakończone'] }} {{ $pl($returnPeopleByStatus['zakończone'], 'zakończony', 'zakończone', 'zakończonych') }}</x-ui.badge>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="wo-dep-table-wrap">
+                            <table class="wo-dep-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Dzień</th>
+                                        <th>Osoby</th>
+                                        <th>Czym</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($returnTrips as $returnTrip)
+                                        @php
+                                            $uniqueParticipants = $returnTrip->participants
+                                                ->filter(fn ($participant) => $participant->employee !== null)
+                                                ->unique('employee_id')
+                                                ->values();
+                                            $participantsCount = $uniqueParticipants->count();
+                                            $visualStatus = $returnTrip->getVisualStatus();
+                                            $when = $returnTrip->event_date;
+                                            $dayLabel = (int) $when->dayOfWeekIso === 4
+                                                ? 'czw'
+                                                : $when->locale('pl')->isoFormat('dd');
+                                            $statusLabel = match ($visualStatus) {
+                                                'oczekuje' => 'Zaplanowany',
+                                                'w trakcie' => 'W trakcie',
+                                                'zakończone' => 'Zakończone',
+                                                'anulowany' => 'Anulowany',
+                                                default => ucfirst((string) $visualStatus),
+                                            };
+                                            $badgeVariant = match ($visualStatus) {
+                                                'oczekuje' => 'info',
+                                                'w trakcie' => 'warning',
+                                                'zakończone' => 'success',
+                                                'anulowany' => 'danger',
+                                                default => 'secondary',
+                                            };
+                                        @endphp
+                                        <tr>
+                                            <td style="white-space:nowrap;">
+                                                <div class="fw-semibold text-uppercase" style="letter-spacing:0.04em;">{{ $dayLabel }}</div>
+                                                <div class="text-muted small" style="font-variant-numeric:tabular-nums;">{{ $when->format('d.m') }}</div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <x-ui.avatar-stack :employees="$uniqueParticipants->pluck('employee')" size="42px" :max="4" />
+                                                    <span class="wo-dep-people">{{ $participantsCount }} os.</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="wo-dep-mode" aria-hidden="true">
+                                                        <i class="bi {{ $returnTrip->vehicle ? 'bi-car-front' : 'bi-bus-front' }}"></i>
+                                                    </span>
+                                                    <span>
+                                                        <span class="fw-semibold">{{ $returnTrip->vehicle ? 'auto' : 'publiczny' }}</span>
+                                                        @if($returnTrip->vehicle?->registration_number)
+                                                            <span class="text-muted small d-block">{{ $returnTrip->vehicle->registration_number }}</span>
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
+                                            </td>
+                                            <td class="text-end">
+                                                <x-ui.button variant="ghost" href="{{ route('return-trips.show', $returnTrip) }}" class="btn-sm" title="Zobacz">
+                                                    <i class="bi bi-eye"></i>
+                                                </x-ui.button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     @else
                         <p class="text-muted small mb-0">Brak zjazdów w tym tygodniu.</p>
                     @endif
@@ -603,45 +776,128 @@
 
                 <div x-show="active === 'departures'" x-cloak>
                     @if(isset($allDepartures) && $allDepartures->isNotEmpty())
-                        <ul class="mb-0 small list-unstyled">
-                            @foreach($allDepartures as $departure)
-                                @php
-                                    $uniqueParticipants = $departure->participants
-                                        ->filter(fn ($p) => $p->employee !== null);
-                                    $participantsCount = $uniqueParticipants->count();
-                                    $participantNames = $uniqueParticipants
-                                        ->map(fn ($p) => $p->employee->full_name)
-                                        ->join(', ');
-                                    $visualStatus = $departure->getVisualStatus();
-                                    $dayOfWeek = $departure->event_date->locale('pl')->isoFormat('dd');
-                                @endphp
-                                <li class="mb-2">
-                                    <a href="{{ route('departures.show', $departure) }}" class="text-decoration-none d-flex align-items-center gap-1 flex-wrap">
-                                        <i class="bi bi-calendar-week"></i>
-                                        <span class="text-uppercase">{{ $dayOfWeek }}</span>
-                                        @if($departure->toLocation)
-                                            <i class="bi bi-flag"></i>
-                                            <span>{{ $departure->toLocation->name }}</span>
-                                        @endif
-                                        <span class="text-muted">|</span>
-                                        @if($participantsCount > 0)
-                                            <span data-tip="{{ $participantNames }}">
-                                                {{ $participantsCount }} os.
-                                            </span>
-                                        @endif
-                                        @if($departure->vehicle)
-                                            <span class="text-muted">|</span>
-                                            <i class="bi bi-car-front"></i>
-                                            <span>{{ $departure->vehicle->registration_number }}</span>
-                                        @endif
-                                        <span class="text-muted">|</span>
-                                        <small class="badge badge-sm {{ $visualStatus === 'oczekuje' ? 'badge-primary' : ($visualStatus === 'w trakcie' ? 'badge-warning' : 'badge-success') }}">
-                                            {{ $visualStatus }}
-                                        </small>
-                                    </a>
-                                </li>
-                            @endforeach
-                        </ul>
+                        @php
+                            $departureSeatCount = 0;
+                            $departurePeopleByStatus = [
+                                'oczekuje' => 0,
+                                'w trakcie' => 0,
+                                'zakończone' => 0,
+                            ];
+                            foreach ($allDepartures as $departureRow) {
+                                $seats = $departureRow->participants
+                                    ->filter(fn ($participant) => $participant->employee !== null)
+                                    ->unique('employee_id')
+                                    ->count();
+                                $departureSeatCount += $seats;
+                                $rowStatus = $departureRow->getVisualStatus();
+                                if (array_key_exists($rowStatus, $departurePeopleByStatus)) {
+                                    $departurePeopleByStatus[$rowStatus] += $seats;
+                                }
+                            }
+                            $departureVerb = match (true) {
+                                $departureSeatCount === 1 => 'osoba wyjeżdża',
+                                $departureSeatCount % 10 >= 2 && $departureSeatCount % 10 <= 4 && ($departureSeatCount % 100 < 12 || $departureSeatCount % 100 > 14) => 'osoby wyjeżdżają',
+                                default => 'osób wyjeżdża',
+                            };
+                        @endphp
+                        <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap mb-3">
+                            <div>
+                                <div class="wo-dep-hero">
+                                    <span class="wo-dep-hero__n">{{ $departureSeatCount }}</span>
+                                    <span class="wo-dep-hero__verb">{{ $departureVerb }}</span>
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    w {{ $departureEventsCount }} {{ $pl($departureEventsCount, 'wyjeździe', 'wyjazdach', 'wyjazdach') }}
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                @if($departurePeopleByStatus['w trakcie'] > 0)
+                                    <x-ui.badge variant="warning">{{ $departurePeopleByStatus['w trakcie'] }} w trakcie</x-ui.badge>
+                                @endif
+                                @if($departurePeopleByStatus['oczekuje'] > 0)
+                                    <x-ui.badge variant="info">{{ $departurePeopleByStatus['oczekuje'] }} {{ $pl($departurePeopleByStatus['oczekuje'], 'zaplanowany', 'zaplanowane', 'zaplanowanych') }}</x-ui.badge>
+                                @endif
+                                @if($departurePeopleByStatus['zakończone'] > 0)
+                                    <x-ui.badge variant="success">{{ $departurePeopleByStatus['zakończone'] }} {{ $pl($departurePeopleByStatus['zakończone'], 'zakończony', 'zakończone', 'zakończonych') }}</x-ui.badge>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="wo-dep-table-wrap">
+                            <table class="wo-dep-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Dzień</th>
+                                        <th>Osoby</th>
+                                        <th>Czym</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($allDepartures as $departure)
+                                        @php
+                                            $uniqueParticipants = $departure->participants
+                                                ->filter(fn ($participant) => $participant->employee !== null)
+                                                ->unique('employee_id')
+                                                ->values();
+                                            $participantsCount = $uniqueParticipants->count();
+                                            $visualStatus = $departure->getVisualStatus();
+                                            $when = $departure->end_date ?? $departure->event_date;
+                                            $dayLabel = (int) $when->dayOfWeekIso === 4
+                                                ? 'czw'
+                                                : $when->locale('pl')->isoFormat('dd');
+                                            $statusLabel = match ($visualStatus) {
+                                                'oczekuje' => 'Zaplanowany',
+                                                'w trakcie' => 'W trakcie',
+                                                'zakończone' => 'Zakończone',
+                                                'anulowany' => 'Anulowany',
+                                                default => ucfirst((string) $visualStatus),
+                                            };
+                                            $badgeVariant = match ($visualStatus) {
+                                                'oczekuje' => 'info',
+                                                'w trakcie' => 'warning',
+                                                'zakończone' => 'success',
+                                                'anulowany' => 'danger',
+                                                default => 'secondary',
+                                            };
+                                        @endphp
+                                        <tr>
+                                            <td style="white-space:nowrap;">
+                                                <div class="fw-semibold text-uppercase" style="letter-spacing:0.04em;">{{ $dayLabel }}</div>
+                                                <div class="text-muted small" style="font-variant-numeric:tabular-nums;">{{ $when->format('d.m') }}</div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <x-ui.avatar-stack :employees="$uniqueParticipants->pluck('employee')" size="42px" :max="4" />
+                                                    <span class="wo-dep-people">{{ $participantsCount }} os.</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="wo-dep-mode" aria-hidden="true">
+                                                        <i class="bi {{ $departure->vehicle ? 'bi-car-front' : 'bi-bus-front' }}"></i>
+                                                    </span>
+                                                    <span>
+                                                        <span class="fw-semibold">{{ $departure->vehicle ? 'auto' : 'publiczny' }}</span>
+                                                        @if($departure->vehicle?->registration_number)
+                                                            <span class="text-muted small d-block">{{ $departure->vehicle->registration_number }}</span>
+                                                        @endif
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <x-ui.badge variant="{{ $badgeVariant }}">{{ $statusLabel }}</x-ui.badge>
+                                            </td>
+                                            <td class="text-end">
+                                                <x-ui.button variant="ghost" href="{{ route('departures.show', $departure) }}" class="btn-sm" title="Zobacz">
+                                                    <i class="bi bi-eye"></i>
+                                                </x-ui.button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     @else
                         <p class="text-muted small mb-0">Brak wyjazdów w tym tygodniu.</p>
                     @endif
@@ -826,7 +1082,10 @@ document.addEventListener('alpine:init', () => {
             const y = this.clientY;
             el.style.position = 'fixed';
             el.style.zIndex = '10051';
-            el.style.maxWidth = 'min(420px, calc(100vw - 24px))';
+            const wide = this.active === 'departures' || this.active === 'returns';
+            const panelWidth = wide ? 'min(720px, calc(100vw - 24px))' : 'min(420px, calc(100vw - 24px))';
+            el.style.width = panelWidth;
+            el.style.maxWidth = panelWidth;
             let left = x;
             let top = y + 8;
             el.style.left = left + 'px';
