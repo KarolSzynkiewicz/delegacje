@@ -5,8 +5,11 @@ import './procedure-run-flow';
 import './forum-composer';
 import './comment-composer';
 import './attachment-preview';
+import { registerPushWorker } from './push-notifications';
 import * as bootstrap from 'bootstrap'; // Bootstrap JS (dla modals, dropdowns, etc.)
 window.bootstrap = bootstrap;
+
+registerPushWorker();
 
 /**
  * ChronoLogic — globalna poświata podążająca za kursorem (ten sam ambient co na

@@ -9,6 +9,7 @@
         "barryvdh/laravel-dompdf": "^3.1",
         "doctrine/dbal": "^3.10",
         "guzzlehttp/guzzle": "^7.2",
+        "laravel-notification-channels/webpush": "^9.0",
         "laravel/framework": "^10.10",
         "laravel/mcp": "^0.5.1",
         "laravel/passport": "^11.10",

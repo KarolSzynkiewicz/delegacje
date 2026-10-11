@@ -1,7 +1,10 @@
 @props([
     'name',
     'show' => false,
-    'maxWidth' => '2xl'
+    'maxWidth' => '2xl',
+    'dark' => false,
+    'compact' => false,
+    'teleport' => false,
 ])
 
 @php
@@ -14,6 +17,10 @@ $maxWidth = [
 ][$maxWidth];
 @endphp
 
+@if($teleport)
+<div x-data>
+<template x-teleport="body">
+@endif
 <div
     x-data="{
         show: @js($show),
@@ -70,8 +77,13 @@ $maxWidth = [
     <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem 1rem; z-index: 99999; pointer-events: none; overflow-y: auto;">
         <div
             x-show="show"
-            class="bg-white rounded-lg shadow-xl {{ $maxWidth }}"
-            style="max-width: 1320px; width: 100%; max-height: calc(100vh - 4rem); overflow: hidden; display: flex; flex-direction: column; position: relative; pointer-events: auto; margin-top: 0;"
+            @class([
+                'rounded-lg shadow-xl',
+                $maxWidth,
+                'profile-modal' => $dark,
+                'bg-white' => ! $dark,
+            ])
+            style="max-width: {{ $compact ? '32rem' : '1320px' }}; width: 100%; max-height: calc(100vh - 4rem); overflow: hidden; display: flex; flex-direction: column; position: relative; pointer-events: auto; margin-top: 0;"
             x-transition:enter="ease-out duration-300"
             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
@@ -86,3 +98,7 @@ $maxWidth = [
         </div>
     </div>
 </div>
+@if($teleport)
+</template>
+</div>
+@endif

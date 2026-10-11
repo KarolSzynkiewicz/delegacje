@@ -8,6 +8,7 @@ use App\Models\NotificationPreference;
 use App\Models\User;
 use App\Notifications\NotificationRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use NotificationChannels\WebPush\WebPushChannel;
 use Tests\TestCase;
 
 class NotificationRouterTest extends TestCase
@@ -20,7 +21,9 @@ class NotificationRouterTest extends TestCase
         $router = new NotificationRouter;
 
         $this->assertTrue($router->enabled($user, NotificationEvent::TaskAssigned, NotificationChannel::Database));
-        $this->assertSame(['database'], $router->channels($user, NotificationEvent::TaskAssigned));
+        $this->assertTrue($router->enabled($user, NotificationEvent::TaskAssigned, NotificationChannel::Push));
+        $this->assertFalse($router->enabled($user, NotificationEvent::CommentLiked, NotificationChannel::Push));
+        $this->assertSame(['database', WebPushChannel::class], $router->channels($user, NotificationEvent::TaskAssigned));
         $this->assertSame(['database'], $router->channels($user, NotificationEvent::CommentLiked));
     }
 
@@ -37,7 +40,7 @@ class NotificationRouterTest extends TestCase
         $router = new NotificationRouter;
 
         $this->assertSame([], $router->channels($user, NotificationEvent::CommentLiked));
-        $this->assertSame(['database'], $router->channels($user, NotificationEvent::TaskAssigned));
+        $this->assertSame(['database', WebPushChannel::class], $router->channels($user, NotificationEvent::TaskAssigned));
     }
 
     public function test_mail_is_not_implemented_yet(): void
@@ -45,6 +48,22 @@ class NotificationRouterTest extends TestCase
         $user = User::factory()->create();
         $router = new NotificationRouter;
 
-        $this->assertSame(['database'], $router->channels($user, NotificationEvent::ApprovalRequested));
+        $this->assertSame(['database', WebPushChannel::class], $router->channels($user, NotificationEvent::ApprovalRequested));
+        $this->assertNotContains('mail', $router->channels($user, NotificationEvent::ApprovalRequested));
+    }
+
+    public function test_push_preference_can_turn_the_channel_off(): void
+    {
+        $user = User::factory()->create();
+        NotificationPreference::query()->create([
+            'user_id' => $user->id,
+            'event_type' => NotificationEvent::MeetingInvited->value,
+            'channel' => NotificationChannel::Push->value,
+            'enabled' => false,
+        ]);
+
+        $router = new NotificationRouter;
+
+        $this->assertSame(['database'], $router->channels($user, NotificationEvent::MeetingInvited));
     }
 }

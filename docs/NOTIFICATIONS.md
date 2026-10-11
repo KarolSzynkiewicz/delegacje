@@ -1,8 +1,9 @@
 # Powiadomienia
 
-Inbox (dzwonek) to kanał Laravel `database`. Wybór kanału idzie przez
-`NotificationRouter` + katalog `NotificationEvent`. Faza 0 implementuje
-tylko dzwonek; defaulty mail/push siedzą w katalogu, ale nie są wysyłane.
+Inbox (dzwonek) to kanał Laravel `database`. Push przeglądarki to kanał
+`NotificationChannels\WebPush\WebPushChannel`. Wybór kanału idzie przez
+`NotificationRouter` + katalog `NotificationEvent`. Mail, WhatsApp i SMS
+zostają w katalogu, ale nie są wysyłane.
 
 ## Warstwy
 
@@ -19,8 +20,10 @@ ApprovalAssigneeChanged→  SendApprovalRequested
 Kontroler / Livewire / MCP **zapisuje model**. Observer albo serwis emituje
 event. Jedyny `->notify()` w aplikacji jest w `App\Notifications\Notifier`.
 
-Preferencje: Profil → macierz (na razie kolumna dzwonek). Brak wiersza w
-`notification_preferences` = default z katalogu.
+Preferencje: Profil → macierz (dzwonek i push). Brak wiersza w
+`notification_preferences` = default z katalogu. Push dociera tylko do
+przeglądarek, które zapisały subskrypcję (przycisk nad macierzą). Klucze
+VAPID: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
 
 ## Typy (`data.type` / `NotificationEvent`)
 
@@ -45,8 +48,10 @@ Preferencje: Profil → macierz (na razie kolumna dzwonek). Brak wiersza w
 4. Case w `NotificationEvent` (label, grupa, defaulty kanałów, ikona).
 5. Macierz w profilu dokłada wiersz sama.
 
-Kolejny kanał: driver w `NotificationChannel::implemented()` + `toMail()`
-na klasach. Call site’ów zapisu nie ruszasz.
+Kolejny kanał: driver w `NotificationChannel::implemented()` + metoda
+`toMail()` / odpowiednik na klasach. `toWebPush()` jest wspólne w
+`ChronoNotification` i bierze treść z `toDatabase()`. Call site’ów zapisu
+nie ruszasz.
 
 ## Kolejka
 

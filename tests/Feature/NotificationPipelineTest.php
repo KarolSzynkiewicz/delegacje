@@ -15,6 +15,7 @@ use App\Notifications\TaskAssigned;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
+use NotificationChannels\WebPush\WebPushChannel;
 use Tests\TestCase;
 
 class NotificationPipelineTest extends TestCase
@@ -70,7 +71,11 @@ class NotificationPipelineTest extends TestCase
             'created_by' => $this->user->id,
         ]);
 
-        Notification::assertNotSentTo($robert, TaskAssigned::class);
+        Notification::assertSentTo(
+            $robert,
+            TaskAssigned::class,
+            fn (TaskAssigned $notification, array $channels) => $channels === [WebPushChannel::class],
+        );
     }
 
     public function test_new_meeting_participants_are_invited(): void
@@ -135,9 +140,13 @@ class NotificationPipelineTest extends TestCase
     public function test_profile_preferences_toggle_persists(): void
     {
         Livewire::test(NotificationPreferences::class)
-            ->assertSet('enabled.'.NotificationEvent::CommentLiked->value, true)
-            ->call('toggle', NotificationEvent::CommentLiked->value)
-            ->assertSet('enabled.'.NotificationEvent::CommentLiked->value, false);
+            ->assertSet('enabled.'.NotificationEvent::CommentLiked->value.'.'.NotificationChannel::Database->value, true)
+            ->assertSet('enabled.'.NotificationEvent::TaskAssigned->value.'.'.NotificationChannel::Push->value, true)
+            ->assertSet('enabled.'.NotificationEvent::CommentLiked->value.'.'.NotificationChannel::Push->value, false)
+            ->assertSee('W aplikacji')
+            ->assertSee('zaznacz wszystkie')
+            ->call('toggle', NotificationEvent::CommentLiked->value, NotificationChannel::Database->value)
+            ->assertSet('enabled.'.NotificationEvent::CommentLiked->value.'.'.NotificationChannel::Database->value, false);
 
         $this->assertDatabaseHas('notification_preferences', [
             'user_id' => $this->user->id,
@@ -145,5 +154,63 @@ class NotificationPipelineTest extends TestCase
             'channel' => NotificationChannel::Database->value,
             'enabled' => 0,
         ]);
+    }
+
+    public function test_profile_push_column_and_subscription_persist(): void
+    {
+        Livewire::test(NotificationPreferences::class)
+            ->call('toggle', NotificationEvent::MeetingInvited->value, NotificationChannel::Push->value)
+            ->assertSet('enabled.'.NotificationEvent::MeetingInvited->value.'.'.NotificationChannel::Push->value, false)
+            ->call('toggleColumn', NotificationChannel::Push->value)
+            ->assertSet('enabled.'.NotificationEvent::CommentLiked->value.'.'.NotificationChannel::Push->value, true)
+            ->call('storePushSubscription', [
+                'endpoint' => 'https://push.example.test/sub/1',
+                'keys' => ['p256dh' => 'public-key', 'auth' => 'auth-token'],
+                'contentEncoding' => 'aes128gcm',
+            ])
+            ->call('storePushSubscription', [
+                'endpoint' => 'http://push.example.test/insecure',
+                'keys' => ['p256dh' => 'public-key', 'auth' => 'auth-token'],
+            ])
+            ->assertHasErrors('endpoint');
+
+        $this->assertDatabaseHas('notification_preferences', [
+            'user_id' => $this->user->id,
+            'event_type' => NotificationEvent::CommentLiked->value,
+            'channel' => NotificationChannel::Push->value,
+            'enabled' => 1,
+        ]);
+
+        $this->assertDatabaseHas('push_subscriptions', [
+            'subscribable_id' => $this->user->id,
+            'endpoint' => 'https://push.example.test/sub/1',
+            'content_encoding' => 'aes128gcm',
+        ]);
+
+        $this->assertDatabaseMissing('push_subscriptions', [
+            'endpoint' => 'http://push.example.test/insecure',
+        ]);
+
+        Livewire::test(NotificationPreferences::class)
+            ->call('deletePushSubscription', 'https://push.example.test/sub/1');
+
+        $this->assertDatabaseMissing('push_subscriptions', [
+            'endpoint' => 'https://push.example.test/sub/1',
+        ]);
+    }
+
+    public function test_web_push_payload_uses_the_database_message_and_url(): void
+    {
+        $task = ProjectTask::query()->create([
+            'name' => 'Pompa',
+            'status' => TaskStatus::PENDING,
+            'created_by' => $this->user->id,
+        ]);
+
+        $notification = new TaskAssigned($task, $this->user);
+        $payload = $notification->toWebPush($this->user, $notification)->toArray();
+
+        $this->assertSame($this->user->name.' przypisał(-a) Ci zadanie', $payload['body']);
+        $this->assertSame(route('tasks.show', $task), $payload['data']['url']);
     }
 }

@@ -70,6 +70,11 @@ echo "[STEP] Ensuring database sessions table..."
 php artisan migrate --force --no-interaction --path=database/migrations/2026_10_11_195500_create_sessions_table.php
 echo "[OK] Sessions table ready"
 
+echo "[STEP] Ensuring push subscriptions table..."
+php artisan migrate --force --no-interaction --path=database/migrations/2026_10_11_235000_create_push_subscriptions_table.php
+php artisan migrate --force --no-interaction --path=database/migrations/2026_10_12_002600_add_user_agent_to_push_subscriptions_table.php
+echo "[OK] Push subscriptions table ready"
+
 # Optional migrations (controlled by RUN_MIGRATIONS env var)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[MIGRATE] Running database migrations..."

@@ -1,0 +1,16 @@
+{
+    "name": "ChronoLogic",
+    "short_name": "ChronoLogic",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#070a13",
+    "theme_color": "#070a13",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}

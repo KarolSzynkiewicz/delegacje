@@ -76,7 +76,12 @@ enum NotificationEvent: string
                 self::MeetingInvited,
             ], true),
             NotificationChannel::Push => in_array($this, [
+                self::TaskAssigned,
+                self::CommentMentioned,
                 self::ApprovalRequested,
+                self::ApprovalDecided,
+                self::ProcedureWaitElapsed,
+                self::ProcedureStepReady,
                 self::MeetingInvited,
             ], true),
             NotificationChannel::WhatsApp, NotificationChannel::Sms => false,

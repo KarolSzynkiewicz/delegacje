@@ -764,6 +764,13 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('/', [ProfileController::class, 'edit'])->name('edit');
         Route::patch('/', [ProfileController::class, 'update'])->name('update');
         Route::delete('/', [ProfileController::class, 'destroy'])->name('destroy');
+        Route::delete('/sessions', [ProfileController::class, 'destroyOtherSessions'])->name('sessions.destroy-others');
+        Route::delete('/sessions/{session}', [ProfileController::class, 'destroySession'])
+            ->name('sessions.destroy')
+            ->where('session', '[a-f0-9]{64}');
+        Route::delete('/devices/{device}', [ProfileController::class, 'destroyDevice'])
+            ->name('devices.destroy')
+            ->whereNumber('device');
     });
 
     // Mine routes - projects managed by current user for manages of projects)

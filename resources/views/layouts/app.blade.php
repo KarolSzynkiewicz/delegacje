@@ -9,6 +9,12 @@
 
         <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
         <link rel="alternate icon" href="{{ asset('favicon.svg') }}">
+        <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
+        @auth
+            @if (config('webpush.vapid.public_key'))
+                <meta name="vapid-public-key" content="{{ config('webpush.vapid.public_key') }}">
+            @endif
+        @endauth
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.googleapis.com">

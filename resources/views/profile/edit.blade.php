@@ -1,202 +1,258 @@
+@php
+    $nameParts = preg_split('/\s+/', trim($user->name)) ?: [];
+    $initials = count($nameParts) >= 2
+        ? strtoupper(substr($nameParts[0], 0, 1).substr($nameParts[1], 0, 1))
+        : strtoupper(substr($user->name, 0, 1));
+    $imageUrl = $user->image_path ? $user->image_url : null;
+    $managed = $user->managedProjects;
+    $managedCount = $managed->count();
+    $lead = $managedCount === 0
+        ? 'Kierownik · nie zarządzasz żadnymi projektami'
+        : 'Kierownik · '.$managed->take(3)->pluck('name')->join(', ').($managedCount > 3 ? ' +'.($managedCount - 3) : '');
+    $otherSessions = collect($sessions)->contains(fn (array $session) => ! $session['current'] && $session['id']);
+@endphp
+
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Profile') }}
-        </h2>
-    </x-slot>
-
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-            <!-- Wiersz 1: 3 kolumny -->
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="row align-items-start g-4">
-                    <!-- Kolumna 1: Zdjęcie -->
-                    <div class="col-auto">
-                        @php
-                            $nameParts = explode(' ', $user->name);
-                            $initials = count($nameParts) >= 2 
-                                ? strtoupper(substr($nameParts[0], 0, 1) . substr($nameParts[1], 0, 1))
-                                : strtoupper(substr($user->name, 0, 1));
-                            $imageUrl = $user->image_path ? $user->image_url : null;
-                        @endphp
-                        <x-ui.avatar 
-                            :image-url="$imageUrl"
-                            :alt="$user->name"
-                            :initials="$initials"
-                            size="120px"
-                            shape="circle"
-                        />
+    <div class="profile-page d-flex flex-column gap-3">
+        <x-ui.card>
+            <div class="profile-hero">
+                <div class="profile-hero__avatar">
+                    <x-ui.avatar
+                        :image-url="$imageUrl"
+                        :alt="$user->name"
+                        :initials="$initials"
+                        size="88px"
+                        shape="circle"
+                    />
+                    <label for="profile-image" class="profile-hero__cam" title="Zmień zdjęcie">
+                        <i class="bi bi-camera"></i>
+                    </label>
+                </div>
+                <div class="profile-hero__identity">
+                    <h2 class="profile-hero__name">{{ $user->name }}</h2>
+                    <div class="profile-hero__email">
+                        <i class="bi bi-envelope"></i>
+                        <span>{{ $user->email }}</span>
                     </div>
-                    
-                    <!-- Kolumna 2: Username, Email, Wybierz plik, Zapisz zdjęcie -->
-                    <div class="col">
-                        <div class="d-flex flex-column gap-3">
-                            <!-- Update Name -->
-                            <div>
-                                <h3 class="fs-5 fw-semibold mb-2">{{ __('Dane użytkownika') }}</h3>
-                                <form method="post" action="{{ route('profile.update') }}" class="mb-3">
-                                    @csrf
-                                    @method('patch')
-                                    <input type="hidden" name="email" value="{{ $user->email }}" />
-                                    
-                                    <div class="mb-3">
-                                        <x-ui.input 
-                                            type="text" 
-                                            name="name" 
-                                            label="Nazwa użytkownika"
-                                            :value="old('name', $user->name)"
-                                            required
-                                        />
-                                        <x-input-error class="mt-2" :messages="$errors->get('name')" />
-                                    </div>
-                                    
-                                    <div class="d-flex align-items-center gap-2">
-                                        <x-primary-button class="btn-sm">{{ __('Zapisz nazwę') }}</x-primary-button>
-                                        @if (session('status') === 'profile-updated')
-                                            <span class="text-success small">{{ __('Zapisano') }}</span>
-                                        @endif
-                                    </div>
-                                </form>
-                            </div>
-                            
-                            <div>
-                                <span class="text-muted">
-                                    <i class="bi bi-envelope me-1"></i>
-                                    {{ $user->email }}
-                                </span>
-                            </div>
-                            
-                            <!-- Update Photo -->
-                            <div class="mt-2">
-                                <h3 class="fs-5 fw-semibold mb-2">{{ __('Zdjęcie profilowe') }}</h3>
-                                <form method="post" action="{{ route('profile.update') }}" enctype="multipart/form-data" class="d-inline">
-                                    @csrf
-                                    @method('patch')
-                                    <input type="hidden" name="name" value="{{ $user->name }}" />
-                                    <input type="hidden" name="email" value="{{ $user->email }}" />
-                                    
-                                    <div class="mb-2">
-                                        <x-ui.image-preview 
-                                            :showCurrentImage="false"
-                                            :currentImageUrl="null"
-                                            :currentImage="null"
-                                        />
-                                        <x-input-error class="mt-2" :messages="$errors->get('image')" />
-                                    </div>
-                                    
-                                    <div class="d-flex align-items-center gap-2">
-                                        <x-primary-button class="btn-sm">{{ __('Zapisz zdjęcie') }}</x-primary-button>
-                                        @if (session('status') === 'profile-updated')
-                                            <span class="text-success small">{{ __('Zapisano') }}</span>
-                                        @endif
-                                    </div>
-                                </form>
-                            </div>
+                    @if($user->roles->isNotEmpty())
+                        <div class="profile-hero__roles">
+                            @foreach($user->roles as $role)
+                                <x-ui.badge variant="info">{{ $role->name }}</x-ui.badge>
+                            @endforeach
                         </div>
-                    </div>
-                    
-                    <!-- Kolumna 3: Rola i Kierownik -->
-                    <div class="col">
-                        <div class="d-flex flex-column gap-3">
-                            <!-- Rola -->
-                            <div>
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <span class="fw-semibold">Rola</span>
-                                    <x-tooltip title="Rola zapewnia dostęp do modułów zgodnie z konfiguracją uprawnień. Uprawnienia przypisane do roli określają, do jakich funkcji i danych użytkownik ma dostęp w systemie." direction="bottom">
-                                        <i class="bi bi-info-circle text-primary fs-6"></i>
-                                    </x-tooltip>
-                                </div>
-                                @if($user->roles->count() > 0)
-                                    <div class="d-flex flex-wrap gap-2">
-                                        @foreach($user->roles as $role)
-                                            <x-ui.badge variant="info">{{ $role->name }}</x-ui.badge>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <p class="text-muted small mb-0">Brak przypisanych ról</p>
-                                @endif
-                            </div>
-                            
-                            <!-- Kierownik -->
-                            <div>
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <span class="fw-semibold">Kierownik</span>
-                                    <x-tooltip title="Kierownictwo projektów zapewnia dostęp do zakładki 'Mój zespół' dla projektów, którymi użytkownik zarządza. Jako kierownik możesz przeglądać i zarządzać danymi pracowników przypisanych do Twoich projektów, dodawać oceny, zarządzać zadaniami i ewidencją godzin." direction="bottom">
-                                        <i class="bi bi-info-circle text-primary fs-6"></i>
-                                    </x-tooltip>
-                                </div>
-                                @if($user->managedProjects->count() > 0)
-                                    <div class="d-flex flex-column gap-1">
-                                        <span class="text-muted small">{{ $user->managedProjects->count() }} {{ $user->managedProjects->count() === 1 ? 'projekt' : 'projektów' }}</span>
-                                        <div class="d-flex flex-wrap gap-2">
-                                            @foreach($user->managedProjects->take(3) as $project)
-                                                <x-ui.badge variant="primary">
-                                                    <i class="bi bi-folder me-1"></i>{{ $project->name }}
-                                                </x-ui.badge>
-                                            @endforeach
-                                            @if($user->managedProjects->count() > 3)
-                                                <x-ui.badge variant="secondary">
-                                                    +{{ $user->managedProjects->count() - 3 }} więcej
-                                                </x-ui.badge>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @else
-                                    <p class="text-muted small mb-0">Nie zarządzasz żadnymi projektami</p>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+                    @endif
+                    <p class="profile-hero__lead mb-0">{{ $lead }}</p>
                 </div>
             </div>
+        </x-ui.card>
 
-            <!-- Wiersz 2: 2 kolumny -->
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="row g-4">
-                    <!-- Kolumna 1: Obecne hasło (formularz zmiany hasła) -->
-                    <div class="col-md-6">
-                        <h3 class="text-lg font-medium text-gray-900 mb-3">{{ __('Zmień hasło') }}</h3>
-                        <form method="post" action="{{ route('password.update') }}">
-                            @csrf
-                            @method('put')
-                            
-                            <div class="mb-3">
-                                <x-input-label for="update_password_current_password" :value="__('Obecne hasło')" />
-                                <x-text-input id="update_password_current_password" name="current_password" type="password" class="mt-1 block w-full" autocomplete="current-password" />
-                                <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
-                            </div>
-                            
-                            <div class="mb-3">
-                                <x-input-label for="update_password_password" :value="__('Nowe hasło')" />
-                                <x-text-input id="update_password_password" name="password" type="password" class="mt-1 block w-full" autocomplete="new-password" />
-                                <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
-                            </div>
-                            
-                            <div class="mb-3">
-                                <x-input-label for="update_password_password_confirmation" :value="__('Potwierdź hasło')" />
-                                <x-text-input id="update_password_password_confirmation" name="password_confirmation" type="password" class="mt-1 block w-full" autocomplete="new-password" />
-                                <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
-                            </div>
-                            
-                            <div class="d-flex align-items-center gap-2">
-                                <x-primary-button>{{ __('Zapisz hasło') }}</x-primary-button>
-                                @if (session('status') === 'password-updated')
-                                    <span class="text-success small">{{ __('Zapisano') }}</span>
-                                @endif
-                            </div>
-                        </form>
-                    </div>
-                    
-                    <!-- Kolumna 2: Usuń konto -->
-                    <div class="col-md-6">
-                        @include('profile.partials.delete-user-form')
-                    </div>
-                </div>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <x-ui.card class="h-100">
+                    <form
+                        method="post"
+                        action="{{ route('profile.update') }}"
+                        enctype="multipart/form-data"
+                        class="profile-card"
+                        x-data="{ fileName: '', over: false }"
+                    >
+                        @csrf
+                        @method('patch')
+                        <input type="hidden" name="email" value="{{ $user->email }}">
+
+                        <h3 class="profile-card__title">Dane użytkownika</h3>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="profile-name">Nazwa użytkownika <span class="text-danger">*</span></label>
+                            <input
+                                id="profile-name"
+                                name="name"
+                                type="text"
+                                class="form-control"
+                                value="{{ old('name', $user->name) }}"
+                                required
+                            >
+                            <x-input-error class="mt-2" :messages="$errors->get('name')" />
+                        </div>
+
+                        <label
+                            for="profile-image"
+                            class="profile-drop"
+                            :class="over && 'is-over'"
+                            @dragover.prevent="over = true"
+                            @dragleave.prevent="over = false"
+                            @drop.prevent="
+                                over = false;
+                                const input = $refs.file;
+                                if ($event.dataTransfer.files.length) {
+                                    input.files = $event.dataTransfer.files;
+                                    fileName = input.files[0]?.name || '';
+                                }
+                            "
+                        >
+                            <span x-text="fileName || 'Przeciągnij zdjęcie lub wybierz plik'"></span>
+                            <small>Maks. 2 MB · JPEG, PNG, GIF, WEBP</small>
+                        </label>
+                        <input
+                            x-ref="file"
+                            id="profile-image"
+                            name="image"
+                            type="file"
+                            class="visually-hidden"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            @change="fileName = $event.target.files[0]?.name || ''"
+                        >
+                        <x-input-error class="mt-2" :messages="$errors->get('image')" />
+
+                        <div class="profile-card__actions">
+                            @if (session('status') === 'profile-updated')
+                                <span class="text-success small">Zapisano</span>
+                            @endif
+                            <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
+                        </div>
+                    </form>
+                </x-ui.card>
             </div>
 
-            <div class="mt-4">
-                <livewire:notification-preferences />
+            <div class="col-lg-6">
+                <x-ui.card class="h-100">
+                    <form method="post" action="{{ route('password.update') }}" class="profile-card">
+                        @csrf
+                        @method('put')
+
+                        <h3 class="profile-card__title">Zmień hasło</h3>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="update_password_current_password">Obecne hasło</label>
+                            <div class="profile-secret" x-data="{ show: false }">
+                                <input
+                                    id="update_password_current_password"
+                                    name="current_password"
+                                    :type="show ? 'text' : 'password'"
+                                    class="form-control"
+                                    autocomplete="current-password"
+                                >
+                                <button type="button" class="profile-secret__eye" @click="show = !show" :aria-label="show ? 'Ukryj hasło' : 'Pokaż hasło'">
+                                    <i class="bi" :class="show ? 'bi-eye-slash' : 'bi-eye'"></i>
+                                </button>
+                            </div>
+                            <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="update_password_password">Nowe hasło</label>
+                            <div class="profile-secret" x-data="{ show: false }">
+                                <input
+                                    id="update_password_password"
+                                    name="password"
+                                    :type="show ? 'text' : 'password'"
+                                    class="form-control"
+                                    autocomplete="new-password"
+                                >
+                                <button type="button" class="profile-secret__eye" @click="show = !show" :aria-label="show ? 'Ukryj hasło' : 'Pokaż hasło'">
+                                    <i class="bi" :class="show ? 'bi-eye-slash' : 'bi-eye'"></i>
+                                </button>
+                            </div>
+                            <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="update_password_password_confirmation">Potwierdź hasło</label>
+                            <div class="profile-secret" x-data="{ show: false }">
+                                <input
+                                    id="update_password_password_confirmation"
+                                    name="password_confirmation"
+                                    :type="show ? 'text' : 'password'"
+                                    class="form-control"
+                                    autocomplete="new-password"
+                                >
+                                <button type="button" class="profile-secret__eye" @click="show = !show" :aria-label="show ? 'Ukryj hasło' : 'Pokaż hasło'">
+                                    <i class="bi" :class="show ? 'bi-eye-slash' : 'bi-eye'"></i>
+                                </button>
+                            </div>
+                            <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
+                        </div>
+
+                        <div class="profile-card__actions">
+                            @if (session('status') === 'password-updated')
+                                <span class="text-success small">Zapisano</span>
+                            @endif
+                            <button type="submit" class="btn btn-primary">Zapisz hasło</button>
+                        </div>
+                    </form>
+                </x-ui.card>
             </div>
         </div>
+
+        @include('profile.partials.delete-user-form')
+
+        <x-ui.card>
+            <div class="profile-card">
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <h3 class="profile-card__title mb-1">Sesje i urządzenia</h3>
+                        <p class="text-muted small mb-0">Gdzie jesteś zalogowany i które przeglądarki dostają push.</p>
+                    </div>
+                    @if($otherSessions)
+                        <form method="post" action="{{ route('profile.sessions.destroy-others') }}">
+                            @csrf
+                            @method('delete')
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Wyloguj pozostałe</button>
+                        </form>
+                    @endif
+                </div>
+
+                <div class="profile-list-label">Sesje</div>
+                <div class="profile-list">
+                    @foreach($sessions as $session)
+                        <div class="profile-list__row">
+                            <i class="bi {{ $session['icon'] }} profile-list__icon"></i>
+                            <div class="profile-list__body">
+                                <div class="profile-list__title">
+                                    {{ $session['label'] }}
+                                    @if($session['current'])
+                                        <span class="profile-list__badge">ta sesja</span>
+                                    @endif
+                                </div>
+                                <div class="profile-list__meta">{{ $session['ip'] }} · {{ $session['seen'] }}</div>
+                            </div>
+                            @if($session['id'] && ! $session['current'])
+                                <form method="post" action="{{ route('profile.sessions.destroy', $session['id']) }}">
+                                    @csrf
+                                    @method('delete')
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Wyloguj</button>
+                                </form>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="profile-list-label">Push</div>
+                @if($pushDevices === [])
+                    <p class="text-muted small mb-0">Żadna przeglądarka nie dostaje jeszcze push.</p>
+                @else
+                    <div class="profile-list">
+                        @foreach($pushDevices as $device)
+                            <div class="profile-list__row">
+                                <i class="bi {{ $device['icon'] }} profile-list__icon"></i>
+                                <div class="profile-list__body">
+                                    <div class="profile-list__title">{{ $device['label'] }}</div>
+                                    @if($device['seen'] !== '')
+                                        <div class="profile-list__meta">{{ $device['seen'] }}</div>
+                                    @endif
+                                </div>
+                                <form method="post" action="{{ route('profile.devices.destroy', $device['id']) }}">
+                                    @csrf
+                                    @method('delete')
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Odłącz</button>
+                                </form>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </x-ui.card>
+
+        <livewire:notification-preferences />
     </div>
 </x-app-layout>
