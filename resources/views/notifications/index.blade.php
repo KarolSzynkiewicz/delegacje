@@ -35,8 +35,8 @@
                 </ul>
 
                 @if($notifications->hasPages())
-                    <div class="mt-3 pt-3 border-top">
-                        {{ $notifications->links() }}
+                    <div class="notifications-pagination mt-3 pt-3 border-top">
+                        {{ $notifications->links('pagination::bootstrap-5') }}
                     </div>
                 @endif
             @endif

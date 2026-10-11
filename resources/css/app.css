@@ -4814,6 +4814,15 @@ html .text-muted,
     display: none !important;
 }
 
+/* /notifications: numery i strzałki w jednym rzędzie na środku, nie na krawędziach karty */
+.notifications-pagination .d-none.flex-sm-fill.d-sm-flex {
+    width: auto !important;
+    margin-inline: auto;
+    justify-content: center !important;
+    gap: 0.75rem 1.25rem;
+    flex-wrap: wrap;
+}
+
 .d-none.flex-sm-fill.d-sm-flex {
     display: flex !important;
     width: 100% !important;
