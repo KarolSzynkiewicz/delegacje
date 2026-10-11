@@ -5,12 +5,12 @@ namespace App\Support;
 class ProductionSessionDriver
 {
     /**
-     * Plikowe sesje na produkcji siedzą w dysku kontenera i znikają przy redeployu.
-     * Redis albo jawny database zostają bez zmian.
+     * Plikowe sesje poza lokalnym środowiskiem siedzą w dysku kontenera i znikają przy redeployu.
+     * Railway ma APP_ENV=staging. Redis albo jawny database zostają bez zmian.
      */
     public static function resolve(string $environment, string $configured): string
     {
-        if ($environment === 'production' && $configured === 'file') {
+        if ($configured === 'file' && ! in_array($environment, ['local', 'testing'], true)) {
             return 'database';
         }
 

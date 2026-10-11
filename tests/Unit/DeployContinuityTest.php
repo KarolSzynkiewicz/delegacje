@@ -7,9 +7,10 @@ use PHPUnit\Framework\TestCase;
 
 class DeployContinuityTest extends TestCase
 {
-    public function test_production_file_sessions_move_to_the_database(): void
+    public function test_hosted_file_sessions_move_to_the_database(): void
     {
         $this->assertSame('database', ProductionSessionDriver::resolve('production', 'file'));
+        $this->assertSame('database', ProductionSessionDriver::resolve('staging', 'file'));
     }
 
     public function test_explicit_session_drivers_stay_put(): void
