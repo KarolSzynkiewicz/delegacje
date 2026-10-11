@@ -64,6 +64,12 @@ php artisan view:clear
 php artisan cache:clear
 echo "[OK] All caches cleared"
 
+# Session rows live in MySQL so a replaced container keeps users logged in.
+# Idempotent, and runs even when RUN_MIGRATIONS is off.
+echo "[STEP] Ensuring database sessions table..."
+php artisan migrate --force --no-interaction --path=database/migrations/2026_10_11_195500_create_sessions_table.php
+echo "[OK] Sessions table ready"
+
 # Optional migrations (controlled by RUN_MIGRATIONS env var)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[MIGRATE] Running database migrations..."

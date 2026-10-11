@@ -41,8 +41,11 @@ use App\Observers\SyncsWorkItems;
 use App\Repositories\Llm\DatabaseLlmCredentialRepository;
 use App\Services\Llm\LlmManager;
 use App\Services\SystemBootstrapService;
+use App\Session\HashedDatabaseSessionHandler;
+use App\Support\ProductionSessionDriver;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -65,6 +68,25 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Plikowe sesje giną przy każdym nowym kontenerze Railway.
+        config([
+            'session.driver' => ProductionSessionDriver::resolve(
+                (string) config('app.env'),
+                (string) config('session.driver')
+            ),
+        ]);
+
+        Session::extend('database', function ($app) {
+            $config = $app['config'];
+
+            return new HashedDatabaseSessionHandler(
+                $app['db']->connection($config->get('session.connection')),
+                $config->get('session.table'),
+                $config->get('session.lifetime'),
+                $app
+            );
+        });
+
         // Force debug mode if enabled via cache (for production debugging)
         if (\Illuminate\Support\Facades\Cache::get('force_debug_mode', false)) {
             config(['app.debug' => true]);
