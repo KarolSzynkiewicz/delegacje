@@ -75,6 +75,10 @@ php artisan migrate --force --no-interaction --path=database/migrations/2026_10_
 php artisan migrate --force --no-interaction --path=database/migrations/2026_10_12_002600_add_user_agent_to_push_subscriptions_table.php
 echo "[OK] Push subscriptions table ready"
 
+echo "[STEP] Ensuring reminder columns..."
+php artisan migrate --force --no-interaction --path=database/migrations/2026_10_12_214500_add_reminders.php
+echo "[OK] Reminder columns ready"
+
 # Optional migrations (controlled by RUN_MIGRATIONS env var)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "[MIGRATE] Running database migrations..."

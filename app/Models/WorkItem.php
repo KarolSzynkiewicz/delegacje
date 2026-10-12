@@ -34,12 +34,14 @@ class WorkItem extends Model
         'created_by_id',
         'sprint_id',
         'due_at',
+        'deadline_reminded_on',
     ];
 
     protected $casts = [
         'type' => WorkItemType::class,
         'status' => WorkItemStatus::class,
         'due_at' => 'date',
+        'deadline_reminded_on' => 'date',
         'priority' => 'integer',
     ];
 
@@ -165,6 +167,58 @@ class WorkItem extends Model
         }
 
         return $this->scheduleChipDetail();
+    }
+
+    /**
+     * Nadchodzące sloty z dzwonkiem. Minione i zamknięte zostają tylko na chipie.
+     *
+     * @return list<array{label: string, key: string, remind: bool}>
+     */
+    public function slotReminders(): array
+    {
+        if (! $this->status->isOpen()) {
+            return [];
+        }
+
+        $now = now();
+
+        if ($this->isMeetingItem()) {
+            $source = $this->relationLoaded('source') ? $this->source : $this->source()->first();
+            if (! $source instanceof ProjectTask || ! $source->starts_at || $source->starts_at->lte($now)) {
+                return [];
+            }
+
+            $label = $source->starts_at->format('H:i');
+            if ($source->ends_at) {
+                $label .= '–'.$source->ends_at->format('H:i');
+            }
+
+            return [[
+                'label' => $label,
+                'key' => 'meeting:'.$source->id,
+                'remind' => (bool) ($source->remind ?? true),
+            ]];
+        }
+
+        $rows = [];
+        foreach ($this->itemScheduleBlocks()->sortBy('starts_at') as $block) {
+            $upcoming = $block->all_day
+                ? $block->starts_at->copy()->startOfDay()->gte($now->copy()->startOfDay())
+                : $block->starts_at->gt($now);
+            if (! $upcoming) {
+                continue;
+            }
+
+            $rows[] = [
+                'label' => $block->all_day
+                    ? 'cały dzień'
+                    : $block->starts_at->format('H:i').'–'.$block->ends_at->format('H:i'),
+                'key' => 'block:'.$block->id,
+                'remind' => (bool) ($block->remind ?? true),
+            ];
+        }
+
+        return $rows;
     }
 
     public function scheduleHoverTip(): string

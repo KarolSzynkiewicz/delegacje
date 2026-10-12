@@ -15864,6 +15864,46 @@ a.emp-rail__item { text-decoration: none; }
     font-size: 0.92rem;
 }
 
+.np-grid .np-label__hint,
+.np-grid .np-clock__hint {
+    margin-top: 0.15rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.35;
+}
+
+.np-clock-block {
+    grid-column: 1 / -1;
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.np-clock {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin: 0;
+    color: var(--text-main);
+    font-size: 0.92rem;
+}
+
+.np-grid .np-clock__hint {
+    margin: 0.35rem 0 0;
+}
+
+.np-grid input.np-clock__input {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    background: var(--bg-input);
+    border: 1.5px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 0.28rem 0.55rem;
+}
+
 .np-check {
     display: flex;
     justify-content: center;
@@ -16179,5 +16219,51 @@ h3.profile-danger__title {
     .profile-danger__row {
         align-items: flex-start;
         flex-direction: column;
+    }
+}
+
+.tg-remind-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+}
+
+button.tg-remind {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+button.tg-remind.is-on {
+    color: #fff;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+}
+
+button.tg-remind.is-off {
+    opacity: 0;
+}
+
+.tg-schedule-stack:hover button.tg-remind.is-off,
+.dt-card:hover button.tg-remind.is-off,
+tr:hover button.tg-remind.is-off,
+.task-show-meta:hover button.tg-remind.is-off,
+.tg-remind-line:focus-within button.tg-remind.is-off {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    button.tg-remind.is-off {
+        opacity: 0.45;
     }
 }

@@ -39,6 +39,18 @@ VAPID: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
 | `procedure_wait_elapsed` | Minął wait w procedurze | Assignee kroku i karty |
 | `procedure_step_ready` | Wejście w krok innej osoby | Assignee kroku |
 | `meeting_invited` | Nowy wpis w `participant_ids` | Uczestnik (nie aktor, nie assignee karty) |
+| `block_reminder` | 15 minut przed blokiem z godziną, albo o godzinie z profilu przy bloku na cały dzień i przed startem spotkania | Właściciel bloku; przy spotkaniu assignee i uczestnicy |
+| `deadline_reminder` | W dniu `due_at`, o godzinie z profilu (domyślnie 9:00), dopóki zadanie jest otwarte | Assignee. Spotkania pomijane |
+
+Dzwonek przy slocie w kolumnie „W kalendarzu” jest włączony domyślnie.
+Drugi klik go gasi i chowa; najechanie na wiersz pokazuje go z powrotem.
+Zgaszony dzwonek nie wysyła nic, nawet gdy macierz ma oba kanały.
+Godzina terminu i bloku na cały dzień: Profil → Powiadomienia.
+
+Komenda `reminders:dispatch` chodzi co minutę obok `procedures:resume-waits`.
+Po wysłaniu zapisuje `reminder_sent_for` albo `deadline_reminded_on`, więc
+przesunięcie bloku albo terminu wysyła przypomnienie jeszcze raz. Po północy
+zaległy termin milczy.
 
 ## Rozszerzanie (nowy fakt, np. wyjazd)
 

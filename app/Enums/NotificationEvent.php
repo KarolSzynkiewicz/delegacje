@@ -14,6 +14,8 @@ enum NotificationEvent: string
     case ProcedureWaitElapsed = 'procedure_wait_elapsed';
     case ProcedureStepReady = 'procedure_step_ready';
     case MeetingInvited = 'meeting_invited';
+    case BlockReminder = 'block_reminder';
+    case DeadlineReminder = 'deadline_reminder';
     case SubtaskMentioned = 'subtask_mentioned';
 
     public function label(): string
@@ -29,6 +31,8 @@ enum NotificationEvent: string
             self::ProcedureWaitElapsed => 'Oczekiwanie w procedurze minęło',
             self::ProcedureStepReady => 'Mój krok w procedurze',
             self::MeetingInvited => 'Spotkanie ze mną',
+            self::BlockReminder => 'Przypomnienie o bloku',
+            self::DeadlineReminder => 'Przypomnienie o terminie',
             self::SubtaskMentioned => 'Wzmianka w podzadaniu',
         };
     }
@@ -55,6 +59,8 @@ enum NotificationEvent: string
             self::ProcedureWaitElapsed => 'bi-hourglass-split text-warning',
             self::ProcedureStepReady => 'bi-share-fill text-primary',
             self::MeetingInvited => 'bi-calendar-event-fill text-info',
+            self::BlockReminder => 'bi-bell-fill text-primary',
+            self::DeadlineReminder => 'bi-alarm-fill text-warning',
         };
     }
 
@@ -83,6 +89,8 @@ enum NotificationEvent: string
                 self::ProcedureWaitElapsed,
                 self::ProcedureStepReady,
                 self::MeetingInvited,
+                self::BlockReminder,
+                self::DeadlineReminder,
             ], true),
             NotificationChannel::WhatsApp, NotificationChannel::Sms => false,
         };

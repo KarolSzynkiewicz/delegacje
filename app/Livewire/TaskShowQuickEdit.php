@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\TogglesSlotReminders;
 use App\Livewire\Concerns\WithTaskQuickEdit;
 use App\Models\ProjectTask;
 use App\Models\Sprint;
@@ -12,6 +13,7 @@ use Livewire\Component;
 
 class TaskShowQuickEdit extends Component
 {
+    use TogglesSlotReminders;
     use WithTaskQuickEdit;
 
     public ProjectTask $task;

@@ -38,6 +38,19 @@
             </div>
         @endforeach
 
+        <div class="np-clock-block">
+            <label class="np-clock">
+                <span>Przypomnienie o terminie</span>
+                <input
+                    type="time"
+                    class="np-clock__input"
+                    wire:model.live="deadlineReminderTime"
+                    aria-label="Godzina przypomnienia o terminie"
+                >
+            </label>
+            <p class="np-clock__hint">Domyślnie o 9:00, w dniu terminu, tylko gdy zadanie jest otwarte. Blok na cały dzień budzi o tej samej godzinie.</p>
+        </div>
+
         <div
             class="np-device"
             wire:ignore
@@ -69,7 +82,14 @@
         @foreach($groups as $block)
             <div class="np-section">{{ $block['group']->label() }}</div>
             @foreach($block['events'] as $event)
-                <div class="np-label">{{ $event->label() }}</div>
+                <div class="np-label">
+                    <div>{{ $event->label() }}</div>
+                    @if($event === \App\Enums\NotificationEvent::BlockReminder)
+                        <div class="np-label__hint">15 minut przed startem. Wyłączony dzwonek przy bloku nic nie wyśle.</div>
+                    @elseif($event === \App\Enums\NotificationEvent::DeadlineReminder)
+                        <div class="np-label__hint">W wybranej godzinie. Kanały stąd, godzina z pola powyżej.</div>
+                    @endif
+                </div>
                 @foreach($channels as $channel)
                     <div class="np-check" wire:key="np-{{ $event->value }}-{{ $channel->value }}-{{ (int) ($enabled[$event->value][$channel->value] ?? false) }}">
                         <input

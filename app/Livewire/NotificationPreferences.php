@@ -19,10 +19,13 @@ class NotificationPreferences extends Component
 
     public ?string $testPush = null;
 
+    public string $deadlineReminderTime = '09:00';
+
     public function mount(): void
     {
         $router = app(NotificationRouter::class);
         $user = auth()->user();
+        $this->deadlineReminderTime = $user->reminderClock();
 
         foreach (NotificationEvent::preferenceRows() as $event) {
             foreach (NotificationChannel::preferenceColumns() as $channel) {
@@ -131,6 +134,19 @@ class NotificationPreferences extends Component
             ],
             ['enabled' => $on],
         );
+    }
+
+    public function updatedDeadlineReminderTime(mixed $value): void
+    {
+        $text = is_string($value) ? substr($value, 0, 5) : '';
+        if (! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $text)) {
+            $this->deadlineReminderTime = auth()->user()->reminderClock();
+
+            return;
+        }
+
+        auth()->user()->forceFill(['deadline_reminder_time' => $text.':00'])->save();
+        $this->deadlineReminderTime = $text;
     }
 
     public function deletePushSubscription(string $endpoint): void

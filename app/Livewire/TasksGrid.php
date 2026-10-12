@@ -8,6 +8,7 @@ use App\Enums\TaskStatus;
 use App\Enums\WorkItemStatus;
 use App\Enums\WorkItemType;
 use App\Exceptions\LlmException;
+use App\Livewire\Concerns\TogglesSlotReminders;
 use App\Models\ApprovalRequest;
 use App\Models\Comment;
 use App\Models\CommentMention;
@@ -50,6 +51,7 @@ use Livewire\WithPagination;
 
 class TasksGrid extends Component
 {
+    use TogglesSlotReminders;
     use WithPagination;
 
     // Filters

@@ -117,6 +117,18 @@ class User extends Authenticatable
         return $this->hasMany(NotificationPreference::class);
     }
 
+    public function reminderClock(): string
+    {
+        $raw = $this->deadline_reminder_time;
+        if ($raw instanceof \DateTimeInterface) {
+            return $raw->format('H:i');
+        }
+
+        $text = substr((string) $raw, 0, 5);
+
+        return preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $text) ? $text : '09:00';
+    }
+
     /**
      * Check if user is an admin.
      */

@@ -18,6 +18,8 @@ class WorkItemTimeBlock extends Model
         'starts_at',
         'ends_at',
         'all_day',
+        'remind',
+        'reminder_sent_for',
         'created_by_id',
     ];
 
@@ -26,10 +28,13 @@ class WorkItemTimeBlock extends Model
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
         'all_day' => 'boolean',
+        'remind' => 'boolean',
+        'reminder_sent_for' => 'datetime',
     ];
 
     protected $attributes = [
         'kind' => 'item',
+        'remind' => true,
     ];
 
     public function workItem(): BelongsTo

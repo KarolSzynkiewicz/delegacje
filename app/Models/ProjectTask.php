@@ -40,6 +40,8 @@ class ProjectTask extends Model
         'due_date',
         'starts_at',
         'ends_at',
+        'remind',
+        'reminder_sent_for',
         'participant_ids',
         'location',
         'completed_at',
@@ -55,6 +57,8 @@ class ProjectTask extends Model
         'due_date' => 'date',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'remind' => 'boolean',
+        'reminder_sent_for' => 'datetime',
         'participant_ids' => 'array',
         'completed_at' => 'datetime',
     ];

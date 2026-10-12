@@ -30,12 +30,13 @@
     };
     $chipClass = 'tg-time-chip tg-time-chip--cal tg-time-chip--'.$scheduleState.' tg-schedule tg-schedule--'.$scheduleState.' tg-dt-hit';
     $showSlotList = (bool) ($showSlotList ?? false);
-    $slotPills = $showSlotList && $item->scheduleSlotCount() > 1 ? $item->schedulePills() : [];
+    $reminders = $item->slotReminders();
+    $slotPills = $showSlotList && $reminders === [] && $item->scheduleSlotCount() > 1 ? $item->schedulePills() : [];
     $side = $assignFirst ? 'edit' : 'go';
     $sideClick = $assignFirst ? 'startEdit('.$item->id.', \'assigned_to\')' : null;
     $sideHref = $assignFirst ? null : $scheduleUrl;
 @endphp
-<div @class(['tg-schedule-stack' => $slotPills !== []])>
+<div @class(['tg-schedule-stack' => $slotPills !== [] || $reminders !== []])>
     <x-tasks.chip
         :class="$chipClass"
         :href="$scheduleHref"
@@ -53,7 +54,25 @@
         </span>
         <span class="tg-col-chip__label tg-time-chip__label">{{ $scheduleLabel }}</span>
     </x-tasks.chip>
-@if($slotPills !== [])
+@if($reminders !== [])
+    <ul class="tg-schedule-slots">
+        @foreach($reminders as $slot)
+            <li class="tg-remind-line">
+                <span>{{ $slot['label'] }}</span>
+                <button
+                    type="button"
+                    class="tg-remind {{ $slot['remind'] ? 'is-on' : 'is-off' }}"
+                    wire:click.stop="toggleSlotReminder('{{ $slot['key'] }}')"
+                    aria-pressed="{{ $slot['remind'] ? 'true' : 'false' }}"
+                    aria-label="{{ $slot['remind'] ? 'Przypomnienie włączone' : 'Włącz przypomnienie' }}"
+                    title="{{ $slot['remind'] ? 'Przypomnienie włączone' : 'Włącz przypomnienie' }}"
+                >
+                    <i class="bi {{ $slot['remind'] ? 'bi-bell-fill' : 'bi-bell' }}" aria-hidden="true"></i>
+                </button>
+            </li>
+        @endforeach
+    </ul>
+@elseif($slotPills !== [])
     <ul class="tg-schedule-slots">
         @foreach($slotPills as $pill)
             <li>{{ $pill }}</li>

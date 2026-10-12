@@ -14,6 +14,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('pulse:check --once')->everyMinute();
         $schedule->command('procedures:resume-waits')->everyMinute()->withoutOverlapping();
+        $schedule->command('reminders:dispatch')->everyMinute()->withoutOverlapping();
     }
 
     /**
