@@ -64,11 +64,11 @@ class WeeklyOverviewService
             // Show only projects that overlap the selected week by at least one day.
             ->where(function ($q) use ($weekEnd) {
                 $q->whereNull('start_date')
-                    ->orWhereDate('start_date', '<=', $weekEnd->toDateString());
+                    ->orWhere('start_date', '<=', $weekEnd->toDateString());
             })
             ->where(function ($q) use ($weekStart) {
                 $q->whereNull('end_date')
-                    ->orWhereDate('end_date', '>=', $weekStart->toDateString());
+                    ->orWhere('end_date', '>=', $weekStart->toDateString());
             })
             ->get();
 
@@ -233,8 +233,8 @@ class WeeklyOverviewService
             : Rotation::whereIn('employee_id', $employeeIds)
                 ->where(function ($q) use ($weekStart, $weekEnd) {
                     $q->where(function ($query) use ($weekStart, $weekEnd) {
-                        $query->whereDate('start_date', '<=', $weekEnd->toDateString())
-                            ->whereDate('end_date', '>=', $weekStart->toDateString());
+                        $query->where('start_date', '<=', $weekEnd->toDateString())
+                            ->where('end_date', '>=', $weekStart->toDateString());
                     })->orWhereNull('end_date');
                 })
                 ->orderBy('end_date', 'asc')

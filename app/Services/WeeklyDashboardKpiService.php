@@ -20,6 +20,15 @@ use Illuminate\Support\Collection;
 
 final class WeeklyDashboardKpiService
 {
+    /** @var array<string, Collection<int, int>> */
+    private array $demandSlotsCache = [];
+
+    /** @var array<string, Collection<int, ProjectAssignment>> */
+    private array $assignmentPairsCache = [];
+
+    /** @var array<string, Collection<int, Rotation>> */
+    private array $rotationsEndingCache = [];
+
     public function __construct(
         private LocationTrackingService $locationTracking,
     ) {}
@@ -80,11 +89,10 @@ final class WeeklyDashboardKpiService
      */
     public function countEmployeesInFieldForWeek(Carbon $weekStart, Carbon $weekEnd): int
     {
-        return (int) ProjectAssignment::query()
-            ->overlappingWith($weekStart, $weekEnd)
-            ->toBase()
-            ->selectRaw('count(distinct employee_id) as c')
-            ->value('c');
+        return $this->assignmentPairsForWeek($weekStart, $weekEnd)
+            ->pluck('employee_id')
+            ->unique()
+            ->count();
     }
 
     /**
@@ -94,16 +102,13 @@ final class WeeklyDashboardKpiService
      */
     public function employeesInFieldByProjectForWeek(Carbon $weekStart, Carbon $weekEnd): Collection
     {
-        $rangeStart = $weekStart->copy()->startOfDay();
-        $rangeEnd = $weekEnd->copy()->endOfDay();
-
-        // Bez JOIN do projects w tym samym zapytaniu co overlappingWith — obie tabele mają
-        // start_date/end_date i MySQL zgłasza „Column 'start_date' … is ambiguous”.
-        $rows = ProjectAssignment::query()
-            ->overlappingWith($rangeStart, $rangeEnd)
-            ->selectRaw('project_assignments.project_id, COUNT(DISTINCT project_assignments.employee_id) as employee_count')
-            ->groupBy('project_assignments.project_id')
-            ->get();
+        $rows = $this->assignmentPairsForWeek($weekStart, $weekEnd)
+            ->groupBy('project_id')
+            ->map(fn (Collection $group) => (object) [
+                'project_id' => (int) $group->first()->project_id,
+                'employee_count' => $group->pluck('employee_id')->unique()->count(),
+            ])
+            ->values();
 
         $neededByProject = $this->demandSlotsByProjectForWeek($weekStart, $weekEnd);
 
@@ -172,10 +177,15 @@ final class WeeklyDashboardKpiService
      */
     public function rotationsEndingThrough(Carbon $weekStart, Carbon $horizonEnd): Collection
     {
-        return Rotation::query()
+        $key = $this->weekKey($weekStart, $horizonEnd);
+        if (array_key_exists($key, $this->rotationsEndingCache)) {
+            return $this->rotationsEndingCache[$key];
+        }
+
+        return $this->rotationsEndingCache[$key] = Rotation::query()
             ->whereNotNull('end_date')
-            ->whereDate('end_date', '>=', $weekStart->toDateString())
-            ->whereDate('end_date', '<=', $horizonEnd->toDateString())
+            ->where('end_date', '>=', $weekStart->toDateString())
+            ->where('end_date', '<=', $horizonEnd->toDateString())
             ->with('employee')
             ->orderBy('end_date')
             ->orderBy('id')
@@ -184,17 +194,45 @@ final class WeeklyDashboardKpiService
             ->values();
     }
 
+    private function weekKey(Carbon $weekStart, Carbon $weekEnd): string
+    {
+        return $weekStart->toDateString().'|'.$weekEnd->toDateString();
+    }
+
+    /**
+     * Pary pracownik–projekt przecinające tydzień. Jedno zapytanie wystarcza
+     * i na licznik osób w polu, i na podział po projektach.
+     *
+     * @return Collection<int, ProjectAssignment>
+     */
+    private function assignmentPairsForWeek(Carbon $weekStart, Carbon $weekEnd): Collection
+    {
+        $key = $this->weekKey($weekStart, $weekEnd);
+        if (array_key_exists($key, $this->assignmentPairsCache)) {
+            return $this->assignmentPairsCache[$key];
+        }
+
+        return $this->assignmentPairsCache[$key] = ProjectAssignment::query()
+            ->overlappingWith($weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay())
+            ->get(['id', 'employee_id', 'project_id']);
+    }
+
     /**
      * @return Collection<int, int> project_id => liczba slotów zapotrzebowania
      */
     private function demandSlotsByProjectForWeek(Carbon $weekStart, Carbon $weekEnd): Collection
     {
+        $key = $this->weekKey($weekStart, $weekEnd);
+        if (array_key_exists($key, $this->demandSlotsCache)) {
+            return $this->demandSlotsCache[$key];
+        }
+
         $rows = ProjectDemand::query()
             ->overlappingWith($weekStart->copy()->startOfDay(), $weekEnd->copy()->endOfDay())
             ->where('required_count', '>', 0)
             ->get(['project_id', 'role_id', 'required_count']);
 
-        return $rows
+        return $this->demandSlotsCache[$key] = $rows
             ->groupBy(fn ($row) => $row->project_id.'|'.$row->role_id)
             ->map(fn ($group) => (object) [
                 'project_id' => (int) $group->first()->project_id,
@@ -365,26 +403,23 @@ final class WeeklyDashboardKpiService
         $roster = Employee::query()
             ->where(fn ($q) => $q->whereNull('terminated_at')->orWhereDate('terminated_at', '>', $day->toDateString()))
             ->where(fn ($q) => $q->whereNull('hired_at')->orWhereDate('hired_at', '<=', $day->toDateString()))
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id);
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
+        $rosterIds = $roster->map(fn (Employee $employee) => (int) $employee->id);
 
         $notInBase = collect($this->locationTracking->employeeIdsNotInBaseOn($day))->map(fn ($id) => (int) $id);
-        $inBase = $roster->diff($notInBase)->values();
+        $inBase = $rosterIds->diff($notInBase)->values();
 
         $withRotationIds = Rotation::query()
-            ->whereDate('start_date', '<=', $cutoff->toDateString())
-            ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', $day->toDateString()))
+            ->where('start_date', '<=', $cutoff->toDateString())
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $day->toDateString()))
             ->pluck('employee_id')
             ->map(fn ($id) => (int) $id);
 
         $withIds = $inBase->intersect($withRotationIds)->values();
         $withoutIds = $inBase->diff($withRotationIds)->values();
-        $names = Employee::query()
-            ->whereIn('id', $inBase)
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name'])
-            ->keyBy('id');
+        $names = $roster->keyBy(fn (Employee $employee) => (int) $employee->id);
 
         $person = function (int $id) use ($names) {
             $employee = $names->get($id);

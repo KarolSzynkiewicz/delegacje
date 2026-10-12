@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Payroll;
-use App\Models\Employee;
-use App\Services\GeneratePayrollForEmployee;
 use App\Http\Requests\GenerateBatchPayrollRequest;
 use App\Http\Requests\StorePayrollRequest;
 use App\Http\Requests\UpdatePayrollRequest;
-use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
+use App\Models\Employee;
+use App\Models\Payroll;
+use App\Services\GeneratePayrollForEmployee;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class PayrollController extends Controller
 {
@@ -33,6 +33,7 @@ class PayrollController extends Controller
     public function create(): View
     {
         $employees = Employee::orderBy('last_name')->orderBy('first_name')->get();
+
         return view('payrolls.create', compact('employees'));
     }
 
@@ -71,6 +72,7 @@ class PayrollController extends Controller
                 // Check if payroll already exists
                 if (Payroll::existsForPeriod($employeeId, $periodStart, $periodEnd)) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -83,7 +85,7 @@ class PayrollController extends Controller
                 );
                 $generated++;
             } catch (\Exception $e) {
-                $errors[] = "Pracownik ID {$employeeId}: " . $e->getMessage();
+                $errors[] = "Pracownik ID {$employeeId}: ".$e->getMessage();
             }
         }
 
@@ -91,8 +93,8 @@ class PayrollController extends Controller
         if ($skipped > 0) {
             $message .= " Pominięto {$skipped} (już istnieją).";
         }
-        if (!empty($errors)) {
-            $message .= " Błędy: " . implode(', ', $errors);
+        if (! empty($errors)) {
+            $message .= ' Błędy: '.implode(', ', $errors);
         }
 
         return redirect()->route('payrolls.index')
@@ -130,38 +132,38 @@ class PayrollController extends Controller
     public function show(Payroll $payroll): View
     {
         $payroll->load(['employee', 'adjustments', 'advances']);
-        
+
         // Get TimeLogs for this payroll period
         $timeLogs = $this->generatePayrollService->getTimeLogsForPeriod(
             $payroll->employee_id,
             $payroll->period_start,
             $payroll->period_end
         )->load('projectAssignment.project');
-        
+
         // Prepare detailed hours breakdown
         $hoursBreakdown = [];
         foreach ($timeLogs as $timeLog) {
             $workDate = \Carbon\Carbon::parse($timeLog->start_time)->toDateString();
             $hoursWorked = (float) $timeLog->hours_worked;
-            
+
             if ($hoursWorked <= 0) {
                 continue;
             }
-            
+
             // Find rate for this date
             $rate = $this->generatePayrollService->findEmployeeRateForDate(
                 $payroll->employee_id,
                 $workDate,
                 $payroll->currency
             );
-            
-            if (!$rate) {
+
+            if (! $rate) {
                 $rate = $this->generatePayrollService->findAnyEmployeeRateForDate(
                     $payroll->employee_id,
                     $workDate
                 );
             }
-            
+
             if ($rate) {
                 $amount = $hoursWorked * (float) $rate->amount;
                 $hoursBreakdown[] = [
@@ -175,7 +177,7 @@ class PayrollController extends Controller
                 ];
             }
         }
-        
+
         return view('payrolls.show', compact('payroll', 'hoursBreakdown'));
     }
 
@@ -201,7 +203,7 @@ class PayrollController extends Controller
         if (isset($validated['notes'])) {
             $payroll->notes = $validated['notes'];
         }
-        
+
         // Recalculate total
         $payroll->recalculateTotal();
         $payroll->save();
@@ -218,11 +220,11 @@ class PayrollController extends Controller
     {
         try {
             $this->generatePayrollService->recalculate($payroll);
-            
+
             return back()->with('success', 'Payroll został przeliczony (godziny, obciążenia, uznania i zaliczki).');
         } catch (\Exception $e) {
             return back()
-                ->withErrors(['error' => 'Błąd podczas przeliczania: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Błąd podczas przeliczania: '.$e->getMessage()]);
         }
     }
 
@@ -232,7 +234,7 @@ class PayrollController extends Controller
     public function destroy(Payroll $payroll): RedirectResponse
     {
         // Only allow deletion of draft payrolls
-        if (!$payroll->canBeDeleted()) {
+        if (! $payroll->canBeDeleted()) {
             return back()
                 ->withErrors(['error' => 'Można usunąć tylko payroll ze statusem "Szkic".']);
         }
@@ -249,21 +251,16 @@ class PayrollController extends Controller
     public function recalculateAll(): RedirectResponse
     {
         $payrolls = Payroll::recalculatable()->get();
-        $recalculated = 0;
-        $errors = [];
-
-        foreach ($payrolls as $payroll) {
-            try {
-                $this->generatePayrollService->recalculate($payroll);
-                $recalculated++;
-            } catch (\Exception $e) {
-                $errors[] = "Payroll ID {$payroll->id}: " . $e->getMessage();
-            }
-        }
+        $result = $this->generatePayrollService->recalculateMany($payrolls);
+        $recalculated = $result['recalculated'];
+        $errors = array_map(
+            fn (array $error) => "Payroll ID {$error['id']}: {$error['message']}",
+            $result['errors'],
+        );
 
         $message = "Przeliczono {$recalculated} payrolli.";
-        if (!empty($errors)) {
-            $message .= " Błędy: " . implode(', ', $errors);
+        if (! empty($errors)) {
+            $message .= ' Błędy: '.implode(', ', $errors);
         }
 
         return redirect()->route('payrolls.index')

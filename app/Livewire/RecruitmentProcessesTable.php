@@ -21,6 +21,7 @@ use App\Models\WorkItem;
 use App\Support\PhoneNormalizer;
 use App\Support\RecruitmentBacklog;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -1168,6 +1169,71 @@ class RecruitmentProcessesTable extends Component
     }
 
     /**
+     * Liczniki rekruterów jednym GROUP BY zamiast zapytania na osobę.
+     *
+     * @return array<string, int>
+     */
+    protected function recruiterFilterCounts(): array
+    {
+        $rows = RecruitmentProcess::query()
+            ->when($this->status, fn ($q) => $q->where('status', $this->status))
+            ->selectRaw('assigned_recruiter_id, COUNT(*) as total')
+            ->groupBy('assigned_recruiter_id')
+            ->pluck('total', 'assigned_recruiter_id');
+
+        $counts = ['unassigned' => 0];
+        foreach ($rows as $recruiterId => $total) {
+            if ($recruiterId === null || $recruiterId === '') {
+                $counts['unassigned'] = (int) $total;
+
+                continue;
+            }
+
+            $counts[(string) $recruiterId] = (int) $total;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Liczniki źródeł polecenia: jedno grupowanie plus podtypy cyklu życia.
+     *
+     * @return array<string, int>
+     */
+    protected function referralSourceFilterCounts(): array
+    {
+        $rows = DB::table('recruitment_processes')
+            ->join('recruitment_leads', 'recruitment_leads.id', '=', 'recruitment_processes.lead_id')
+            ->when($this->status, fn ($q) => $q->where('recruitment_processes.status', $this->status))
+            ->groupBy('recruitment_leads.referral_source')
+            ->selectRaw('recruitment_leads.referral_source as source, COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN recruitment_leads.referral_source = 'employee_lifecycle' AND recruitment_leads.referral_source_detail LIKE 'Przywrócenie%' THEN 1 ELSE 0 END) as reinstate")
+            ->selectRaw("SUM(CASE WHEN recruitment_leads.referral_source = 'employee_lifecycle' AND recruitment_leads.referral_source_detail LIKE 'Zwolnienie%' THEN 1 ELSE 0 END) as terminate")
+            ->get();
+
+        $bySource = [];
+        $reinstate = 0;
+        $terminate = 0;
+        foreach ($rows as $row) {
+            $bySource[(string) $row->source] = (int) $row->total;
+            $reinstate += (int) $row->reinstate;
+            $terminate += (int) $row->terminate;
+        }
+
+        $counts = [];
+        foreach ($this->referralSourceFilterOptions() as $option) {
+            $key = $option['key'];
+            $counts[$key] = match ($key) {
+                'employee_lifecycle:reinstate' => $reinstate,
+                'employee_lifecycle:terminate' => $terminate,
+                default => (int) ($bySource[$key] ?? 0),
+            };
+        }
+
+        return $counts;
+    }
+
+    /**
      * Aktualny stan filtrów listy (bez sortowania).
      *
      * @return array<string, mixed>
@@ -1237,10 +1303,13 @@ class RecruitmentProcessesTable extends Component
     /**
      * Zapytanie kandydatów z nałożonymi filtrami (bez select/with/order/paginate).
      *
+     * Licznik procesów jest potrzebny tylko na stronie wyników i przy filtrze „min. procesów”.
+     * Pełna lista id do nawigacji go nie potrzebuje.
+     *
      * @param  array<string, mixed>  $filters
      * @return Builder<\App\Models\RecruitmentCandidate>
      */
-    protected function filteredCandidatesQuery(array $filters): Builder
+    protected function filteredCandidatesQuery(array $filters, bool $withProcessCount = true): Builder
     {
         $flag = (string) ($filters['flag'] ?? '');
         $employment = (string) ($filters['employment'] ?? '');
@@ -1267,7 +1336,7 @@ class RecruitmentProcessesTable extends Component
             : null;
 
         $query = RecruitmentCandidate::query()
-            ->withCount('processes')
+            ->when($withProcessCount || $minProcesses >= 2, fn ($q) => $q->withCount('processes'))
             ->whereHas('processes', function ($q) use ($filters) {
                 $this->applyProcessListFilters($q, $filters);
             })
@@ -1313,7 +1382,11 @@ class RecruitmentProcessesTable extends Component
      */
     protected function countCandidatesForFilters(array $filters): int
     {
-        return (int) $this->filteredCandidatesQuery($filters)->toBase()->getCountForPagination();
+        $minProcesses = ($filters['min_processes'] ?? '') !== '' ? (int) $filters['min_processes'] : 0;
+
+        return (int) $this->filteredCandidatesQuery($filters, withProcessCount: $minProcesses >= 2)
+            ->toBase()
+            ->getCountForPagination();
     }
 
     public function selectProcess(int $id): void
@@ -1443,7 +1516,7 @@ class RecruitmentProcessesTable extends Component
     protected function orderedFilteredCandidatesQuery(): Builder
     {
         return $this->applyCandidateListOrder(
-            $this->filteredCandidatesQuery($this->currentListFilters())
+            $this->filteredCandidatesQuery($this->currentListFilters(), withProcessCount: false)
         );
     }
 
@@ -1452,10 +1525,28 @@ class RecruitmentProcessesTable extends Component
      */
     protected function orderedFilteredCandidateIds(): \Illuminate\Support\Collection
     {
-        return $this->orderedFilteredCandidateIdsCache ??= $this->orderedFilteredCandidatesQuery()
+        return $this->orderedFilteredCandidateIdsCache ??= $this->orderedCandidateIdQuery()
             ->pluck('recruitment_candidates.id')
             ->map(fn ($id) => (int) $id)
             ->values();
+    }
+
+    /**
+     * Id kandydatów w kolejności listy, bez liczenia procesów na każdym wierszu.
+     *
+     * @return Builder<RecruitmentCandidate>
+     */
+    protected function orderedCandidateIdQuery(): Builder
+    {
+        $filters = $this->currentListFilters();
+        $minProcesses = ($filters['min_processes'] ?? '') !== '' ? (int) $filters['min_processes'] : 0;
+        $query = $this->filteredCandidatesQuery($filters, withProcessCount: $minProcesses >= 2);
+
+        if ($minProcesses < 2) {
+            $query->select('recruitment_candidates.id');
+        }
+
+        return $this->applyCandidateListOrder($query);
     }
 
     /**
@@ -2207,13 +2298,23 @@ class RecruitmentProcessesTable extends Component
         $task->status === TaskStatus::COMPLETED ? $task->markInProgress() : $task->markCompleted();
     }
 
+    protected ?RecruitmentProcess $selectedProcessMemo = null;
+
+    protected bool $selectedProcessMemoReady = false;
+
     protected function getSelectedProcess(): ?RecruitmentProcess
     {
-        if (! $this->selectedId) {
-            return null;
+        if ($this->selectedProcessMemoReady) {
+            return $this->selectedProcessMemo;
         }
 
-        return RecruitmentProcess::with([
+        $this->selectedProcessMemoReady = true;
+
+        if (! $this->selectedId) {
+            return $this->selectedProcessMemo = null;
+        }
+
+        return $this->selectedProcessMemo = RecruitmentProcess::with([
             'candidate.consents',
             'candidate.roles',
             'candidate.employee',
@@ -2323,21 +2424,8 @@ class RecruitmentProcessesTable extends Component
             ? $this->candidatesFollowingOpen((int) $selected->candidate_id)
             : $this->candidateRowsQuery()->paginate(20);
 
-        $recruiterCounts = [
-            'unassigned' => $this->countProcessesForFilter(fn ($q) => $q->whereNull('assigned_recruiter_id')),
-        ];
-        foreach ($recruiters as $recruiterUser) {
-            $recruiterCounts[(string) $recruiterUser->id] = $this->countProcessesForFilter(
-                fn ($q) => $q->where('assigned_recruiter_id', $recruiterUser->id)
-            );
-        }
-
-        $referralSourceCounts = [];
-        foreach ($this->referralSourceFilterOptions() as $option) {
-            $referralSourceCounts[$option['key']] = $this->countProcessesForFilter(
-                fn ($q) => $this->applyReferralSourceFilter($q, $option['key'])
-            );
-        }
+        $recruiterCounts = $this->recruiterFilterCounts();
+        $referralSourceCounts = $this->referralSourceFilterCounts();
 
         $formerEmployeeCount = $this->countProcessesForFilter(
             fn ($q) => $q->where('status', RecruitmentStatus::BylyPracownik->value)
@@ -2354,8 +2442,11 @@ class RecruitmentProcessesTable extends Component
 
         $viewCounts = [];
         foreach ($savedViews as $savedView) {
-            $viewCounts[$savedView->slug] = $this->countCandidatesForFilters(
-                $this->filtersFromView($savedView)
+            $cacheKey = 'recruitment.view-count.'.$savedView->id.'.'.($savedView->updated_at?->getTimestamp() ?? 0);
+            $viewCounts[$savedView->slug] = Cache::remember(
+                $cacheKey,
+                now()->addSeconds(45),
+                fn () => $this->countCandidatesForFilters($this->filtersFromView($savedView)),
             );
         }
 
