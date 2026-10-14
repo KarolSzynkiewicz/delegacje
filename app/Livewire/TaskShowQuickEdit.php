@@ -58,12 +58,16 @@ class TaskShowQuickEdit extends Component
     public function render()
     {
         return view('livewire.task-show-quick-edit', [
-            'allUsers' => User::orderBy('name')->get(),
-            'sprints' => Sprint::query()
-                ->orderByDesc('start_date')
-                ->orderByDesc('id')
-                ->limit(40)
-                ->get(),
+            'allUsers' => $this->quickEditField === 'assigned_to'
+                ? User::orderedDirectory()
+                : collect(),
+            'sprints' => $this->quickEditField === 'sprint_id'
+                ? Sprint::query()
+                    ->orderByDesc('start_date')
+                    ->orderByDesc('id')
+                    ->limit(40)
+                    ->get()
+                : collect(),
             'sourceCard' => $this->task->sourceCard(),
             'workItem' => WorkItem::forProjectTask($this->task),
         ]);

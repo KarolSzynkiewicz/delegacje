@@ -19,6 +19,12 @@ class Employee extends Model
     use HasComments, HasFactory, SoftDeletes;
 
     /**
+     * Formularz przypisania wczytał rotacje i przypisania hurtem.
+     * Metody dostępności nie odpytują wtedy bazy osobno dla każdej osoby.
+     */
+    public bool $availabilityPreloaded = false;
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -454,6 +460,22 @@ class Employee extends Model
     }
 
     /**
+     * Rotacje nachodzące na okres. Przy formularzu przypisania kolekcja jest już wczytana.
+     */
+    protected function rotationsOverlappingRange($startDate, $endDate)
+    {
+        if ($this->availabilityPreloaded && $this->relationLoaded('rotations')) {
+            return $this->rotations
+                ->filter(fn ($rotation) => $rotation->overlapsWith($startDate, $endDate))
+                ->values();
+        }
+
+        return $this->rotations()
+            ->overlappingWith($startDate, $endDate)
+            ->get();
+    }
+
+    /**
      * Check if employee has a rotation (active or scheduled) that covers the entire date range.
      * Rotacja musi pokrywać CAŁY okres przypisania (od start_date do end_date).
      * Sprawdza zarówno rotacje aktywne jak i zaplanowane (nie anulowane).
@@ -462,9 +484,7 @@ class Employee extends Model
     {
         // Sprawdź czy istnieje rotacja (aktywna lub zaplanowana, nie anulowana),
         // która pokrywa CAŁY okres przypisania
-        $rotations = $this->rotations()
-            ->overlappingWith($startDate, $endDate)
-            ->get();
+        $rotations = $this->rotationsOverlappingRange($startDate, $endDate);
 
         if ($rotations->isEmpty()) {
             return false;
@@ -490,14 +510,22 @@ class Employee extends Model
     protected function hasContinuousRotationsCoveringRange($startDate, $endDate): bool
     {
         // Pobierz wszystkie rotacje (aktywne lub zaplanowane, nie anulowane), które nakładają się z okresem
-        $rotations = $this->rotations()
-            ->where(function ($q) {
-                $q->whereNull('status')
-                    ->orWhere('status', '!=', 'cancelled');
-            })
-            ->overlappingWith($startDate, $endDate)
-            ->orderBy('start_date')
-            ->get();
+        if ($this->availabilityPreloaded && $this->relationLoaded('rotations')) {
+            $rotations = $this->rotations
+                ->filter(fn ($rotation) => ($rotation->status === null || $rotation->status !== 'cancelled')
+                    && $rotation->overlapsWith($startDate, $endDate))
+                ->sortBy(fn ($rotation) => $rotation->start_date?->getTimestamp() ?? 0)
+                ->values();
+        } else {
+            $rotations = $this->rotations()
+                ->where(function ($q) {
+                    $q->whereNull('status')
+                        ->orWhere('status', '!=', 'cancelled');
+                })
+                ->overlappingWith($startDate, $endDate)
+                ->orderBy('start_date')
+                ->get();
+        }
 
         if ($rotations->isEmpty()) {
             return false;
@@ -777,21 +805,39 @@ class Employee extends Model
         }
 
         // 3. Sprawdź konfliktujące przypisania do INNYCH projektów (wykluczając aktualnie edytowane przypisanie)
-        $query = $this->assignments()
-            ->active()
-            ->overlappingWith($startDate, $endDate);
+        if ($this->availabilityPreloaded && $this->relationLoaded('assignments')) {
+            $today = \Carbon\Carbon::today();
+            $hasConflictingAssignments = $this->assignments->contains(function ($assignment) use ($startDate, $endDate, $excludeAssignmentId, $projectId, $today) {
+                if ($excludeAssignmentId && (int) $assignment->id === (int) $excludeAssignmentId) {
+                    return false;
+                }
+                if ($projectId !== null && (int) $assignment->project_id === (int) $projectId) {
+                    return false;
+                }
 
-        // Jeśli podano projectId, wyklucz przypisania do tego samego projektu (pozwól na edycję)
-        if ($projectId !== null) {
-            $query->where('project_id', '!=', $projectId);
+                $starts = $assignment->start_date?->copy()->startOfDay();
+                $ends = $assignment->end_date?->copy()->startOfDay();
+                $activeToday = $starts && $starts->lte($today) && ($ends === null || $ends->gte($today));
+
+                return $activeToday && $assignment->overlapsWith($startDate, $endDate);
+            });
+        } else {
+            $query = $this->assignments()
+                ->active()
+                ->overlappingWith($startDate, $endDate);
+
+            // Jeśli podano projectId, wyklucz przypisania do tego samego projektu (pozwól na edycję)
+            if ($projectId !== null) {
+                $query->where('project_id', '!=', $projectId);
+            }
+
+            // Wyklucz aktualnie edytowane przypisanie
+            if ($excludeAssignmentId) {
+                $query->where('id', '!=', $excludeAssignmentId);
+            }
+
+            $hasConflictingAssignments = $query->exists();
         }
-
-        // Wyklucz aktualnie edytowane przypisanie
-        if ($excludeAssignmentId) {
-            $query->where('id', '!=', $excludeAssignmentId);
-        }
-
-        $hasConflictingAssignments = $query->exists();
 
         if ($hasConflictingAssignments) {
             $available = false;

@@ -238,36 +238,46 @@ final class SprintActivityFeed
      */
     private function auditLogsForTask(ProjectTask $task, array $related): Collection
     {
+        $slices = [
+            [ProjectTask::class, [$task->id]],
+            [TaskSubtask::class, $related['subtaskIds']],
+            [Comment::class, $related['commentIds']],
+            [Attachment::class, $related['attachmentIds']],
+        ];
+
+        $logs = collect();
+        foreach ($slices as [$type, $ids]) {
+            if ($ids === []) {
+                continue;
+            }
+
+            $logs = $logs->concat($this->recentAuditSlice($type, $ids));
+        }
+
+        return $logs
+            ->sortByDesc(fn (AuditLog $log) => sprintf(
+                '%s-%010d',
+                $log->created_at?->format('Y-m-d H:i:s.u') ?? '',
+                $log->id,
+            ))
+            ->values();
+    }
+
+    /**
+     * Ostatnie wpisy jednego typu. Pełna historia zadania trzyma w JSON-ie cały opis
+     * przy każdej edycji — bez limitu karta zadania czyta dziesiątki tysięcy wierszy.
+     *
+     * @param  list<int>  $ids
+     * @return Collection<int, AuditLog>
+     */
+    private function recentAuditSlice(string $type, array $ids): Collection
+    {
         return AuditLog::query()
-            ->where(function ($query) use ($task, $related) {
-                $query->where(function ($inner) use ($task) {
-                    $inner->where('auditable_type', ProjectTask::class)
-                        ->where('auditable_id', $task->id);
-                });
-
-                if ($related['subtaskIds'] !== []) {
-                    $query->orWhere(function ($inner) use ($related) {
-                        $inner->where('auditable_type', TaskSubtask::class)
-                            ->whereIn('auditable_id', $related['subtaskIds']);
-                    });
-                }
-
-                if ($related['commentIds'] !== []) {
-                    $query->orWhere(function ($inner) use ($related) {
-                        $inner->where('auditable_type', Comment::class)
-                            ->whereIn('auditable_id', $related['commentIds']);
-                    });
-                }
-
-                if ($related['attachmentIds'] !== []) {
-                    $query->orWhere(function ($inner) use ($related) {
-                        $inner->where('auditable_type', Attachment::class)
-                            ->whereIn('auditable_id', $related['attachmentIds']);
-                    });
-                }
-            })
-            ->orderByDesc('created_at')
+            ->select(['id', 'user_id', 'auditable_type', 'auditable_id', 'event', 'old_values', 'new_values', 'created_at'])
+            ->where('auditable_type', $type)
+            ->whereIn('auditable_id', $ids)
             ->orderByDesc('id')
+            ->limit(300)
             ->get();
     }
 

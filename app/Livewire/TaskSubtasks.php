@@ -459,7 +459,7 @@ class TaskSubtasks extends Component
             $subtaskNumbers[$st->id] = $i + 1;
         }
 
-        $directoryUsers = User::orderBy('name')->get();
+        $directoryUsers = User::orderedDirectory();
 
         return view('livewire.task-subtasks', [
             'pendingSubtasks' => $pendingSubtasks,

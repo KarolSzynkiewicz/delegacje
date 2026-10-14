@@ -40,11 +40,15 @@ class Document extends Model
 
     public static function requiredTypes(): \Illuminate\Support\Collection
     {
-        if (! \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required')) {
-            return collect();
+        if (static::$requiredTypesCache !== null) {
+            return static::$requiredTypesCache;
         }
 
-        return static::$requiredTypesCache ??= static::query()
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('documents', 'is_required')) {
+            return static::$requiredTypesCache = collect();
+        }
+
+        return static::$requiredTypesCache = static::query()
             ->where('is_required', true)
             ->get();
     }

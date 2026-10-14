@@ -249,6 +249,19 @@ class ProjectAssignmentService
             ->get();
 
         if ($startDate && $endDate) {
+            $employees->load([
+                'rotations' => fn ($query) => $query->overlappingWith($startDate, $endDate),
+                'assignments.project.location',
+                'accommodationAssignments.accommodation',
+                'vehicleAssignments.vehicle',
+            ]);
+            if ($projectId !== null) {
+                \App\Models\Project::with('location')->find($projectId);
+            }
+            $employees->each(function ($employee) {
+                $employee->availabilityPreloaded = true;
+            });
+
             $employees = $employees->map(function ($employee) use ($startDate, $endDate, $excludeAssignmentId, $roleId, $projectId) {
                 $status = $employee->getAvailabilityStatus($startDate, $endDate, $excludeAssignmentId, $roleId, $projectId);
                 // Upewnij się, że missing_documents jest zawsze tablicą
@@ -256,6 +269,13 @@ class ProjectAssignmentService
                     $status['missing_documents'] = [];
                 }
                 $employee->availability_status = $status;
+                $employee->availabilityPreloaded = false;
+                $employee->unsetRelation('rotations');
+                $employee->unsetRelation('assignments');
+                $employee->unsetRelation('accommodationAssignments');
+                $employee->unsetRelation('vehicleAssignments');
+                $employee->unsetRelation('employeeDocuments');
+                $employee->unsetRelation('companyAssignments');
 
                 return $employee;
             });
