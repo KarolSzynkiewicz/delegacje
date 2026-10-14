@@ -196,6 +196,7 @@ final class DummyWorld
                     ]),
                 ]),
                 'vehicle_insurance' => collect(),
+                'vehicle_ac' => collect(),
             ],
             'projectsEndingThisMonth' => collect([
                 new SnapRecord([

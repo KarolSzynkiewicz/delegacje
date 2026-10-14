@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
  *
  * Returns:
  * - Employee documents expiring this month
- * - Vehicle inspections expiring this month
+ * - Vehicle OC, AC and inspections due this month or already overdue
  * - Accommodation leases expiring this month (only rented accommodations)
  */
 class ExpiringDocumentsService
@@ -21,10 +21,14 @@ class ExpiringDocumentsService
     /**
      * Get all expiring items for the current month.
      *
+     * Vehicle OC / AC / inspection include dates already in the past.
+     * A deadline that slipped out of the calendar month is still open work.
+     *
      * @return array{
      *     documents: Collection<EmployeeDocument>,
      *     vehicle_inspections: Collection<Vehicle>,
      *     vehicle_insurance: Collection<Vehicle>,
+     *     vehicle_ac: Collection<Vehicle>,
      *     accommodations: Collection<Accommodation>
      * }
      */
@@ -35,8 +39,9 @@ class ExpiringDocumentsService
 
         return [
             'documents' => $this->getExpiringDocuments($monthStart, $monthEnd),
-            'vehicle_inspections' => $this->getExpiringVehicleInspections($monthStart, $monthEnd),
-            'vehicle_insurance' => $this->getExpiringVehicleInsurance($monthStart, $monthEnd),
+            'vehicle_inspections' => $this->operationalVehiclesDueBy('inspection_valid_to', $monthEnd),
+            'vehicle_insurance' => $this->operationalVehiclesDueBy('insurance_valid_to', $monthEnd),
+            'vehicle_ac' => $this->operationalVehiclesDueBy('ac_wazne_do', $monthEnd),
             'accommodations' => $this->getExpiringLeases($monthStart, $monthEnd),
         ];
     }
@@ -58,28 +63,18 @@ class ExpiringDocumentsService
     }
 
     /**
-     * Get vehicles with inspections expiring in the given month range.
+     * Operational vehicles whose deadline falls on or before the end of the window.
+     * Retired vehicles stay out of the fleet tile.
      *
      * @return Collection<Vehicle>
      */
-    public function getExpiringVehicleInspections(Carbon $monthStart, Carbon $monthEnd): Collection
+    public function operationalVehiclesDueBy(string $column, Carbon $through): Collection
     {
-        return Vehicle::whereNotNull('inspection_valid_to')
-            ->whereBetween('inspection_valid_to', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
-            ->orderBy('inspection_valid_to')
-            ->get();
-    }
-
-    /**
-     * Get vehicles with insurance expiring in the given month range.
-     *
-     * @return Collection<Vehicle>
-     */
-    public function getExpiringVehicleInsurance(Carbon $monthStart, Carbon $monthEnd): Collection
-    {
-        return Vehicle::whereNotNull('insurance_valid_to')
-            ->whereBetween('insurance_valid_to', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
-            ->orderBy('insurance_valid_to')
+        return Vehicle::query()
+            ->operational()
+            ->whereNotNull($column)
+            ->whereDate($column, '<=', $through->toDateString())
+            ->orderBy($column)
             ->get();
     }
 

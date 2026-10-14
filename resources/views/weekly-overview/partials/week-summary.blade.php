@@ -153,6 +153,13 @@
             'date' => $vehicle->insurance_valid_to,
         ]);
     }
+    foreach ($expiringItems['vehicle_ac'] ?? [] as $vehicle) {
+        $vehiclesList->push([
+            'vehicle' => $vehicle,
+            'type' => 'ac',
+            'date' => $vehicle->ac_wazne_do,
+        ]);
+    }
     $vehiclesList = $vehiclesList->sortBy('date');
 
     $expiringDocsCount = $expiringItems['documents']->count();
@@ -348,7 +355,7 @@
         </div>
 
         <div class="mt-3 pt-3 border-top" style="border-color: var(--glass-border) !important;">
-            <p class="small text-muted mb-3 mb-lg-2">Terminy wygasające oraz projekty kończące się w <strong>tym miesiącu</strong> (dokumenty, najmy, OC/przegląd aut, data końca projektu)</p>
+            <p class="small text-muted mb-3 mb-lg-2">Terminy wygasające oraz projekty kończące się w <strong>tym miesiącu</strong> (dokumenty, najmy, data końca projektu). Auta: OC, AC i przegląd w tym miesiącu oraz już po terminie.</p>
             <div class="row g-3">
                 <div class="col-6 col-lg-3">
                     <button
@@ -378,7 +385,7 @@
                     <button
                         type="button"
                         class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="OC i przegląd — liczba terminów (auto może mieć oba)"
+                    data-tip="OC, AC i przegląd — liczba terminów w tym miesiącu oraz już po terminie. Auto może mieć kilka."
                     @click.prevent="openPanel('expiring-vehicles', $event)"
                     >
                         <i class="bi bi-car-front weekly-logistics-metric__icon" aria-hidden="true"></i>
@@ -955,12 +962,14 @@
 
                 <div x-show="active === 'expiring-vehicles'" x-cloak>
                     @if($vehiclesList->isNotEmpty())
+                        <p class="text-muted small mb-2">OC, AC i przegląd z terminem w tym miesiącu albo już po terminie.</p>
                         <div class="small">
                             @foreach($vehiclesList as $item)
                                 @php
                                     $vehicle = $item['vehicle'];
                                     $type = $item['type'];
                                     $date = $item['date'];
+                                    $overdue = $date && $date->copy()->startOfDay()->lt(\Carbon\Carbon::today());
                                 @endphp
                                 <div class="weekly-summary-popover-line">
                                     <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none d-block">
@@ -969,17 +978,22 @@
                                         <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
                                             @if($type === 'inspection')
                                                 <x-ui.badge variant="warning" class="small">Przegląd</x-ui.badge>
+                                            @elseif($type === 'ac')
+                                                <x-ui.badge variant="info" class="small">AC</x-ui.badge>
                                             @else
                                                 <x-ui.badge variant="danger" class="small">OC</x-ui.badge>
                                             @endif
                                             <span><i class="bi bi-calendar-event"></i> {{ $date->format('d.m.Y') }}</span>
+                                            @if($overdue)
+                                                <span class="text-danger">po terminie</span>
+                                            @endif
                                         </div>
                                     </a>
                                 </div>
                             @endforeach
                         </div>
                     @else
-                        <p class="text-muted small mb-0">Brak kończących się terminów OC lub przeglądu w tym miesiącu.</p>
+                        <p class="text-muted small mb-0">Brak kończących się lub przeterminowanych terminów OC, AC lub przeglądu.</p>
                     @endif
                 </div>
 
@@ -1049,7 +1063,7 @@ document.addEventListener('alpine:init', () => {
                 'to-send': 'Do dosłania',
                 'expiring-documents': 'Dokumenty (miesiąc)',
                 'expiring-leases': 'Najmy (miesiąc)',
-                'expiring-vehicles': 'Auta (OC / przegląd)',
+                'expiring-vehicles': 'Auta (OC / AC / przegląd)',
                 'expiring-projects': 'Projekty (miesiąc)',
             };
 
