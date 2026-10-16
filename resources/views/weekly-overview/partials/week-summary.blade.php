@@ -194,12 +194,23 @@
             ->count();
     };
 
+    // Plan zmian zapisuje kilka wierszy uczestnika na jedną osobę (stare i nowe
+    // przypisanie). Liczymy osoby raz na transfer i sumujemy, żeby kafelek
+    // zgadzał się z listą. Osoba na dwóch transferach liczy się w każdym.
+    $peopleOnOneTransfer = function ($event): int {
+        return collect($event->participants ?? [])
+            ->filter(fn ($participant) => $participant->employee_id && $participant->employee)
+            ->unique('employee_id')
+            ->count();
+    };
+
     $departureEventsCount = collect($allDepartures ?? [])->count();
     $returnEventsCount = collect($returnTrips ?? [])->count();
-    $transferEventsCount = collect($allTransfers ?? [])->count();
+    $transferEvents = collect($allTransfers ?? []);
+    $transferEventsCount = $transferEvents->count();
     $departurePeopleCount = $peopleOnEvents($allDepartures ?? collect());
     $returnPeopleCount = $peopleOnEvents($returnTrips ?? collect());
-    $transferPeopleCount = $peopleOnEvents($allTransfers ?? collect());
+    $transferPeopleCount = $transferEvents->sum(fn ($event) => $peopleOnOneTransfer($event));
     $rotationsEndingCount = collect($rotationsEnding ?? [])->count();
     $employeesNeededCount = (int) ($employeesNeededCount ?? 0);
     $housingOccupied = (int) ($housingOccupied ?? 0);
@@ -233,7 +244,7 @@
                 <button
                     type="button"
                     class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="Lista transferów w tym tygodniu"
+                    data-tip="Lista transferów w tym tygodniu. Osoba liczy się raz na transfer, a osobno na każdym kolejnym."
                     @click.prevent="openPanel('transfers', $event)"
                 >
                     <i class="bi bi-arrow-left-right weekly-logistics-metric__icon" aria-hidden="true"></i>
@@ -469,7 +480,9 @@
                             @foreach($allTransfers as $transfer)
                                 @php
                                     $uniqueParticipants = $transfer->participants
-                                        ->filter(fn ($p) => $p->employee !== null);
+                                        ->filter(fn ($p) => $p->employee !== null)
+                                        ->unique('employee_id')
+                                        ->values();
                                     $participantsCount = $uniqueParticipants->count();
                                     $participantNames = $uniqueParticipants
                                         ->map(fn ($p) => $p->employee->full_name)

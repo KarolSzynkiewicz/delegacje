@@ -1500,7 +1500,11 @@ class TransferCreateBoard extends Component
                     'start_date' => $row['start_date'] ?? null,
                     'end_date' => $row['end_date'] ?? null,
                     'accommodation_id' => $row['accommodation_id'] ?? null,
+                    'accommodation_start_date' => $row['accommodation_start_date'] ?? null,
+                    'accommodation_end_date' => $row['accommodation_end_date'] ?? null,
                     'vehicle_id' => $row['vehicle_id'] ?? null,
+                    'vehicle_start_date' => $row['vehicle_start_date'] ?? null,
+                    'vehicle_end_date' => $row['vehicle_end_date'] ?? null,
                     'vehicle_position' => $row['vehicle_position'] ?? null,
                 ]);
                 $added++;
@@ -1769,7 +1773,11 @@ class TransferCreateBoard extends Component
                 'start_date' => $details['start_date'],
                 'end_date' => $details['end_date'],
                 'accommodation_id' => $accId > 0 ? $accId : null,
+                'accommodation_start_date' => is_array($accRow) ? ($accRow['start_date'] ?? null) : null,
+                'accommodation_end_date' => is_array($accRow) ? ($accRow['end_date'] ?? null) : null,
                 'vehicle_id' => $vehId > 0 ? $vehId : null,
+                'vehicle_start_date' => is_array($vehRow) ? ($vehRow['start_date'] ?? null) : null,
+                'vehicle_end_date' => is_array($vehRow) ? ($vehRow['end_date'] ?? null) : null,
                 'vehicle_position' => is_array($vehRow) && ! empty($vehRow['position'])
                     ? (string) $vehRow['position']
                     : VehiclePosition::PASSENGER->value,
