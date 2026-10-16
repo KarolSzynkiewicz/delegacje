@@ -107,51 +107,36 @@
                 })->isNotEmpty();
                 $companyAssignment = $employee->companyAssignments->first();
             @endphp
-            <x-ui.card class="mb-2 py-3">
-                <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
-                    <div>
-                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <x-employee-cell :employee="$employee" />
-                            @if($employee->isTerminated())
-                                <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
-                            @endif
-                            @if($employee->has_komornik)
-                                <x-ui.badge variant="warning">Komornik</x-ui.badge>
-                            @endif
-                        </div>
-                        @include('livewire.partials.employee-list-meta')
+            <x-ui.card class="mb-2 py-3 emp-row-card" data-emp-href="{{ route('employees.show', $employee) }}">
+                <div class="mb-2">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <x-employee-cell :employee="$employee" />
+                        @if($employee->isTerminated())
+                            <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
+                        @endif
+                        @if($employee->has_komornik)
+                            <x-ui.badge variant="warning">Komornik</x-ui.badge>
+                        @endif
                     </div>
-                    <x-ui.action-buttons>
-                        <x-ui.button variant="ghost" href="{{ route('employees.show', $employee) }}" class="btn-sm">
-                            <i class="bi bi-eye"></i>
-                        </x-ui.button>
-                        <x-ui.button variant="ghost" href="{{ route('employees.edit', $employee) }}" class="btn-sm">
-                            <i class="bi bi-pencil"></i>
-                        </x-ui.button>
-                    </x-ui.action-buttons>
+                    @include('livewire.partials.employee-list-meta')
                 </div>
                 <div class="mb-2">
                     @include('livewire.partials.employee-qualifications')
                 </div>
                 <div class="d-flex flex-wrap gap-1 mb-2">
-                    @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
-                        <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
-                    @elseif($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE)
-                        <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
-                    @else
-                        <x-ui.badge variant="info">📍 Poza bazą</x-ui.badge>
-                    @endif
                     <x-ui.badge :variant="$hasActiveRotation ? 'success' : 'danger'">
                         {{ $hasActiveRotation ? '✓' : '✗' }} Rotacja
                     </x-ui.badge>
                     @if($companyAssignment && $companyAssignment->company)
                         <x-ui.badge variant="secondary">🏢 {{ $companyAssignment->company->name }}</x-ui.badge>
                     @endif
-                    @if($employee->hired_at)
-                        <span class="small text-muted" title="{{ $employee->hired_at->format('d.m.Y') }}">{{ $employee->hired_at->locale('pl')->diffForHumans() }}</span>
-                    @endif
                 </div>
                 @include('livewire.partials.employee-where')
+                @if($employee->hired_at)
+                    <div class="small text-muted mt-2" title="{{ $employee->hired_at->format('d.m.Y') }}">
+                        Zatrudniony {{ $employee->hired_at->locale('pl')->diffForHumans() }}
+                    </div>
+                @endif
             </x-ui.card>
         @empty
             <x-ui.empty-state icon="people" message="Brak pracowników do wyświetlenia" />
@@ -177,14 +162,12 @@
                             Pracownik
                         </x-livewire.sortable-header>
                         <th style="min-width: 200px;">Kwalifikacje</th>
+                        <th style="min-width: 220px;">Gdzie jest</th>
                         <x-livewire.sortable-header field="hired_at" :sortField="$sortField" :sortDirection="$sortDirection" class="text-nowrap">
                             Zatrudniony
                         </x-livewire.sortable-header>
-                        <th class="text-center" style="min-width: 120px;">Status</th>
-                        <th style="min-width: 220px;">Gdzie jest</th>
                         <th class="text-center" style="min-width: 100px;">Rotacja</th>
                         <th class="text-center" style="min-width: 110px;">Spółka</th>
-                        <th class="text-end">Akcje</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -205,7 +188,7 @@
                                     && ($endDate === null || $endDate->gte($checkDate));
                             })->isNotEmpty();
                         @endphp
-                        <tr>
+                        <tr data-emp-href="{{ route('employees.show', $employee) }}">
                             <td class="text-muted small">
                                 {{ $employee->id }}
                             </td>
@@ -224,23 +207,11 @@
                             <td class="employees-table__stack">
                                 @include('livewire.partials.employee-qualifications')
                             </td>
-                            <td class="text-nowrap small" @if($employee->hired_at) title="{{ $employee->hired_at->format('d.m.Y') }}" @endif>
-                                {{ $employee->hired_at?->locale('pl')->diffForHumans() ?? '—' }}
-                            </td>
-
-                            <!-- Status (Baza/W podróży/Poza bazą) -->
-                            <td class="text-center">
-                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
-                                    <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
-                                @elseif($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE)
-                                    <x-ui.badge variant="success">🏠 Baza</x-ui.badge>
-                                @else
-                                    <x-ui.badge variant="info">📍 Poza bazą</x-ui.badge>
-                                @endif
-                            </td>
-                            
                             <td class="employees-table__stack">
                                 @include('livewire.partials.employee-where')
+                            </td>
+                            <td class="text-nowrap small" @if($employee->hired_at) title="{{ $employee->hired_at->format('d.m.Y') }}" @endif>
+                                {{ $employee->hired_at?->locale('pl')->diffForHumans() ?? '—' }}
                             </td>
                             
                             <!-- Rotacja -->
@@ -265,20 +236,10 @@
                                 @endif
                             </td>
 
-                            <td class="text-end">
-                                <x-ui.action-buttons>
-                                    <x-ui.button variant="ghost" href="{{ route('employees.show', $employee) }}" class="btn-sm">
-                                        <i class="bi bi-eye"></i>
-                                    </x-ui.button>
-                                    <x-ui.button variant="ghost" href="{{ route('employees.edit', $employee) }}" class="btn-sm">
-                                        <i class="bi bi-pencil"></i>
-                                    </x-ui.button>
-                                </x-ui.action-buttons>
-                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-4">
+                            <td colspan="7" class="text-center py-4">
                                 <x-ui.empty-state 
                                     icon="people"
                                     message="Brak pracowników do wyświetlenia"
@@ -298,3 +259,16 @@
         @endif
     </x-ui.card>
 </div>
+
+<script>
+    if (!window.__empRowNav) {
+        window.__empRowNav = true;
+        document.addEventListener('click', (event) => {
+            const row = event.target.closest('[data-emp-href]');
+            if (!row || event.target.closest('a, button, input, select, label')) {
+                return;
+            }
+            window.location.assign(row.getAttribute('data-emp-href'));
+        });
+    }
+</script>
