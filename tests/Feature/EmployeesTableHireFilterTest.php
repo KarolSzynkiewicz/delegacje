@@ -60,7 +60,8 @@ class EmployeesTableHireFilterTest extends TestCase
 
         Livewire::test(EmployeesTable::class)
             ->assertSee('Zatrudniony')
-            ->assertSee($employee->hired_at->format('Y-m-d'));
+            ->assertSee($employee->hired_at->locale('pl')->diffForHumans())
+            ->assertSee($employee->hired_at->format('d.m.Y'));
     }
 
     public function test_komornik_filter_keeps_garnished_employees_only(): void

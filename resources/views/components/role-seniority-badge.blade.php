@@ -3,6 +3,7 @@
     'seniority' => null,
     'compact' => false,
     'href' => null,
+    'row' => false,
 ])
 
 @php
@@ -19,6 +20,17 @@
     $tag = $href ? 'a' : 'span';
 @endphp
 
+@if($row)
+<{{ $tag }}
+    @if($href) href="{{ $href }}" @endif
+    {{ $attributes->class(['emp-kv__row']) }}
+    title="{{ $title }}"
+>
+    <span class="visually-hidden">{{ $label }}</span>
+    <span class="emp-kv__name" aria-hidden="true">{{ $role->name }}</span>
+    <span class="emp-kv__tag emp-kv__tag--{{ $tone }}" aria-hidden="true">{{ $level?->shortLabel() ?? '?' }}</span>
+</{{ $tag }}>
+@else
 <{{ $tag }}
     @if($href) href="{{ $href }}" @endif
     {{ $attributes->class([
@@ -36,3 +48,4 @@
         <span class="role-ribbon__wrap">{{ $level?->shortLabel() ?? '?' }}</span>
     </span>
 </{{ $tag }}>
+@endif

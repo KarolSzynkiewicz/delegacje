@@ -146,6 +146,7 @@ class EmployeesTable extends Component
             'vehicleAssignments.vehicle',
             'rotations',
             'companyAssignments' => fn ($q) => $q->active()->orderByDesc('start_date')->with('company'),
+            'latestEvaluation.createdBy',
         ]);
 
         // Filtrowanie po pracownikach (dla /mine/*)
@@ -259,6 +260,8 @@ class EmployeesTable extends Component
 
         $roles = Role::orderBy('name')->get();
         $companies = Company::orderBy('name')->get();
+        $plannerDocuments = app(\App\Services\WeeklyOverviewService::class)
+            ->loadPlannerDocumentsByEmployee(collect($employees->items())->pluck('id'));
 
         return view('livewire.employees-table', [
             'employees' => $employees,
@@ -266,6 +269,7 @@ class EmployeesTable extends Component
             'companies' => $companies,
             'filterProjectIds' => $this->filterProjectIds,
             'checkDate' => $checkDate,
+            'plannerDocuments' => $plannerDocuments,
         ]);
     }
 }

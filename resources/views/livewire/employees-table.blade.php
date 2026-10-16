@@ -89,9 +89,8 @@
         </div>
     </x-data-table-filters>
 
-    <!-- Karty na mobile: 8 kolumn tabeli (status/dom/auto/projekt/rotacja/spółka) nie
-         mieszczą się na wąskim ekranie nawet ze scrollem — czytelniejszy jest jeden
-         pracownik na kartę z tymi samymi odznakami ułożonymi w siatkę. -->
+    <!-- Karty na mobile: kwalifikacje i „gdzie jest” nie mieszczą się obok siebie
+         na wąskim ekranie — ten sam układ wierszy, jeden pracownik na kartę. -->
     <div class="d-md-none">
         @forelse ($employees as $employee)
             @php
@@ -107,21 +106,20 @@
                     return $startDate->lte($checkDate) && ($endDate === null || $endDate->gte($checkDate));
                 })->isNotEmpty();
                 $companyAssignment = $employee->companyAssignments->first();
-                $inBaseOrTransit = in_array($locationStatus['state'], [
-                    \App\Enums\EmployeeLocationState::IN_BASE,
-                    \App\Enums\EmployeeLocationState::IN_TRANSIT,
-                ], true);
             @endphp
             <x-ui.card class="mb-2 py-3">
                 <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <x-employee-cell :employee="$employee" />
-                        @if($employee->isTerminated())
-                            <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
-                        @endif
-                        @if($employee->has_komornik)
-                            <x-ui.badge variant="warning">Komornik</x-ui.badge>
-                        @endif
+                    <div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <x-employee-cell :employee="$employee" />
+                            @if($employee->isTerminated())
+                                <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
+                            @endif
+                            @if($employee->has_komornik)
+                                <x-ui.badge variant="warning">Komornik</x-ui.badge>
+                            @endif
+                        </div>
+                        @include('livewire.partials.employee-list-meta')
                     </div>
                     <x-ui.action-buttons>
                         <x-ui.button variant="ghost" href="{{ route('employees.show', $employee) }}" class="btn-sm">
@@ -132,13 +130,9 @@
                         </x-ui.button>
                     </x-ui.action-buttons>
                 </div>
-                @if($employee->roles->isNotEmpty())
-                    <div class="d-flex flex-wrap gap-1 mb-2">
-                        @foreach($employee->roles as $role)
-                            <x-role-seniority-badge :role="$role" />
-                        @endforeach
-                    </div>
-                @endif
+                <div class="mb-2">
+                    @include('livewire.partials.employee-qualifications')
+                </div>
                 <div class="d-flex flex-wrap gap-1 mb-2">
                     @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
                         <x-ui.badge variant="warning">🚗 W podróży</x-ui.badge>
@@ -154,34 +148,10 @@
                         <x-ui.badge variant="secondary">🏢 {{ $companyAssignment->company->name }}</x-ui.badge>
                     @endif
                     @if($employee->hired_at)
-                        <span class="small text-muted">od {{ $employee->hired_at->format('d.m.Y') }}</span>
+                        <span class="small text-muted" title="{{ $employee->hired_at->format('d.m.Y') }}">{{ $employee->hired_at->locale('pl')->diffForHumans() }}</span>
                     @endif
                 </div>
-                @unless($inBaseOrTransit)
-                    <div class="d-flex flex-wrap gap-1 small">
-                        @if(!empty($locationStatus['accommodation_names']))
-                            @foreach($locationStatus['accommodation_names'] as $accName)
-                                <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏡 {{ $accName }}</x-ui.badge>
-                            @endforeach
-                        @else
-                            <x-ui.badge variant="danger">❌ Brak domu</x-ui.badge>
-                        @endif
-                        @if(!empty($locationStatus['vehicle_labels']))
-                            @foreach($locationStatus['vehicle_labels'] as $reg)
-                                <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🚗 {{ $reg }}</x-ui.badge>
-                            @endforeach
-                        @else
-                            <x-ui.badge variant="danger">❌ Brak auta</x-ui.badge>
-                        @endif
-                        @if(!empty($locationStatus['project_names']))
-                            @foreach($locationStatus['project_names'] as $pname)
-                                <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'">🏢 {{ $pname }}</x-ui.badge>
-                            @endforeach
-                        @else
-                            <x-ui.badge variant="danger">❌ Brak projektu</x-ui.badge>
-                        @endif
-                    </div>
-                @endunless
+                @include('livewire.partials.employee-where')
             </x-ui.card>
         @empty
             <x-ui.empty-state icon="people" message="Brak pracowników do wyświetlenia" />
@@ -197,7 +167,7 @@
     <!-- Tabela (desktop/tablet — na mobile zastąpiona kartami wyżej) -->
     <x-ui.card class="d-none d-md-block">
         <div class="table-responsive">
-            <table class="table">
+            <table class="table employees-table">
                 <thead>
                     <tr>
                         <x-livewire.sortable-header field="id" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start" style="width: 70px;">
@@ -206,13 +176,12 @@
                         <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
                             Pracownik
                         </x-livewire.sortable-header>
+                        <th style="min-width: 200px;">Kwalifikacje</th>
                         <x-livewire.sortable-header field="hired_at" :sortField="$sortField" :sortDirection="$sortDirection" class="text-nowrap">
                             Zatrudniony
                         </x-livewire.sortable-header>
                         <th class="text-center" style="min-width: 120px;">Status</th>
-                        <th class="text-center" style="min-width: 140px;">Dom</th>
-                        <th class="text-center" style="min-width: 120px;">Auto</th>
-                        <th class="text-center" style="min-width: 140px;">Projekt</th>
+                        <th style="min-width: 220px;">Gdzie jest</th>
                         <th class="text-center" style="min-width: 100px;">Rotacja</th>
                         <th class="text-center" style="min-width: 110px;">Spółka</th>
                         <th class="text-end">Akcje</th>
@@ -250,16 +219,13 @@
                                         <x-ui.badge variant="warning">Komornik</x-ui.badge>
                                     @endif
                                 </div>
-                                @if($employee->roles->isNotEmpty())
-                                    <div class="d-flex flex-wrap gap-1 mt-1">
-                                        @foreach($employee->roles as $role)
-                                            <x-role-seniority-badge :role="$role" />
-                                        @endforeach
-                                    </div>
-                                @endif
+                                @include('livewire.partials.employee-list-meta')
                             </td>
-                            <td class="text-nowrap font-mono small">
-                                {{ $employee->hired_at?->format('Y-m-d') ?? '—' }}
+                            <td class="employees-table__stack">
+                                @include('livewire.partials.employee-qualifications')
+                            </td>
+                            <td class="text-nowrap small" @if($employee->hired_at) title="{{ $employee->hired_at->format('d.m.Y') }}" @endif>
+                                {{ $employee->hired_at?->locale('pl')->diffForHumans() ?? '—' }}
                             </td>
 
                             <!-- Status (Baza/W podróży/Poza bazą) -->
@@ -273,61 +239,8 @@
                                 @endif
                             </td>
                             
-                            <!-- Dom (Accommodation) — wszystkie aktywne; nakładanie = ostrzeżenie -->
-                            <td class="text-center">
-                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE || $locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
-                                    <span class="text-muted">─</span>
-                                @elseif(!empty($locationStatus['accommodation_names']))
-                                    <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
-                                        @foreach($locationStatus['accommodation_names'] as $accName)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'" title="{{ $accName }}">
-                                                🏡 {{ \Illuminate\Support\Str::limit($accName, 5, '…') }}
-                                            </x-ui.badge>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <x-ui.badge variant="danger">
-                                        ❌ Brak
-                                    </x-ui.badge>
-                                @endif
-                            </td>
-
-                            <!-- Auto -->
-                            <td class="text-center">
-                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE || $locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
-                                    <span class="text-muted">─</span>
-                                @elseif(!empty($locationStatus['vehicle_labels']))
-                                    <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
-                                        @foreach($locationStatus['vehicle_labels'] as $reg)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'" title="{{ $reg }}">
-                                                🚗 {{ \Illuminate\Support\Str::limit($reg, 5, '…') }}
-                                            </x-ui.badge>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <x-ui.badge variant="danger">
-                                        ❌ Brak
-                                    </x-ui.badge>
-                                @endif
-                            </td>
-                            
-                            <!-- Projekt -->
-                            <td class="text-center">
-                                @if($locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_BASE || $locationStatus['state'] === \App\Enums\EmployeeLocationState::IN_TRANSIT)
-                                    <span class="text-muted">─</span>
-                                @elseif(!empty($locationStatus['project_names']))
-                                    <div class="d-flex flex-wrap gap-1 justify-content-center align-items-center">
-                                        @foreach($locationStatus['project_names'] as $pname)
-                                            <x-ui.badge :variant="($locationStatus['has_assignment_overlap'] ?? false) ? 'warning' : 'info'" title="{{ $pname }}">
-                                                🏢 {{ \Illuminate\Support\Str::limit($pname, 5, '…') }}
-                                            </x-ui.badge>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <x-ui.badge variant="danger">
-                                        ❌ Brak
-                                    </x-ui.badge>
-                                @endif
+                            <td class="employees-table__stack">
+                                @include('livewire.partials.employee-where')
                             </td>
                             
                             <!-- Rotacja -->
@@ -365,7 +278,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="text-center py-4">
+                            <td colspan="9" class="text-center py-4">
                                 <x-ui.empty-state 
                                     icon="people"
                                     message="Brak pracowników do wyświetlenia"

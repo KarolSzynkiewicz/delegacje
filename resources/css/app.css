@@ -1775,6 +1775,86 @@ a.role-ribbon:hover {
     border-color: color-mix(in srgb, var(--ribbon) 50%, rgba(255, 255, 255, 0.2));
 }
 
+/* Employees list: qualification / "gdzie jest" rows — name left, value right. */
+.emp-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    min-width: 11.5rem;
+}
+.emp-kv__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    min-height: 1.85rem;
+    margin: 0;
+    padding: 0.22rem 0.35rem 0.22rem 0.7rem;
+    border-radius: 8px;
+    background: rgba(12, 16, 26, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    text-decoration: none;
+}
+a.emp-kv__row:hover {
+    color: var(--text-main);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+.emp-kv__name,
+.emp-kv__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+.emp-kv__label {
+    color: var(--text-muted);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.emp-kv__tag {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    height: 1.4rem;
+    padding: 0 0.35rem;
+    border-radius: 6px;
+    color: #fff;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.emp-kv__tag--1 { background: #f59e0b; }
+.emp-kv__tag--2 { background: #3b82f6; }
+.emp-kv__tag--3 { background: #10b981; }
+.emp-kv__tag--4 { background: #a855f7; }
+.emp-kv__tag--unset { background: #64748b; }
+.emp-kv__value {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.2rem;
+    min-width: 0;
+}
+.emp-kv__value .badge {
+    max-width: 8.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.18rem 0.5rem;
+    font-size: 0.7rem;
+}
+.employees-table__stack {
+    vertical-align: middle;
+}
+
 /* Clickable badge — hover jak na przeglądzie tygodnia (uniesienie + kolorowa poświata). */
 .badge-clickable {
     cursor: pointer;
