@@ -1038,10 +1038,19 @@ class ProcedureRunService
 
     public function resumeExpiredWaits(?ProcedureRun $only = null): int
     {
+        // Co minutę. Bierzemy tylko oczekiwania, które mogą już minąć, i tylko
+        // w trwających procedurach. Inaczej skanuje się całą historię kroków.
         $query = ProcedureRunStep::query()
-            ->with(['run.version', 'run.template', 'run.task', 'run.startedBy'])
+            ->with(['run.version'])
             ->where('node_type', 'wait')
-            ->whereNull('completed_at');
+            ->whereNull('completed_at')
+            ->where(function ($inner) {
+                $inner->whereNull('resume_at')
+                    ->orWhere('resume_at', '<=', now());
+            })
+            ->whereHas('run', function ($run) {
+                $run->where('status', ProcedureRunStatus::IN_PROGRESS);
+            });
 
         if ($only) {
             $query->where('procedure_run_id', $only->id);
