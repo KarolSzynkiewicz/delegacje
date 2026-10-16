@@ -36,6 +36,10 @@ use Illuminate\Support\Facades\Route;
 
 // Homepage - normal Laravel route (can have auth, middleware, etc.)
 Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+
     return view('welcome');
 })->name('home');
 

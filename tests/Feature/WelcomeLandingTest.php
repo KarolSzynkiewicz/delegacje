@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Tests\TestCase;
 
 class WelcomeLandingTest extends TestCase
@@ -25,5 +26,15 @@ class WelcomeLandingTest extends TestCase
             ->assertSee('E-mail')
             ->assertSee('Wejście do systemu')
             ->assertDontSee('MK TECHNIC');
+    }
+
+    public function test_authenticated_home_redirects_to_dashboard(): void
+    {
+        $user = new User;
+        $user->id = 1;
+
+        $this->actingAs($user)
+            ->get('/')
+            ->assertRedirect(route('dashboard'));
     }
 }
