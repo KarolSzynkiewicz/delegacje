@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Livewire\EmployeesTable;
 use App\Models\Employee;
+use App\Models\EmployeeListView;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -83,5 +85,33 @@ class EmployeesTableHireFilterTest extends TestCase
             ->set('komornikFilter', 'yes')
             ->assertSee('Z Komornikiem')
             ->assertDontSee('Bez Komornika');
+    }
+
+    public function test_filters_become_chips_and_views_restore_them(): void
+    {
+        $role = Role::factory()->create(['name' => 'SpawaczWidok']);
+
+        $component = Livewire::test(EmployeesTable::class)
+            ->set('roleFilter', (string) $role->id)
+            ->assertSee('Rola: SpawaczWidok')
+            ->assertSeeHtml('data-emp-col="qualifications"')
+            ->call('clearFilter', 'roleFilter')
+            ->assertDontSee('Rola: SpawaczWidok')
+            ->call('toggleColumn', 'qualifications')
+            ->assertDontSeeHtml('data-emp-col="qualifications"')
+            ->set('hirePeriod', '7d')
+            ->set('saveViewName', 'Nowi')
+            ->call('saveView');
+
+        $view = EmployeeListView::query()->where('name', 'Nowi')->first();
+        $this->assertNotNull($view);
+        $this->assertSame('7d', $view->filters['hirePeriod']);
+        $this->assertNotContains('qualifications', $view->visible_columns);
+
+        $component->call('clearFilters')
+            ->call('toggleColumn', 'qualifications')
+            ->call('loadSavedView', $view->id)
+            ->assertSet('hirePeriod', '7d')
+            ->assertDontSeeHtml('data-emp-col="qualifications"');
     }
 }

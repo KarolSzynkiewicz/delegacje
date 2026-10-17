@@ -1,93 +1,128 @@
 <div>
-    <x-data-table-filters
-        :count="$employees->total()"
-        :has-filters="(bool) ($search || $roleFilter || $locationFilter || $rotationFilter || $statusDate || $companyFilter || $showTerminated || $hirePeriod || $komornikFilter)"
-        item-label="pracowników"
-    >
-        @if($statusDate || $showTerminated || $hirePeriod)
-            <x-slot:note>
-                @if($hirePeriod === '7d')zatrudnieni w ostatnich 7 dniach @endif
-                @if($hirePeriod === '30d')zatrudnieni w ostatnich 30 dniach @endif
-                @if($hirePeriod && ($statusDate || $showTerminated)), @endif
-                @if($statusDate){{ 'stan na '.\Carbon\Carbon::parse($statusDate)->format('d.m.Y') }}@endif
-                @if($statusDate && $showTerminated), @endif
-                @if($showTerminated)z uwzględnieniem zwolnionych @endif
-            </x-slot:note>
+    @php $filterBadgeCount = count($filterChips); @endphp
+    <x-ui.card class="mb-2">
+        <div class="emp-toolbar">
+            <div class="input-group emp-toolbar__search">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" wire:model.live.debounce.300ms="search" placeholder="Szukaj…" class="form-control" aria-label="Szukaj">
+            </div>
+
+            <label class="emp-toolbar__date">
+                <span>Stan na dzień</span>
+                <input type="date" wire:model.live="statusDate" class="form-control" aria-label="Stan na dzień">
+            </label>
+
+            <div x-data="{ open: false, top: 0, left: 0 }">
+                <button type="button"
+                        @click.stop="if (open) { open = false; return } const r = $el.getBoundingClientRect(); const pw = Math.min(420, window.innerWidth - 24); top = r.bottom + 4; left = Math.max(4, Math.min(r.left, window.innerWidth - pw - 4)); open = true"
+                        class="btn btn-sm btn-outline-secondary emp-quiet-btn {{ $filterBadgeCount > 0 ? 'is-on' : '' }}">
+                    <i class="bi bi-sliders me-1"></i>Filtry
+                    @if($filterBadgeCount > 0)
+                        <span class="emp-quiet-count">{{ $filterBadgeCount }}</span>
+                    @endif
+                </button>
+                <template x-teleport="body">
+                    <div x-show="open" x-cloak @click.outside="open = false"
+                         :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;width:min(420px, calc(100vw - 24px))`"
+                         class="rp-filter-panel">
+                        @include('livewire.partials.emp-filter-panel')
+                    </div>
+                </template>
+            </div>
+
+            <div x-data="{ open: false, top: 0, left: 0 }">
+                <button type="button"
+                        @click.stop="if (open) { open = false; return } const r = $el.getBoundingClientRect(); const pw = Math.min(320, window.innerWidth - 24); top = r.bottom + 4; left = Math.max(4, Math.min(r.left, window.innerWidth - pw - 4)); open = true"
+                        class="btn btn-sm btn-outline-secondary emp-quiet-btn">
+                    <i class="bi bi-layout-three-columns me-1"></i>Kolumny
+                    <span class="emp-quiet-count">{{ $this->visibleColumnCount() }}</span>
+                </button>
+                <template x-teleport="body">
+                    <div x-show="open" x-cloak @click.outside="open = false"
+                         :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;width:min(320px, calc(100vw - 24px))`"
+                         class="rp-filter-panel">
+                        @include('livewire.partials.emp-columns-panel')
+                    </div>
+                </template>
+            </div>
+
+            <div class="emp-toolbar__views">
+                @foreach($savedViews as $savedView)
+                    <button type="button"
+                            wire:click="loadSavedView({{ $savedView->id }})"
+                            class="btn btn-sm btn-outline-secondary emp-quiet-btn {{ $activeViewId === $savedView->id ? 'is-on' : '' }}"
+                            title="{{ $savedView->is_global ? 'Widok globalny' : 'Twój widok' }}">
+                        <i class="bi bi-{{ $savedView->is_global ? 'globe' : 'bookmark' }} me-1"></i>{{ $savedView->name }}
+                    </button>
+                @endforeach
+            </div>
+
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <div x-data="{ open: false, top: 0, left: 0 }">
+                    <button type="button"
+                            @click.stop="if (open) { open = false; return } const r = $el.getBoundingClientRect(); const pw = Math.min(300, window.innerWidth - 24); top = r.bottom + 4; left = Math.max(4, Math.min(r.right - pw, window.innerWidth - pw - 4)); open = true"
+                            class="btn btn-sm btn-outline-secondary emp-quiet-btn {{ $activeViewId ? 'is-on' : '' }}"
+                            title="Zapisz i zarządzaj widokami">
+                        <i class="bi bi-bookmark{{ $activeViewId ? '-fill' : '' }}"></i>
+                    </button>
+                    <template x-teleport="body">
+                        <div x-show="open" x-cloak @click.outside="open = false"
+                             :style="`position:fixed;top:${top}px;left:${left}px;z-index:999990;width:min(300px, calc(100vw - 24px))`"
+                             class="dropdown-menu show emp-view-menu shadow-lg">
+                            @if($activeViewId && $activeViewName)
+                                <div class="small fw-semibold mb-2">{{ $activeViewName }}</div>
+                                <button type="button" wire:click="clearView" @click="open = false" class="btn btn-sm btn-outline-secondary w-100 mb-2">Widok domyślny</button>
+                            @endif
+                            @foreach($savedViews as $savedView)
+                                <div class="d-flex align-items-center gap-1 mb-1">
+                                    <button type="button" wire:click="loadSavedView({{ $savedView->id }})" @click="open = false"
+                                            class="btn btn-sm btn-link text-start flex-grow-1 p-1 text-decoration-none {{ $activeViewId === $savedView->id ? 'fw-bold' : '' }}">
+                                        <i class="bi bi-{{ $savedView->is_global ? 'globe' : 'bookmark' }} me-1"></i>{{ $savedView->name }}
+                                    </button>
+                                    @if($savedView->canBeManagedBy(auth()->user()))
+                                        <button type="button" wire:click="overwriteView({{ $savedView->id }})" @click="open = false" class="btn btn-sm btn-link p-1" title="Nadpisz bieżącymi filtrami">
+                                            <i class="bi bi-floppy"></i>
+                                        </button>
+                                        <button type="button" wire:click="deleteView({{ $savedView->id }})" @click="open = false" class="btn btn-sm btn-link p-1 text-danger" title="Usuń">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    @endif
+                                </div>
+                            @endforeach
+                            <div class="small text-muted text-uppercase mt-2 mb-1" style="letter-spacing:.04em;font-size:.68rem">Zapisz jako nowy widok</div>
+                            <div class="d-flex gap-2">
+                                <input wire:model="saveViewName" type="text" class="form-control form-control-sm" placeholder="Nazwa widoku…" wire:keydown.enter="saveView" @click.stop>
+                                <button type="button" wire:click="saveView" @click="open = false" class="btn btn-sm btn-primary"><i class="bi bi-floppy"></i></button>
+                            </div>
+                            <label class="form-check form-check-compact mt-2 mb-0" @click.stop>
+                                <input type="checkbox" class="form-check-input" wire:model="saveViewAsGlobal">
+                                <span>Widok globalny</span>
+                            </label>
+                        </div>
+                    </template>
+                </div>
+                <span class="emp-toolbar__count">Rekordów: <strong>{{ $employees->total() }}</strong></span>
+            </div>
+        </div>
+        @if($notice !== '')
+            <div class="small text-muted mt-2">{{ $notice }}</div>
         @endif
+    </x-ui.card>
 
-        <x-slot:actions>
-            <div class="form-check mb-0 d-none d-md-flex">
-                <input type="checkbox" class="form-check-input" id="showTerminated" wire:model.live="showTerminated">
-                <label class="form-check-label small" for="showTerminated">Pokaż zwolnionych</label>
-            </div>
-        </x-slot:actions>
-
-        <div class="dt-filter-field d-md-none">
-            <div class="form-check mb-0">
-                <input type="checkbox" class="form-check-input" id="showTerminatedMobile" wire:model.live="showTerminated">
-                <label class="form-check-label small" for="showTerminatedMobile">Pokaż zwolnionych</label>
-            </div>
+    @if(count($filterChips) > 0)
+        <div class="rp-active-filters mb-2 px-1">
+            <span class="rp-active-filters__label">Filtry:</span>
+            @foreach($filterChips as $chip)
+                <span class="rp-active-filters__chip" wire:key="emp-filter-{{ $chip['key'] }}">
+                    <span>{{ $chip['label'] }}</span>
+                    <button type="button" wire:click="clearFilter('{{ $chip['key'] }}')" class="rp-active-filters__chip-remove" title="Usuń filtr">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </span>
+            @endforeach
+            <button type="button" wire:click="clearFilters" class="rp-active-filters__clear">Wyczyść</button>
         </div>
-        <div class="dt-filter-field dt-filter-field--wide">
-            <label class="form-label small"><i class="bi bi-search me-1"></i> Szukaj</label>
-            <input type="text" wire:model.live.debounce.300ms="search" placeholder="Imię, nazwisko, telefon..." class="form-control">
-        </div>
-        <div class="dt-filter-field">
-            <label class="form-label small"><i class="bi bi-person-plus me-1"></i> Zatrudniony</label>
-            <select wire:model.live="hirePeriod" class="form-select">
-                <option value="">Wszyscy</option>
-                <option value="7d">Ostatnie 7 dni</option>
-                <option value="30d">Ostatnie 30 dni</option>
-            </select>
-        </div>
-        <div class="dt-filter-field">
-            <label class="form-label small"><i class="bi bi-calendar me-1"></i> Stan na dzień</label>
-            <input type="date" wire:model.live="statusDate" placeholder="Dzisiaj" class="form-control">
-        </div>
-        <div class="dt-filter-field">
-            <label class="form-label small"><i class="bi bi-person-badge me-1"></i> Rola</label>
-            <select wire:model.live="roleFilter" class="form-select">
-                <option value="">Wszystkie role</option>
-                @foreach($roles as $role)
-                    <option value="{{ $role->id }}">{{ $role->name }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="dt-filter-field">
-            <label class="form-label small"><i class="bi bi-geo-alt me-1"></i> Lokalizacja</label>
-            <select wire:model.live="locationFilter" class="form-select">
-                <option value="">Wszystkie</option>
-                <option value="base">Baza</option>
-                <option value="field">W terenie</option>
-                <option value="transit">W podróży</option>
-            </select>
-        </div>
-        <div class="dt-filter-field">
-            <label class="form-label small"><i class="bi bi-arrow-repeat me-1"></i> Rotacja</label>
-            <select wire:model.live="rotationFilter" class="form-select">
-                <option value="">Wszystkie</option>
-                <option value="active">Aktywna</option>
-                <option value="inactive">Nieaktywna</option>
-            </select>
-        </div>
-        <div class="dt-filter-field">
-            <label class="form-label small"><i class="bi bi-exclamation-octagon me-1"></i> Komornik</label>
-            <select wire:model.live="komornikFilter" class="form-select">
-                <option value="">Wszyscy</option>
-                <option value="yes">Z komornikiem</option>
-                <option value="no">Bez komornika</option>
-            </select>
-        </div>
-        <div class="dt-filter-field">
-            <label class="form-label small"><i class="bi bi-building me-1"></i> Spółka</label>
-            <select wire:model.live="companyFilter" class="form-select">
-                <option value="">Wszystkie spółki</option>
-                @foreach($companies as $company)
-                    <option value="{{ $company->id }}">{{ $company->name }}</option>
-                @endforeach
-            </select>
-        </div>
-    </x-data-table-filters>
+    @endif
 
     <!-- Karty na mobile: kwalifikacje i „gdzie jest” nie mieszczą się obok siebie
          na wąskim ekranie — ten sam układ wierszy, jeden pracownik na kartę. -->
@@ -120,19 +155,25 @@
                     </div>
                     @include('livewire.partials.employee-list-meta')
                 </div>
-                <div class="mb-2">
-                    @include('livewire.partials.employee-qualifications')
-                </div>
+                @if($this->showsColumn('qualifications'))
+                    <div class="mb-2">
+                        @include('livewire.partials.employee-qualifications')
+                    </div>
+                @endif
                 <div class="d-flex flex-wrap gap-1 mb-2">
-                    <x-ui.badge :variant="$hasActiveRotation ? 'success' : 'danger'">
-                        {{ $hasActiveRotation ? '✓' : '✗' }} Rotacja
-                    </x-ui.badge>
-                    @if($companyAssignment && $companyAssignment->company)
+                    @if($this->showsColumn('rotation'))
+                        <x-ui.badge :variant="$hasActiveRotation ? 'success' : 'danger'">
+                            {{ $hasActiveRotation ? '✓' : '✗' }} Rotacja
+                        </x-ui.badge>
+                    @endif
+                    @if($this->showsColumn('company') && $companyAssignment && $companyAssignment->company)
                         <x-ui.badge variant="secondary">🏢 {{ $companyAssignment->company->name }}</x-ui.badge>
                     @endif
                 </div>
-                @include('livewire.partials.employee-where')
-                @if($employee->hired_at)
+                @if($this->showsColumn('where'))
+                    @include('livewire.partials.employee-where')
+                @endif
+                @if($this->showsColumn('hired') && $employee->hired_at)
                     <div class="small text-muted mt-2" title="{{ $employee->hired_at->format('d.m.Y') }}">
                         Zatrudniony {{ $employee->hired_at->locale('pl')->diffForHumans() }}
                     </div>
@@ -155,19 +196,31 @@
             <table class="table employees-table">
                 <thead>
                     <tr>
-                        <x-livewire.sortable-header field="id" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start" style="width: 70px;">
-                            ID
-                        </x-livewire.sortable-header>
+                        @if($this->showsColumn('id'))
+                            <x-livewire.sortable-header field="id" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start" style="width: 70px;">
+                                ID
+                            </x-livewire.sortable-header>
+                        @endif
                         <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">
                             Pracownik
                         </x-livewire.sortable-header>
-                        <th style="min-width: 200px;">Kwalifikacje</th>
-                        <th style="min-width: 220px;">Gdzie jest</th>
-                        <x-livewire.sortable-header field="hired_at" :sortField="$sortField" :sortDirection="$sortDirection" class="text-nowrap">
-                            Zatrudniony
-                        </x-livewire.sortable-header>
-                        <th class="text-center" style="min-width: 100px;">Rotacja</th>
-                        <th class="text-center" style="min-width: 110px;">Spółka</th>
+                        @if($this->showsColumn('qualifications'))
+                            <th data-emp-col="qualifications" style="min-width: 200px;">Kwalifikacje</th>
+                        @endif
+                        @if($this->showsColumn('where'))
+                            <th style="min-width: 220px;">Gdzie jest</th>
+                        @endif
+                        @if($this->showsColumn('hired'))
+                            <x-livewire.sortable-header field="hired_at" :sortField="$sortField" :sortDirection="$sortDirection" class="text-nowrap">
+                                Zatrudniony
+                            </x-livewire.sortable-header>
+                        @endif
+                        @if($this->showsColumn('rotation'))
+                            <th class="text-center" style="min-width: 100px;">Rotacja</th>
+                        @endif
+                        @if($this->showsColumn('company'))
+                            <th class="text-center" style="min-width: 110px;">Spółka</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -189,9 +242,11 @@
                             })->isNotEmpty();
                         @endphp
                         <tr data-emp-href="{{ route('employees.show', $employee) }}">
+                            @if($this->showsColumn('id'))
                             <td class="text-muted small">
                                 {{ $employee->id }}
                             </td>
+                            @endif
                             <td>
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                     <x-employee-cell :employee="$employee"  />
@@ -204,17 +259,23 @@
                                 </div>
                                 @include('livewire.partials.employee-list-meta')
                             </td>
+                            @if($this->showsColumn('qualifications'))
                             <td class="employees-table__stack">
                                 @include('livewire.partials.employee-qualifications')
                             </td>
+                            @endif
+                            @if($this->showsColumn('where'))
                             <td class="employees-table__stack">
                                 @include('livewire.partials.employee-where')
                             </td>
+                            @endif
+                            @if($this->showsColumn('hired'))
                             <td class="text-nowrap small" @if($employee->hired_at) title="{{ $employee->hired_at->format('d.m.Y') }}" @endif>
                                 {{ $employee->hired_at?->locale('pl')->diffForHumans() ?? '—' }}
                             </td>
+                            @endif
                             
-                            <!-- Rotacja -->
+                            @if($this->showsColumn('rotation'))
                             <td class="text-center">
                                 @if($hasActiveRotation)
                                     <x-ui.badge variant="success">✓ Tak</x-ui.badge>
@@ -222,8 +283,9 @@
                                     <x-ui.badge variant="danger">✗ Nie</x-ui.badge>
                                 @endif
                             </td>
+                            @endif
 
-                            <!-- Spółka (aktywne przypisanie) -->
+                            @if($this->showsColumn('company'))
                             <td class="text-center text-nowrap">
                                 @php $companyAssignment = $employee->companyAssignments->first(); @endphp
                                 @if($companyAssignment && $companyAssignment->company)
@@ -235,11 +297,12 @@
                                     <span class="text-muted">—</span>
                                 @endif
                             </td>
+                            @endif
 
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-4">
+                            <td colspan="{{ $this->visibleColumnCount() }}" class="text-center py-4">
                                 <x-ui.empty-state 
                                     icon="people"
                                     message="Brak pracowników do wyświetlenia"

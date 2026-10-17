@@ -1867,6 +1867,116 @@ a.emp-kv__row:hover {
     cursor: pointer;
 }
 
+.emp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.55rem;
+}
+.emp-toolbar__search {
+    flex: 1 1 14rem;
+    max-width: 18rem;
+    min-width: 0;
+}
+.emp-toolbar__search .input-group-text {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+}
+.emp-toolbar__date {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.emp-toolbar__date .form-control {
+    width: 10.75rem;
+    font-size: 0.82rem;
+}
+.emp-view-menu {
+    color: var(--text-main);
+    padding: 0.85rem !important;
+}
+.emp-view-menu .small,
+.emp-view-menu .form-check-compact,
+.emp-view-menu .form-check-compact span {
+    color: var(--text-main);
+}
+.emp-view-menu .text-muted {
+    color: var(--text-muted) !important;
+}
+.emp-toolbar__views {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+}
+.emp-toolbar__count {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+.emp-toolbar__count strong {
+    color: var(--text-main);
+}
+.emp-toolbar .emp-quiet-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    box-shadow: none;
+}
+.emp-toolbar .emp-quiet-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: var(--text-main);
+}
+.emp-toolbar .emp-quiet-btn.is-on {
+    background: rgba(168, 85, 247, 0.10);
+    border-color: rgba(168, 85, 247, 0.28);
+    color: #e2e8f0;
+}
+.emp-quiet-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.2em;
+    padding: 0 0.3rem;
+    margin-left: 0.3rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    background: rgba(255, 255, 255, 0.08);
+    color: inherit;
+}
+.emp-filter-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem 0.75rem;
+}
+.emp-filter-grid__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+@media (max-width: 520px) {
+    .emp-filter-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Clickable badge — hover jak na przeglądzie tygodnia (uniesienie + kolorowa poświata). */
 .badge-clickable {
     cursor: pointer;
@@ -10763,6 +10873,54 @@ span.eq-wh-card {
     margin-left: 0.35rem;
     color: var(--primary);
 }
+
+/* Labeled filters (employees, payroll, …) wrap into a grid.
+   A nowrap scroller painted a horizontal bar through the inputs and hid
+   the last fields. */
+.dt-filter-field {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 0.28rem;
+    min-width: 0;
+}
+.dt-filter-field .form-label {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.dt-toolbar:has(.dt-filter-field) {
+    flex-wrap: wrap;
+    align-items: end;
+    row-gap: 0.75rem;
+}
+.dt-toolbar:has(.dt-filter-field) .dt-toolbar__fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+    flex: 1 1 40rem;
+    min-width: 0;
+    overflow: visible;
+    align-items: end;
+    gap: 0.7rem 0.75rem;
+}
+.dt-toolbar:has(.dt-filter-field) .dt-toolbar__fields .form-control,
+.dt-toolbar:has(.dt-filter-field) .dt-toolbar__fields .form-select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+.dt-toolbar:has(.dt-filter-field) .dt-toolbar__meta {
+    flex: 1 1 auto;
+    margin-left: auto;
+    justify-content: flex-end;
+    align-self: end;
+    padding-bottom: 0.35rem;
+}
+
 @media (max-width: 767.98px) {
     .dt-toolbar {
         flex-wrap: wrap;
@@ -10783,6 +10941,13 @@ span.eq-wh-card {
         margin-left: 0;
         width: 100%;
         justify-content: flex-end;
+    }
+    .dt-toolbar:has(.dt-filter-field) .dt-toolbar__fields {
+        grid-template-columns: 1fr;
+        flex-basis: 100%;
+    }
+    .dt-toolbar:has(.dt-filter-field) .dt-toolbar__meta {
+        padding-bottom: 0;
     }
 }
 
