@@ -2,7 +2,7 @@
 # Uses php artisan serve (single process on dynamic $PORT)
 
 # Build stage
-FROM php:8.3-fpm AS base
+FROM php:8.3.36-fpm AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -70,7 +70,7 @@ RUN echo "[STEP] Cleaning up node_modules..." && \
     echo "[OK] node_modules removed"
 
 # Production stage
-FROM php:8.3-cli
+FROM php:8.3.36-cli
 
 ENV DEBIAN_FRONTEND=noninteractive
 
