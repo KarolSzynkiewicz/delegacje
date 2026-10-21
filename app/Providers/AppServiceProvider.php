@@ -14,6 +14,7 @@ use App\Models\Comment;
 use App\Models\CommentLike;
 use App\Models\CommentMention;
 use App\Models\Employee;
+use App\Models\FixedCostEntry;
 use App\Models\LogisticsEvent;
 use App\Models\LogisticsEventParticipant;
 use App\Models\ProcedureRun;
@@ -21,6 +22,7 @@ use App\Models\ProcedureTemplate;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectHourlyRate;
 use App\Models\ProjectTask;
+use App\Models\ProjectVariableCost;
 use App\Models\RecruitmentCandidate;
 use App\Models\Sprint;
 use App\Models\SprintDodItem;
@@ -30,6 +32,7 @@ use App\Models\TaskSubtask;
 use App\Models\TransportCost;
 use App\Models\User;
 use App\Models\VehicleAssignment;
+use App\Models\VehicleRepair;
 use App\Models\WarehouseDispatch;
 use App\Observers\AdvancesProcedureOnApproval;
 use App\Observers\AuditableModelObserver;
@@ -37,6 +40,7 @@ use App\Observers\DispatchesApprovalEvents;
 use App\Observers\DispatchesCommentLikeEvents;
 use App\Observers\DispatchesWorkItemNotificationEvents;
 use App\Observers\ProcedureTemplateObserver;
+use App\Observers\SyncsCostRegistry;
 use App\Observers\SyncsWorkItems;
 use App\Repositories\Llm\DatabaseLlmCredentialRepository;
 use App\Services\Llm\LlmManager;
@@ -151,6 +155,12 @@ class AppServiceProvider extends ServiceProvider
         CommentMention::observe(DispatchesWorkItemNotificationEvents::class);
         CommentLike::observe(DispatchesCommentLikeEvents::class);
 
+        // Rejestr kosztów: każdy koszt źródłowy ma swoją otoczkę w cost_entries.
+        FixedCostEntry::observe(SyncsCostRegistry::class);
+        ProjectVariableCost::observe(SyncsCostRegistry::class);
+        TransportCost::observe(SyncsCostRegistry::class);
+        VehicleRepair::observe(SyncsCostRegistry::class);
+
         Relation::enforceMorphMap([
             'project_assignment' => \App\Models\ProjectAssignment::class,
             'vehicle_assignment' => \App\Models\VehicleAssignment::class,
@@ -178,6 +188,11 @@ class AppServiceProvider extends ServiceProvider
             'approval_request' => \App\Models\ApprovalRequest::class,
             'forum_post' => \App\Models\ForumPost::class,
             'planning_week' => \App\Models\PlanningWeek::class,
+            // Źródła rejestru kosztów (cost_entries.source_type)
+            'fixed_cost_entry' => \App\Models\FixedCostEntry::class,
+            'project_variable_cost' => \App\Models\ProjectVariableCost::class,
+            'transport_cost' => \App\Models\TransportCost::class,
+            'vehicle_repair' => \App\Models\VehicleRepair::class,
             // Future assignments (e.g., EquipmentAssignment) must be added here
         ]);
 

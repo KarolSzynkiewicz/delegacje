@@ -577,6 +577,16 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->name('equipment-consumptions.create')
             ->defaults('resource', 'equipment');
 
+        // Rejestr kosztów (jedna tablica nad kosztami ogólnofirmowymi / projektowymi / transportu / serwisu)
+        Route::get('cost-registry/create-many', [\App\Http\Controllers\CostRegistryController::class, 'createMany'])
+            ->name('cost-registry.create-many')
+            ->defaults('resource', 'cost-registry');
+        Route::post('cost-registry/store-many', [\App\Http\Controllers\CostRegistryController::class, 'storeMany'])
+            ->name('cost-registry.store-many')
+            ->defaults('resource', 'cost-registry');
+        Route::resource('cost-registry', \App\Http\Controllers\CostRegistryController::class)
+            ->only(['index', 'update']);
+
         // Transport Costs
         Route::resource('transport-costs', \App\Http\Controllers\TransportCostController::class);
 

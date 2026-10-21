@@ -30,6 +30,22 @@ class TransportCost extends Model
     ];
 
     /**
+     * Etykiety typów kosztu transportu (jedno miejsce — rejestr kosztów i karty zdarzeń).
+     *
+     * @return array<string, string>
+     */
+    public static function costTypeLabels(): array
+    {
+        return [
+            'ticket' => 'Bilet',
+            'fuel' => 'Paliwo',
+            'parking' => 'Parking',
+            'toll' => 'Opłata drogowa',
+            'other' => 'Inne',
+        ];
+    }
+
+    /**
      * Get the logistics event for this cost.
      */
     public function logisticsEvent(): BelongsTo

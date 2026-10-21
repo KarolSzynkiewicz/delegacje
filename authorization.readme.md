@@ -355,6 +355,7 @@ Wszystkie zasoby dostępne w tabelce:
 - Dokumenty pracowników (`employee-documents`)
 - Stawki pracowników (`employee-rates`)
 - Koszty stałe (`fixed-costs`)
+- Rejestr kosztów (`cost-registry`) — `view`, `update` (edycja inline pól rejestru) i `create` (siatka „Dodaj wiele" tworząca koszty ogólnofirmowe z polami rejestru); pozostałe pozycje powstają z kosztów źródłowych
 - Payroll (`payrolls`)
 - Koszty zmienne projektów (`project-variable-costs`)
 - Rotacje (`rotations`)

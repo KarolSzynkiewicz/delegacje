@@ -62,6 +62,7 @@ return [
         'icon' => 'bi bi-cash-stack',
         'items' => [
             'dashboard',
+            'cost_registry',
             'fixed_costs',
             'project_variable_costs',
             'transport_costs',

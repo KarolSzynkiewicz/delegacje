@@ -156,6 +156,12 @@ return [
         'label' => 'Rozchód z magazynu',
     ],
 
+    'cost_registry' => [
+        'route' => 'cost-registry.index',
+        'icon' => 'bi bi-receipt',
+        'label' => 'Rejestr kosztów',
+    ],
+
     'project_variable_costs' => [
         'route' => 'project-variable-costs.index',
         'icon' => 'bi bi-arrow-repeat',
