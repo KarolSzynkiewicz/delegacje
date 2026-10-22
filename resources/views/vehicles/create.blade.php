@@ -125,6 +125,18 @@
                     </div>
 
                     <div class="mb-3">
+                        <x-ui.input
+                            type="text"
+                            name="vin"
+                            label="Numer VIN"
+                            value="{{ old('vin') }}"
+                            maxlength="17"
+                            placeholder="17 znaków, bez I/O/Q"
+                            class="font-mono"
+                        />
+                    </div>
+
+                    <div class="mb-3">
                         <x-ui.input 
                             type="textarea" 
                             name="notes" 

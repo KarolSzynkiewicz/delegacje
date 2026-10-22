@@ -256,6 +256,10 @@
                                         <p class="emp-fact__value font-mono {{ $overdueAc ? 'text-danger' : '' }}">{{ $vehicle->ac_wazne_do?->format('Y-m-d') ?? '—' }}</p>
                                     </div>
                                     <div class="emp-fact emp-fact--wide">
+                                        <div class="emp-fact__label">VIN</div>
+                                        <p class="emp-fact__value font-mono">{{ $vehicle->vin ?: '—' }}</p>
+                                    </div>
+                                    <div class="emp-fact emp-fact--wide">
                                         <div class="emp-fact__label">Notatki</div>
                                         <p class="emp-fact__value emp-fact__value--notes">{{ $vehicle->notes ?: '—' }}</p>
                                     </div>

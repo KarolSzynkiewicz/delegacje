@@ -19,12 +19,22 @@ class UpdateVehicleRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
+    protected function prepareForValidation(): void
+    {
+        $vin = $this->input('vin');
+        if (is_string($vin)) {
+            $vin = strtoupper(preg_replace('/\s+/', '', $vin) ?? '');
+            $this->merge(['vin' => $vin === '' ? null : $vin]);
+        }
+    }
+
     public function rules(): array
     {
         $vehicle = $this->route('vehicle');
 
         return [
-            'registration_number' => ['required', 'string', 'unique:vehicles,registration_number,' . $vehicle->id],
+            'registration_number' => ['required', 'string', 'unique:vehicles,registration_number,'.$vehicle->id],
+            'vin' => ['nullable', 'string', 'size:17', 'regex:/^[A-HJ-NPR-Z0-9]{17}$/', 'unique:vehicles,vin,'.$vehicle->id],
             'brand' => ['nullable', 'string', 'max:255'],
             'model' => ['nullable', 'string', 'max:255'],
             'capacity' => ['nullable', 'integer', 'min:1'],
@@ -47,6 +57,9 @@ class UpdateVehicleRequest extends FormRequest
         return [
             'registration_number.required' => 'Numer rejestracyjny jest wymagany.',
             'registration_number.unique' => 'Ten numer rejestracyjny jest już używany.',
+            'vin.size' => 'Numer VIN musi mieć dokładnie 17 znaków.',
+            'vin.regex' => 'Numer VIN może zawierać tylko litery A–Z (bez I, O, Q) i cyfry.',
+            'vin.unique' => 'Ten numer VIN jest już przypisany do innego pojazdu.',
             'capacity.integer' => 'Pojemność musi być liczbą całkowitą.',
             'capacity.min' => 'Pojemność musi być większa od 0.',
             'technical_condition.required' => 'Stan techniczny jest wymagany.',
