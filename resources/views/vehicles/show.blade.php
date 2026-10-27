@@ -265,11 +265,9 @@
                                     </div>
                                 </div>
 
-                                @if(auth()->user()?->hasPermission('comments.view'))
-                                    <div class="emp-dossier__comments">
-                                        <x-comments embedded :commentable="$vehicle" />
-                                    </div>
-                                @endif
+                                <div class="emp-dossier__comments">
+                                    <x-comments embedded :commentable="$vehicle" />
+                                </div>
                             </div>
                         </div>
                     @elseif($tab === 'repairs')
