@@ -14,6 +14,7 @@ return [
             'mine_projects',
             'mine_tasks',
             'mine_time_logs',
+            'mine_office_hours',
             'mine_employees',
             'mine_assignments',
             'mine_employee_evaluations',
@@ -87,6 +88,7 @@ return [
         'items' => [
             'payrolls',
             'time_logs',
+            'office_profiles',
             'adjustments',
             'advances',
             'employee_rates',

@@ -12,8 +12,9 @@ final class ProfileDevices
     /**
      * @return list<array{id: string|null, label: string, icon: string, ip: string, seen: string, current: bool}>
      */
-    public static function sessions(User $user): array
+    public static function sessions(User $user, bool $includeCurrentFallback = true): array
     {
+        $isOwnProfile = auth()->id() === $user->id;
         $currentId = hash('sha256', (string) session()->getId());
         $rows = collect();
 
@@ -32,10 +33,14 @@ final class ProfileDevices
             'icon' => UserAgentLabel::icon($row->user_agent),
             'ip' => $row->ip_address ?: '—',
             'seen' => Carbon::createFromTimestamp((int) $row->last_activity)->locale('pl')->diffForHumans(),
-            'current' => hash_equals($currentId, (string) $row->id),
+            'current' => $isOwnProfile && hash_equals($currentId, (string) $row->id),
         ])->all();
 
-        if (! collect($sessions)->contains(fn (array $session) => $session['current'])) {
+        if (
+            $includeCurrentFallback
+            && $isOwnProfile
+            && ! collect($sessions)->contains(fn (array $session) => $session['current'])
+        ) {
             array_unshift($sessions, [
                 'id' => null,
                 'label' => UserAgentLabel::describe(request()->userAgent()),

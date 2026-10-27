@@ -238,6 +238,18 @@ return [
         'label' => 'Ewidencje godzin',
     ],
 
+    'office_hours' => [
+        'route' => 'office-hours.index',
+        'icon' => 'bi bi-clock-history',
+        'label' => 'Godziny biurowe',
+    ],
+
+    'office_profiles' => [
+        'route' => 'office-profiles.index',
+        'icon' => 'bi bi-building',
+        'label' => 'Biuro',
+    ],
+
     'payrolls' => [
         'route' => 'payrolls.index',
         'icon' => 'bi bi-cash-stack',
@@ -330,6 +342,12 @@ return [
         'route' => 'mine.time-logs.monthly-grid',
         'icon' => 'bi bi-clock',
         'label' => 'Ewidencja godzin',
+    ],
+
+    'mine_office_hours' => [
+        'route' => 'mine.office-hours.index',
+        'icon' => 'bi bi-building',
+        'label' => 'Moje godziny biurowe',
     ],
 
     'mine_employees' => [

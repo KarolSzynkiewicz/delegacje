@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\User;
+use App\Support\ProfileDevices;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -68,10 +72,60 @@ class UserController extends Controller
      */
     public function show(User $user): View
     {
+        $user->load(['roles', 'permissions', 'managedProjects', 'officeProfile', 'employee']);
 
-        $user->load(['roles', 'permissions', 'managedProjects']);
+        $permissionSource = $user->isAdmin()
+            ? Permission::query()->orderBy('name')->get()
+            : $user->getAllPermissions()->sortBy('name')->values();
 
-        return view('users.show', compact('user'));
+        $permissionGroups = $this->groupPermissions($permissionSource);
+        $sessions = ProfileDevices::sessions($user, includeCurrentFallback: false);
+        $pushDevices = ProfileDevices::pushDevices($user);
+
+        return view('users.show', compact(
+            'user',
+            'permissionGroups',
+            'sessions',
+            'pushDevices',
+        ));
+    }
+
+    /**
+     * @param  Collection<int, Permission>  $permissions
+     * @return Collection<int, array{key: string, label: string, actions: Collection<int, string>, count: int}>
+     */
+    private function groupPermissions(Collection $permissions): Collection
+    {
+        return $permissions
+            ->groupBy(function (Permission $permission): string {
+                $parts = explode('.', $permission->name);
+
+                return count($parts) > 1
+                    ? implode('.', array_slice($parts, 0, -1))
+                    : $permission->name;
+            })
+            ->map(function (Collection $group, string $module): array {
+                $actions = $group
+                    ->map(function (Permission $permission) use ($module): string {
+                        if ($permission->name === $module) {
+                            return 'dostęp';
+                        }
+
+                        return Str::afterLast($permission->name, '.');
+                    })
+                    ->unique()
+                    ->sort()
+                    ->values();
+
+                return [
+                    'key' => $module,
+                    'label' => Str::of($module)->replace(['-', '_', '.'], ' ')->title()->toString(),
+                    'actions' => $actions,
+                    'count' => $group->count(),
+                ];
+            })
+            ->sortBy('label')
+            ->values();
     }
 
     /**

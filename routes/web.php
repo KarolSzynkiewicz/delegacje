@@ -641,6 +641,13 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         // Employee Rates
         Route::resource('employee-rates', \App\Http\Controllers\EmployeeRateController::class);
 
+        // Biuro (profile + godziny — osobno od Employee / time-logs stoczni)
+        Route::resource('office-profiles', \App\Http\Controllers\OfficeProfileController::class)
+            ->except(['show']);
+        Route::get('office-hours', [\App\Http\Controllers\OfficeHoursController::class, 'index'])
+            ->name('office-hours.index')
+            ->defaults('resource', 'office-hours');
+
         Route::resource('employee-bank-accounts', \App\Http\Controllers\EmployeeBankAccountController::class)
             ->except(['index']);
 
@@ -794,6 +801,7 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('tasks', [\App\Http\Controllers\MineController::class, 'tasks'])->name('tasks.index');
         Route::get('time-logs', [\App\Http\Controllers\MineController::class, 'timeLogs'])->name('time-logs.index');
         Route::get('time-logs/monthly-grid', [\App\Http\Controllers\MineController::class, 'monthlyGrid'])->name('time-logs.monthly-grid');
+        Route::get('office-hours', [\App\Http\Controllers\OfficeHoursController::class, 'mine'])->name('office-hours.index');
         Route::get('employees', [\App\Http\Controllers\MineController::class, 'employees'])->name('employees.index');
         Route::get('assignments', [\App\Http\Controllers\MineController::class, 'assignments'])->name('assignments.index');
         Route::get('employee-evaluations', [\App\Http\Controllers\MineController::class, 'employeeEvaluations'])->name('employee-evaluations.index');
