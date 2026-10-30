@@ -201,7 +201,7 @@ class UserMentionService
     /**
      * Tworzy wzmianki / wnioski i emituje CommentPosted (powiadomienia idą listenerem).
      *
-     * @return list<int> ID użytkowników wspomnianych @nazwa (bez @nazwa?)
+     * @return list<int> ID użytkowników z @nazwa (bez @nazwa! / @nazwa?)
      */
     public function processComment(Comment $comment, User $author): array
     {
@@ -214,6 +214,8 @@ class UserMentionService
     }
 
     /**
+     * Zwykłe `@nazwa` → CommentMentioned. `@nazwa!` dostaje tylko TaskAssigned (CommentMention).
+     *
      * @return list<int>
      */
     private function mentionUserIds(Comment $comment, User $author): array
@@ -227,13 +229,15 @@ class UserMentionService
             $handle = $match[1];
             $suffix = $match[2] ?? '';
             if (mb_strtolower($handle, 'UTF-8') === 'wszyscy') {
+                // `@wszyscy!` nie tworzy CommentMention — zostaje broadcast powiadomień.
                 if ($suffix !== '?') {
                     $notifyEveryone = true;
                 }
 
                 continue;
             }
-            if ($suffix === '?') {
+            // `!` = zadanie (TaskAssigned), `?` = wniosek — bez CommentMentioned
+            if ($suffix === '!' || $suffix === '?') {
                 continue;
             }
             $notifyHandles[] = $handle;

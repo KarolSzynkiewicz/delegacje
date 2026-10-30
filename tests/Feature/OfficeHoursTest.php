@@ -136,6 +136,48 @@ class OfficeHoursTest extends TestCase
             ->assertHasErrors(["cells.{$key}.ends_at"]);
     }
 
+    public function test_office_hours_allows_saving_start_only_then_end(): void
+    {
+        $profile = OfficeProfile::factory()->create();
+        $date = now()->startOfMonth()->addDays(4);
+        while ($date->isWeekend()) {
+            $date->addDay();
+        }
+        $key = $profile->id.'_'.$date->format('Ymd');
+        $month = $date->format('Y-m');
+
+        Livewire::actingAs($this->admin)
+            ->test(OfficeHoursGrid::class, ['month' => $month, 'viewMode' => 'month', 'onlyMine' => false])
+            ->set("cells.{$key}.starts_at", '09:15')
+            ->set("cells.{$key}.ends_at", '')
+            ->set("cells.{$key}.location", OfficeWorkLocation::Office->value)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('office_work_days', [
+            'office_profile_id' => $profile->id,
+            'work_date' => $date->toDateString(),
+            'starts_at' => '09:15:00',
+            'ends_at' => null,
+            'hours' => 0,
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(OfficeHoursGrid::class, ['month' => $month, 'viewMode' => 'month', 'onlyMine' => false])
+            ->set("cells.{$key}.starts_at", '09:15')
+            ->set("cells.{$key}.ends_at", '17:00')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('office_work_days', [
+            'office_profile_id' => $profile->id,
+            'work_date' => $date->toDateString(),
+            'starts_at' => '09:15:00',
+            'ends_at' => '17:00:00',
+            'hours' => 7.75,
+        ]);
+    }
+
     public function test_copy_from_first_day_fills_weekdays(): void
     {
         $profile = OfficeProfile::factory()->create();

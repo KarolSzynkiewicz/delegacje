@@ -83,13 +83,7 @@ class CommentMentionTaskTest extends TestCase
         $this->assertSame('bi-folder', $card['icon']);
         $this->assertNotSame($item->openUrl(), $card['url']);
 
-        Notification::assertSentTo($robert, CommentMentioned::class, function (CommentMentioned $notification) use ($robert, $comment, $project): bool {
-            $data = $notification->toDatabase($robert);
-
-            return $data['url'] === $comment->fresh()->urlWithCommentAnchor()
-                && $data['context_name'] === $project->name
-                && str_contains((string) $data['excerpt'], 'sprawdź to');
-        });
+        Notification::assertNotSentTo($robert, CommentMentioned::class);
         Notification::assertSentTo($robert, TaskAssigned::class, function (TaskAssigned $notification) use ($robert, $comment): bool {
             $data = $notification->toDatabase($robert);
 

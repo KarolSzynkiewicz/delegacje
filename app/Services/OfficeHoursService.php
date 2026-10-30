@@ -154,6 +154,7 @@ class OfficeHoursService
             $startsAt = $this->normalizeTime($payload['starts_at'] ?? null, $startAttr, $errors);
             $endsAt = $this->normalizeTime($payload['ends_at'] ?? null, $endAttr, $errors);
 
+            // Obie puste = wyczyść dzień. Samo OD lub samo DO = zapis roboczy (np. przyjście → wyjście).
             if ($startsAt === null && $endsAt === null) {
                 $pending[] = [
                     'profile_id' => $profileId,
@@ -164,18 +165,7 @@ class OfficeHoursService
                 continue;
             }
 
-            if ($startsAt === null || $endsAt === null) {
-                if ($startsAt === null && ($payload['starts_at'] ?? '') === '') {
-                    $errors[$startAttr][] = 'Podaj godzinę od.';
-                }
-                if ($endsAt === null && ($payload['ends_at'] ?? '') === '') {
-                    $errors[$endAttr][] = 'Podaj godzinę do.';
-                }
-
-                continue;
-            }
-
-            if ($this->compareTimes($startsAt, $endsAt) >= 0) {
+            if ($startsAt !== null && $endsAt !== null && $this->compareTimes($startsAt, $endsAt) >= 0) {
                 $errors[$endAttr][] = 'Godzina „do” musi być późniejsza niż „od”.';
 
                 continue;
@@ -186,7 +176,9 @@ class OfficeHoursService
                 'date' => $date,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
-                'hours' => $this->hoursBetween($startsAt, $endsAt),
+                'hours' => ($startsAt !== null && $endsAt !== null)
+                    ? $this->hoursBetween($startsAt, $endsAt)
+                    : 0.0,
                 'location' => $location,
                 'delete' => false,
             ];

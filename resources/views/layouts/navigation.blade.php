@@ -11,13 +11,18 @@
             @endif
         </a>
 
-        <!-- Toggle button for mobile -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+        {{-- Dzwonek + hamburger zawsze widoczne na mobile (poza collapse) --}}
+        <div class="d-flex align-items-center gap-1 ms-auto order-lg-last">
+            @auth
+                @livewire('notification-bell')
+            @endauth
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
 
         <!-- Navigation content -->
-        <div class="collapse navbar-collapse" id="navbarNav">
+        <div class="collapse navbar-collapse flex-lg-grow-1" id="navbarNav">
             <ul class="navbar-nav mx-auto">
                 @auth
                     <x-nav.menu />
@@ -27,12 +32,6 @@
             <!-- Right side: User menu -->
             <ul class="navbar-nav align-items-center gap-1">
                 @auth
-                    <!-- Notification Bell -->
-                    <li class="nav-item">
-                        @livewire('notification-bell')
-                    </li>
-
-                    <!-- User Dropdown -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             @if(Auth::user()->image_path)
