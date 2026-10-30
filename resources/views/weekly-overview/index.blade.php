@@ -100,6 +100,10 @@
         'projectsEndingThisMonth' => $projectsEndingThisMonth,
     ])
 
+    @include('weekly-overview.partials.staffing-demand-matrix', [
+        'staffingDemandMatrix' => $staffingDemandMatrix,
+    ])
+
     <div class="mb-4" id="week-comments">
         <x-comments
             :commentable="$planningWeek"
@@ -930,13 +934,154 @@
                 });
             }
 
+            function initDemandTrendChart() {
+                if (!window.Chart) return;
+                const canvas = document.getElementById('wo-demand-trend-chart');
+                if (!canvas) return;
+
+                let payload = null;
+                try {
+                    payload = JSON.parse(canvas.dataset.chart || '{}');
+                } catch (_) {
+                    return;
+                }
+                const labels = payload.labels || [];
+                const needed = payload.needed || [];
+                const assigned = payload.assigned || [];
+                const projects = payload.projects || [];
+                if (!labels.length) return;
+
+                const pointLabelPlugin = {
+                    id: 'woDemandTrendLabels',
+                    afterDatasetsDraw(chart) {
+                        const { ctx } = chart;
+                        ctx.save();
+                        ctx.font = "600 11px 'JetBrains Mono', 'Space Grotesk', monospace";
+                        chart.data.datasets.forEach((dataset, datasetIndex) => {
+                            if (!dataset.woPointLabels) return;
+                            const meta = chart.getDatasetMeta(datasetIndex);
+                            meta.data.forEach((point, index) => {
+                                const value = dataset.data[index];
+                                if (value == null || Number.isNaN(value)) return;
+                                const above = dataset.woLabelSide !== 'below';
+                                ctx.fillStyle = dataset.borderColor || '#fff';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = above ? 'bottom' : 'top';
+                                ctx.fillText(String(value), point.x, point.y + (above ? -8 : 8));
+                            });
+                        });
+                        ctx.restore();
+                    },
+                };
+
+                const projectDatasets = projects.map((project) => ({
+                    label: project.label,
+                    data: project.data || [],
+                    borderColor: 'rgba(148, 163, 184, 0.35)',
+                    backgroundColor: 'transparent',
+                    borderWidth: 1.25,
+                    pointRadius: 0,
+                    pointHoverRadius: 3,
+                    tension: 0.25,
+                    fill: false,
+                    order: 3,
+                }));
+
+                new Chart(canvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            ...projectDatasets,
+                            {
+                                label: 'Popyt razem',
+                                data: needed,
+                                borderColor: '#f1f5f9',
+                                backgroundColor: '#f1f5f9',
+                                borderWidth: 2.5,
+                                pointRadius: 4,
+                                pointHoverRadius: 5,
+                                pointBackgroundColor: '#0b1220',
+                                pointBorderColor: '#f1f5f9',
+                                pointBorderWidth: 2,
+                                tension: 0.28,
+                                fill: false,
+                                order: 1,
+                                woPointLabels: true,
+                                woLabelSide: 'above',
+                            },
+                            {
+                                label: 'Przypisani',
+                                data: assigned,
+                                borderColor: '#60a5fa',
+                                backgroundColor: '#60a5fa',
+                                borderWidth: 2.25,
+                                borderDash: [6, 5],
+                                pointRadius: 4,
+                                pointHoverRadius: 5,
+                                pointBackgroundColor: '#0b1220',
+                                pointBorderColor: '#60a5fa',
+                                pointBorderWidth: 2,
+                                tension: 0.28,
+                                fill: {
+                                    target: '-1',
+                                    above: 'rgba(59, 130, 246, 0.08)',
+                                    below: 'rgba(168, 85, 247, 0.32)',
+                                },
+                                order: 2,
+                                woPointLabels: true,
+                                woLabelSide: 'below',
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label(ctx) {
+                                        const name = ctx.dataset.label || '';
+                                        return ` ${name}: ${ctx.raw}`;
+                                    },
+                                },
+                            },
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: {
+                                    color: 'rgba(148, 163, 184, 0.85)',
+                                    font: { size: 11, family: "'Space Grotesk', system-ui, sans-serif" },
+                                },
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grace: '12%',
+                                grid: { color: 'rgba(148, 163, 184, 0.12)' },
+                                ticks: {
+                                    color: 'rgba(148, 163, 184, 0.75)',
+                                    precision: 0,
+                                    font: { size: 11, family: "'JetBrains Mono', monospace" },
+                                },
+                            },
+                        },
+                    },
+                    plugins: [pointLabelPlugin],
+                });
+            }
+
             function initDemandCharts() {
                 if (!window.Chart) return;
 
                 Chart.defaults.color = 'rgba(255,255,255,0.45)';
                 Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
-                Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+                Chart.defaults.font.family = "'Space Grotesk', system-ui, sans-serif";
                 Chart.defaults.font.size = 11;
+
+                initDemandTrendChart();
 
                 // Main demand donut (roles × needed only)
                 document.querySelectorAll('.wo-demand-chart').forEach(canvas => {

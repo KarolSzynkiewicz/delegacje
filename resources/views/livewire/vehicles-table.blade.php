@@ -1,5 +1,9 @@
 <div>
-    <x-data-table :paginator="$vehicles" :has-filters="(bool) ($search || $conditionFilter || $statusFilter || $locationFilter || $statusDate || $showRetired)">
+    <x-data-table
+        class="vehicles-table"
+        :paginator="$vehicles"
+        :has-filters="(bool) ($search || $conditionFilter || $statusFilter || $locationFilter || $statusDate || $showRetired)"
+    >
         <x-slot:filters>
             <x-data-table-filters :count="$vehicles->total()">
                 @if($statusDate)

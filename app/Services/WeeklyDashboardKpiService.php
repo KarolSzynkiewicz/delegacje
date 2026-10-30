@@ -161,6 +161,107 @@ final class WeeklyDashboardKpiService
     }
 
     /**
+     * Macierz zapotrzebowania: projekty z ≥1 slotem w zakresie vs tygodnie
+     * (poprzedni, bieżący, potem przyszłe). Komórka = przypisani / potrzebni (suma ról).
+     *
+     * @return array{
+     *     weeks: list<array{number: int, start: Carbon, end: Carbon, label: string, is_previous: bool, is_current: bool}>,
+     *     rows: list<array{project_id: int, project_name: string, cells: list<array{assigned: int, needed: int}>}>,
+     *     totals: list<array{assigned: int, needed: int}>
+     * }
+     */
+    public function staffingDemandMatrix(Carbon $currentWeekStart, int $futureWeeks = 4, ?int $projectId = null): array
+    {
+        $anchor = $currentWeekStart->copy()->startOfWeek();
+        $weeks = [];
+        for ($i = 0; $i < 2 + max(0, $futureWeeks); $i++) {
+            $start = $anchor->copy()->subWeek()->addWeeks($i);
+            $end = $start->copy()->endOfWeek();
+            $weeks[] = [
+                'number' => $start->isoWeek(),
+                'start' => $start,
+                'end' => $end,
+                'label' => 'Tydzień '.$start->isoWeek(),
+                'is_previous' => $i === 0,
+                'is_current' => $i === 1,
+            ];
+        }
+
+        /** @var array<int, array{project_id: int, project_name: string, cells: array<int, array{assigned: int, needed: int}>}> $byProject */
+        $byProject = [];
+
+        foreach ($weeks as $weekIndex => $week) {
+            foreach ($this->employeesInFieldByProjectForWeek($week['start'], $week['end']) as $row) {
+                $id = (int) $row->project_id;
+                if ($projectId !== null && $id !== $projectId) {
+                    continue;
+                }
+                if (! isset($byProject[$id])) {
+                    $byProject[$id] = [
+                        'project_id' => $id,
+                        'project_name' => (string) $row->project_name,
+                        'cells' => [],
+                    ];
+                }
+                $byProject[$id]['cells'][$weekIndex] = [
+                    'assigned' => (int) $row->employee_count,
+                    'needed' => (int) $row->needed_count,
+                ];
+            }
+        }
+
+        $weekCount = count($weeks);
+        $rows = collect($byProject)
+            ->filter(function (array $project) use ($weekCount) {
+                for ($i = 0; $i < $weekCount; $i++) {
+                    if (((int) ($project['cells'][$i]['needed'] ?? 0)) > 0) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->map(function (array $project) use ($weekCount) {
+                $cells = [];
+                for ($i = 0; $i < $weekCount; $i++) {
+                    $cells[] = $project['cells'][$i] ?? [
+                        'assigned' => 0,
+                        'needed' => 0,
+                    ];
+                }
+
+                return [
+                    'project_id' => $project['project_id'],
+                    'project_name' => $project['project_name'],
+                    'cells' => $cells,
+                ];
+            })
+            ->sortBy('project_name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+
+        $totals = [];
+        for ($i = 0; $i < $weekCount; $i++) {
+            $assigned = 0;
+            $needed = 0;
+            foreach ($rows as $row) {
+                $assigned += $row['cells'][$i]['assigned'];
+                $needed += $row['cells'][$i]['needed'];
+            }
+            $totals[] = [
+                'assigned' => $assigned,
+                'needed' => $needed,
+            ];
+        }
+
+        return [
+            'weeks' => $weeks,
+            'rows' => $rows,
+            'totals' => $totals,
+        ];
+    }
+
+    /**
      * Środa po niedzieli zamykającej przeglądany tydzień.
      * Osoby kończące rotację liczymy do tego dnia włącznie.
      */
@@ -406,7 +507,9 @@ final class WeeklyDashboardKpiService
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
-        $rosterIds = $roster->map(fn (Employee $employee) => (int) $employee->id);
+        // pluck()->map() = Support\Collection of ints (Eloquent\Collection::map na pustej
+        // kolekcji zostawia Eloquent i potem intersect/diff woła getKey() na int).
+        $rosterIds = $roster->pluck('id')->map(fn ($id) => (int) $id)->values();
 
         $notInBase = collect($this->locationTracking->employeeIdsNotInBaseOn($day))->map(fn ($id) => (int) $id);
         $inBase = $rosterIds->diff($notInBase)->values();

@@ -119,6 +119,48 @@ body {
     transform: rotate(-90deg);
 }
 
+/* Vehicles list: keep long names inside the viewport (no sideways scroll). */
+.vehicles-table {
+    table-layout: fixed;
+    width: 100%;
+}
+.vehicles-table th,
+.vehicles-table td {
+    vertical-align: middle;
+}
+.vehicles-table__cell {
+    overflow: hidden;
+    max-width: 0; /* forces fixed-layout ellipsis in the column */
+}
+.vehicles-table__cell--reg {
+    width: 14%;
+}
+.vehicles-table__cell--brand {
+    width: 12%;
+}
+.vehicles-table__cell--wide {
+    width: 14%;
+}
+.vehicles-table__actions {
+    width: 5.5rem;
+    white-space: nowrap;
+}
+.vehicles-table__truncate {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vehicles-table .badge.vehicles-table__badge {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
 /* Weekly overview: assigned employees table — limit long badge text */
 .weekly-overview-assigned-table {
     table-layout: fixed;
@@ -311,6 +353,160 @@ body {
 .wo-delta-btn__label {
     letter-spacing: 0.02em;
 }
+
+/* Macierz zapotrzebowania (przegląd tygodniowy) */
+.wo-demand-matrix-card .card-body {
+    padding-top: 1.1rem;
+}
+.wo-demand-matrix {
+    margin-bottom: 0;
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text-main);
+    --bs-table-border-color: rgba(148, 163, 184, 0.12);
+    --bs-table-striped-bg: transparent;
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.03);
+    color: var(--text-main);
+}
+.wo-demand-matrix > :not(caption) > * > * {
+    background-color: transparent;
+    color: inherit;
+    border-bottom-color: rgba(148, 163, 184, 0.12) !important;
+}
+.wo-demand-matrix thead th {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted) !important;
+    border-bottom-color: var(--glass-border) !important;
+    white-space: nowrap;
+    vertical-align: bottom;
+    background-color: transparent;
+}
+.wo-demand-matrix td.wo-demand-matrix__project,
+.wo-demand-matrix th.wo-demand-matrix__project {
+    min-width: 11rem;
+    font-weight: 600;
+    color: var(--text-main) !important;
+    background-color: transparent !important;
+}
+.wo-demand-matrix__project-link {
+    color: var(--text-main);
+    text-decoration: none;
+}
+.wo-demand-matrix__project-link:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+.wo-demand-matrix thead th.wo-demand-matrix__week--previous {
+    color: var(--text-muted) !important;
+    opacity: 0.72;
+    border-right: 1px dashed rgba(148, 163, 184, 0.35) !important;
+}
+.wo-demand-matrix thead th.wo-demand-matrix__week--current {
+    color: #fff !important;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(168, 85, 247, 0.8)) !important;
+    border-radius: 12px 12px 0 0;
+    box-shadow:
+        0 0 0 1px rgba(147, 197, 253, 0.55),
+        0 8px 24px rgba(59, 130, 246, 0.35);
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.65rem !important;
+}
+.wo-demand-matrix td.wo-demand-cell--previous-week {
+    opacity: 0.55;
+    border-right: 1px dashed rgba(148, 163, 184, 0.35) !important;
+}
+.wo-demand-matrix tbody td.wo-demand-cell--current-week,
+.wo-demand-matrix tfoot td.wo-demand-cell--current-week {
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.26), rgba(168, 85, 247, 0.14)) !important;
+    box-shadow:
+        inset 2px 0 0 rgba(59, 130, 246, 0.75),
+        inset -2px 0 0 rgba(168, 85, 247, 0.6);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+.wo-demand-matrix tfoot td.wo-demand-cell--current-week {
+    border-radius: 0 0 12px 12px;
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.32), rgba(168, 85, 247, 0.2)) !important;
+    box-shadow:
+        inset 2px 0 0 rgba(59, 130, 246, 0.75),
+        inset -2px 0 0 rgba(168, 85, 247, 0.6),
+        0 8px 20px rgba(59, 130, 246, 0.2);
+}
+.wo-demand-matrix tbody tr:hover > td:not(.wo-demand-cell--current-week) {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+.wo-demand-matrix__total td {
+    border-top: 1px solid var(--glass-border) !important;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding-top: 0.85rem;
+}
+.wo-demand-matrix td.wo-demand-cell {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.wo-demand-trend {
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+.wo-demand-trend__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.wo-demand-trend__legend {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.wo-demand-trend__legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+}
+.wo-demand-trend__swatch {
+    display: inline-block;
+    width: 1.1rem;
+    height: 0.2rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+.wo-demand-trend__swatch--needed {
+    background: #f1f5f9;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.wo-demand-trend__swatch--assigned {
+    background: transparent;
+    border-top: 2px dashed #60a5fa;
+    height: 0;
+    width: 1.15rem;
+}
+.wo-demand-trend__swatch--gap {
+    height: 0.55rem;
+    width: 0.85rem;
+    border-radius: 3px;
+    background: rgba(168, 85, 247, 0.38);
+    border: 1px solid rgba(168, 85, 247, 0.55);
+}
+.wo-demand-trend__swatch--project {
+    background: rgba(148, 163, 184, 0.55);
+}
+.wo-demand-trend__canvas-wrap {
+    position: relative;
+    height: clamp(220px, 32vw, 300px);
+    width: 100%;
+}
+
 .wo-delta-modal {
     background: rgba(0, 0, 0, 0.75);
     z-index: 2000;

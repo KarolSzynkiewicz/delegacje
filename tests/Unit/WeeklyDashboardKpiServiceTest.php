@@ -72,6 +72,65 @@ class WeeklyDashboardKpiServiceTest extends TestCase
         $this->assertSame(25, (int) $byProject->firstWhere('project_id', $second->id)->needed_count);
     }
 
+    public function test_staffing_demand_matrix_starts_with_previous_week_and_sums_roles(): void
+    {
+        $currentStart = Carbon::parse('2026-09-21')->startOfWeek();
+        $prevStart = $currentStart->copy()->subWeek();
+        $roleA = Role::factory()->create(['name' => 'Spawacz']);
+        $roleB = Role::factory()->create(['name' => 'Monter']);
+        $project = Project::factory()->create(['name' => 'Hala A']);
+        $idle = Project::factory()->create(['name' => 'Bez popytu']);
+
+        ProjectDemand::factory()->create([
+            'project_id' => $project->id,
+            'role_id' => $roleA->id,
+            'required_count' => 10,
+            'start_date' => $prevStart,
+            'end_date' => $currentStart->copy()->endOfWeek(),
+        ]);
+        ProjectDemand::factory()->create([
+            'project_id' => $project->id,
+            'role_id' => $roleB->id,
+            'required_count' => 5,
+            'start_date' => $currentStart,
+            'end_date' => $currentStart->copy()->endOfWeek(),
+        ]);
+
+        $employee = Employee::factory()->create();
+        ProjectAssignment::factory()->create([
+            'project_id' => $project->id,
+            'employee_id' => $employee->id,
+            'role_id' => $roleA->id,
+            'start_date' => $currentStart,
+            'end_date' => $currentStart->copy()->endOfWeek(),
+        ]);
+
+        ProjectAssignment::factory()->create([
+            'project_id' => $idle->id,
+            'employee_id' => Employee::factory()->create()->id,
+            'role_id' => $roleA->id,
+            'start_date' => $currentStart,
+            'end_date' => $currentStart->copy()->endOfWeek(),
+        ]);
+
+        $service = app(WeeklyDashboardKpiService::class);
+        $matrix = $service->staffingDemandMatrix($currentStart, 2);
+
+        $this->assertCount(4, $matrix['weeks']);
+        $this->assertTrue($matrix['weeks'][0]['is_previous']);
+        $this->assertTrue($matrix['weeks'][1]['is_current']);
+        $this->assertSame($prevStart->toDateString(), $matrix['weeks'][0]['start']->toDateString());
+        $this->assertSame($currentStart->toDateString(), $matrix['weeks'][1]['start']->toDateString());
+
+        $this->assertCount(1, $matrix['rows']);
+        $row = $matrix['rows'][0];
+        $this->assertSame($project->id, $row['project_id']);
+        $this->assertSame(10, $row['cells'][0]['needed']);
+        $this->assertSame(0, $row['cells'][0]['assigned']);
+        $this->assertSame(15, $row['cells'][1]['needed']);
+        $this->assertSame(1, $row['cells'][1]['assigned']);
+    }
+
     public function test_rotations_ending_include_the_wednesday_after_the_week(): void
     {
         $weekStart = Carbon::parse('2026-09-21')->startOfWeek();
@@ -289,6 +348,27 @@ class WeeklyDashboardKpiServiceTest extends TestCase
 
         $this->assertSame(2, $bench['with_rotation']);
         $this->assertSame(2, $bench['without_rotation']);
+    }
+
+    public function test_bench_on_dispatch_day_handles_empty_roster_with_rotations(): void
+    {
+        $weekStart = Carbon::parse('2020-01-06')->startOfWeek();
+        $weekEnd = $weekStart->copy()->endOfWeek();
+
+        Rotation::factory()->create([
+            'employee_id' => Employee::factory()->create([
+                'hired_at' => $weekStart->copy()->addYears(2),
+            ])->id,
+            'start_date' => $weekStart->copy()->subWeek(),
+            'end_date' => $weekEnd->copy()->addWeeks(4),
+        ]);
+
+        $bench = app(WeeklyDashboardKpiService::class)->benchOnDispatchDay($weekStart, $weekEnd);
+
+        $this->assertSame(0, $bench['with_rotation']);
+        $this->assertSame(0, $bench['without_rotation']);
+        $this->assertCount(0, $bench['with_rotation_people']);
+        $this->assertCount(0, $bench['without_rotation_people']);
     }
 
     public function test_to_send_drops_people_whose_rotation_ends_by_next_wednesday(): void
