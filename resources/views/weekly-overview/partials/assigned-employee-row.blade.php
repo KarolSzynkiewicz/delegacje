@@ -113,4 +113,16 @@
             <span class="text-muted small">-</span>
         @endif
     </td>
+    @php
+        $hourlyRate = $employeeData['hourly_rate'] ?? null;
+        $hourlySort = $hourlyRate['amount'] ?? -1;
+        $hourlyLabel = $hourlyRate['label'] ?? null;
+    @endphp
+    <td class="text-end font-mono wo-assigned-rate" data-label="Stawka" data-sort-value="{{ $hourlySort }}">
+        @if($hourlyLabel)
+            <span class="wo-assigned-rate__value" title="Stawka godzinowa">{{ $hourlyLabel }}</span>
+        @else
+            <span class="text-muted small">-</span>
+        @endif
+    </td>
 </tr>

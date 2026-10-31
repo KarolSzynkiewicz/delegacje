@@ -147,7 +147,13 @@ class WeeklyOverviewService
 
         $assignments = ProjectAssignment::whereIn('project_id', $projectIds)
             ->overlappingWith($weekStart, $weekEnd)
-            ->with(['employee.roles', 'employee.latestEvaluation.createdBy', 'role', 'project'])
+            ->with([
+                'employee.roles',
+                'employee.rates',
+                'employee.latestEvaluation.createdBy',
+                'role',
+                'project',
+            ])
             ->get();
 
         $employeeIds = $assignments->pluck('employee_id')->unique()->filter()->values();
@@ -839,6 +845,8 @@ class WeeklyOverviewService
                 }
             }
 
+            $hourlyRate = $this->resolveHourlyRateForWeek($employee, $weekStart);
+
             return [
                 'assignment' => $firstAssignment,
                 'employee' => $employee,
@@ -858,10 +866,49 @@ class WeeklyOverviewService
                 'is_partial' => $isPartial,
                 'date_range' => $dateRangeText,
                 'rotation' => $rotationInfo,
+                'hourly_rate' => $hourlyRate,
             ];
         })->filter()
             ->sortBy(fn ($item) => mb_strtolower($item['employee']->last_name.' '.$item['employee']->first_name))
             ->values();
+    }
+
+    /**
+     * Active employee hourly rate covering the week start (Monday).
+     *
+     * @return array{amount: float, currency: string, label: string}|null
+     */
+    protected function resolveHourlyRateForWeek(?Employee $employee, Carbon $weekStart): ?array
+    {
+        if (! $employee) {
+            return null;
+        }
+
+        $day = $weekStart->copy()->startOfDay();
+        $rates = $employee->relationLoaded('rates')
+            ? $employee->rates
+            : $employee->rates()->get();
+
+        $rate = $rates
+            ->filter(function ($candidate) use ($day) {
+                if (($candidate->status ?? 'active') !== 'active') {
+                    return false;
+                }
+
+                return $candidate->coversDate($day);
+            })
+            ->sortByDesc(fn ($candidate) => $candidate->start_date?->timestamp ?? 0)
+            ->first();
+
+        if (! $rate) {
+            return null;
+        }
+
+        return [
+            'amount' => (float) $rate->amount,
+            'currency' => (string) $rate->currency,
+            'label' => $rate->compactLabel(),
+        ];
     }
 
     /**

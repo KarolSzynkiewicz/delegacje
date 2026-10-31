@@ -781,6 +781,17 @@
                 @php
                     $assignedList = isset($weekData['assigned_employees']) ? $weekData['assigned_employees'] : collect();
                     $assignedCollapseId = 'weekly-assigned-p'.$project->id.'-w'.$weeks[0]['start']->format('Ymd');
+                    $assignedEurRates = $assignedList
+                        ->map(fn ($row) => $row['hourly_rate'] ?? null)
+                        ->filter(fn ($rate) => is_array($rate)
+                            && isset($rate['amount'], $rate['currency'])
+                            && strtoupper((string) $rate['currency']) === 'EUR');
+                    $assignedAvgRateLabel = $assignedEurRates->isNotEmpty()
+                        ? \App\Models\EmployeeRate::formatCompactLabel(
+                            (float) $assignedEurRates->avg(fn ($rate) => (float) $rate['amount']),
+                            'EUR'
+                        )
+                        : null;
                 @endphp
                 <div class="mt-4">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
@@ -788,6 +799,14 @@
                             <h5 class="mb-0 text-dark">Przypisani pracownicy</h5>
                             @if($assignedList->isNotEmpty())
                                 <span class="badge rounded-pill text-bg-secondary">{{ $assignedList->count() }}</span>
+                                <span
+                                    class="badge rounded-pill wo-assigned-avg-rate {{ $assignedAvgRateLabel ? '' : 'wo-assigned-avg-rate--empty' }}"
+                                    title="{{ $assignedAvgRateLabel
+                                        ? 'Średnia stawka EUR przypisanych ('.$assignedEurRates->count().'/'.$assignedList->count().' w euro)'
+                                        : 'Brak stawek w EUR u przypisanych w tym tygodniu (inne waluty nie wchodzą do średniej)' }}"
+                                >
+                                    śr. {{ $assignedAvgRateLabel ?? '—' }}
+                                </span>
                             @endif
                             <button
                                 type="button"
@@ -862,6 +881,12 @@
                                         <th class="wo-sortable">
                                             <button type="button" class="wo-sort-btn">
                                                 <span>Do rotacji</span>
+                                                <i class="bi bi-chevron-expand wo-sort-icon text-muted"></i>
+                                            </button>
+                                        </th>
+                                        <th class="wo-sortable">
+                                            <button type="button" class="wo-sort-btn">
+                                                <span>Stawka</span>
                                                 <i class="bi bi-chevron-expand wo-sort-icon text-muted"></i>
                                             </button>
                                         </th>
