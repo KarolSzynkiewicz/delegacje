@@ -557,6 +557,26 @@ body {
     gap: 0.85rem 1.25rem;
     margin-bottom: 0.85rem;
 }
+.wo-radar__title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+.wo-radar__argus {
+    display: inline-flex;
+    flex-shrink: 0;
+    line-height: 0;
+}
+.wo-radar__argus .ac-bot {
+    --ac-size: 44px;
+}
+.wo-radar__argus-caption {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
 .wo-radar__title {
     font-size: 1rem;
     font-weight: 700;
@@ -679,6 +699,67 @@ body {
     bottom: 1.55rem;
     z-index: 0;
     pointer-events: none;
+}
+.wo-radar__scan {
+    position: absolute;
+    left: 10rem;
+    top: 0;
+    bottom: 1.55rem;
+    z-index: 3;
+    width: 28%;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(59, 130, 246, 0.05) 30%,
+        rgba(168, 85, 247, 0.22) 55%,
+        rgba(59, 130, 246, 0.55) 78%,
+        rgba(241, 245, 249, 0.85) 92%,
+        transparent 100%
+    );
+    mix-blend-mode: screen;
+}
+.wo-radar--boot .wo-radar__scan {
+    animation: wo-radar-sweep 1.45s cubic-bezier(0.4, 0, 0.2, 1) 1 both;
+}
+.wo-radar--boot .wo-radar__dot {
+    opacity: 0.18;
+    filter: saturate(0.55);
+    animation: wo-radar-dot-ping 0.42s ease-out var(--scan-delay, 0s) forwards;
+}
+@keyframes wo-radar-sweep {
+    0% { opacity: 0; transform: translateX(-35%); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: translateX(290%); }
+}
+@keyframes wo-radar-dot-ping {
+    0% {
+        opacity: 0.18;
+        filter: saturate(0.55);
+        transform: translate(-50%, -50%) scale(0.82);
+    }
+    55% {
+        opacity: 1;
+        filter: saturate(1.15) brightness(1.12);
+        transform: translate(-50%, -50%) scale(1.14);
+    }
+    100% {
+        opacity: 1;
+        filter: none;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .wo-radar__icon-sweep,
+    .wo-radar--boot .wo-radar__scan,
+    .wo-radar--boot .wo-radar__dot {
+        animation: none !important;
+    }
+    .wo-radar--boot .wo-radar__dot {
+        opacity: 1;
+        filter: none;
+    }
 }
 .wo-radar__critical {
     position: absolute;

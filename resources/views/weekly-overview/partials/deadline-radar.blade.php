@@ -19,6 +19,7 @@
 
 <div
     class="wo-radar"
+    :class="{ 'wo-radar--boot': booting }"
     x-data="deadlineRadar(@js([
         'lanes' => collect($lanes)->pluck('key')->all(),
         'clusters' => $clusters,
@@ -27,8 +28,20 @@
 >
     <div class="wo-radar__head">
         <div>
-            <h3 class="wo-radar__title mb-1">Radar terminów</h3>
-            <p class="wo-radar__sub mb-0">
+            <div class="wo-radar__title-row mb-1">
+                <span class="wo-radar__argus" title="Argus skanuje terminy" aria-hidden="true">
+                    <x-ask-chrono-bot
+                        variant="lens"
+                        :size="44"
+                        x-bind:class="booting ? 'ac-bot--thinking' : ''"
+                    />
+                </span>
+                <div>
+                    <h3 class="wo-radar__title mb-0">Radar terminów</h3>
+                    <p class="wo-radar__argus-caption mb-0" x-text="booting ? 'Argus skanuje…' : 'Argus'"></p>
+                </div>
+            </div>
+            <p class="wo-radar__sub mb-0 mt-1">
                 Następne {{ $forwardDays }} dni · {{ $kpis['monitored'] }}
                 {{ $kpis['monitored'] === 1 ? 'termin' : ($kpis['monitored'] >= 2 && $kpis['monitored'] <= 4 ? 'terminy' : 'terminów') }}
             </p>
@@ -53,6 +66,7 @@
                 <div class="wo-radar__today" style="left: {{ $todayLeft }}%;"></div>
                 <div class="wo-radar__mark-line" style="left: {{ $mark7Left }}%;"></div>
             </div>
+            <div class="wo-radar__scan" aria-hidden="true"></div>
 
             @foreach($lanes as $lane)
                 @php
@@ -74,11 +88,12 @@
                         @foreach($laneClusters as $cluster)
                             @php
                                 $left = (($cluster['plot_offset'] - $plotStart) / $plotSpan) * 100;
+                                $scanDelay = round(max(0, min(1, $left / 100)) * 1.15, 3);
                             @endphp
                             <button
                                 type="button"
                                 class="wo-radar__dot wo-radar__dot--{{ $cluster['urgency'] }}"
-                                style="left: {{ $left }}%; --lane: {{ $lane['color'] }};"
+                                style="left: {{ $left }}%; --lane: {{ $lane['color'] }}; --scan-delay: {{ $scanDelay }}s;"
                                 @click="openCluster('{{ $cluster['key'] }}')"
                                 title="{{ $cluster['overdue'] ? 'Zaległe: '.$cluster['count'] : ($cluster['count'].' · '.$cluster['due_label']) }}"
                             >
@@ -171,6 +186,15 @@ document.addEventListener('alpine:init', () => {
         clusters: payload.clusters || [],
         items: payload.items || [],
         activeKey: null,
+        booting: true,
+        init() {
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce) {
+                this.booting = false;
+                return;
+            }
+            window.setTimeout(() => { this.booting = false; }, 1600);
+        },
         get activeCluster() {
             if (!this.activeKey) return null;
             return this.clusters.find((c) => c.key === this.activeKey) || null;
