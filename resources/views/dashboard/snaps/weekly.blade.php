@@ -37,8 +37,7 @@
         'toSendDemandByProject' => $w['toSendDemandByProject'],
         'toSendStayingPeople' => $w['toSendStayingPeople'],
         'toSendLeavingPeople' => $w['toSendLeavingPeople'],
-        'expiringItems' => $w['expiringItems'],
-        'projectsEndingThisMonth' => $w['projectsEndingThisMonth'],
+        'deadlineRadar' => $w['deadlineRadar'],
     ])
 
     <x-ui.card label="{{ $project['name'] }} · {{ $project['location'] }}" class="mt-3">

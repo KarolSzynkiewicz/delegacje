@@ -544,6 +544,304 @@ body {
     background-clip: text;
     color: transparent;
 }
+
+/* Radar terminów (przegląd tygodniowy) */
+.wo-radar {
+    margin-top: 0.25rem;
+}
+.wo-radar__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.85rem 1.25rem;
+    margin-bottom: 0.85rem;
+}
+.wo-radar__title {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.wo-radar__sub {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.wo-radar__kpis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+.wo-radar__kpi {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(148, 163, 184, 0.08);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.wo-radar__kpi strong {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-main);
+}
+.wo-radar__kpi--warn {
+    border-color: rgba(245, 158, 11, 0.55);
+    background: rgba(245, 158, 11, 0.1);
+    color: #fde68a;
+}
+.wo-radar__kpi--warn strong { color: #fde68a; }
+.wo-radar__kpi--danger {
+    border-color: rgba(248, 113, 113, 0.5);
+    background: rgba(248, 113, 113, 0.1);
+    color: #fecaca;
+}
+.wo-radar__kpi--danger strong { color: #fecaca; }
+.wo-radar__chart {
+    display: block;
+}
+.wo-radar__tracks {
+    --lane-count: 5;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
+        rgba(7, 10, 19, 0.35);
+    overflow: hidden;
+}
+.wo-radar__row {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    min-height: 2.35rem;
+    align-items: stretch;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+.wo-radar__row:last-of-type {
+    border-bottom: 0;
+}
+.wo-radar__legend-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    height: 100%;
+    padding: 0.35rem 0.65rem;
+    border: 0;
+    border-right: 1px solid rgba(148, 163, 184, 0.1);
+    background: rgba(255, 255, 255, 0.015);
+    color: var(--text-main);
+    font-size: 0.78rem;
+    text-align: left;
+}
+.wo-radar__legend-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+.wo-radar__legend-btn.is-off {
+    opacity: 0.35;
+}
+.wo-radar__legend-label {
+    flex: 1;
+    min-width: 0;
+}
+.wo-radar__legend-count {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+}
+.wo-radar__swatch {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: var(--lane, #94a3b8);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--lane, #94a3b8) 28%, transparent);
+    flex-shrink: 0;
+}
+.wo-radar__track {
+    position: relative;
+    min-height: 2.35rem;
+}
+.wo-radar__guides {
+    position: absolute;
+    left: 10rem;
+    right: 0;
+    top: 0;
+    bottom: 1.55rem;
+    z-index: 0;
+    pointer-events: none;
+}
+.wo-radar__critical {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0.07));
+    border-right: 1px solid rgba(248, 113, 113, 0.28);
+}
+.wo-radar__today,
+.wo-radar__mark-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+}
+.wo-radar__today {
+    background: rgba(248, 113, 113, 0.85);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.45);
+}
+.wo-radar__mark-line {
+    background: rgba(245, 158, 11, 0.55);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+}
+.wo-radar__dot {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    min-width: 1.45rem;
+    min-height: 1.45rem;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.22rem 0.38rem;
+    border-radius: 999px;
+    border: 2px solid var(--lane, #94a3b8);
+    background: var(--lane, #94a3b8);
+    color: #0b1220;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lane, #94a3b8) 22%, transparent);
+}
+.wo-radar__dot span {
+    display: block;
+    padding: 0 0.05rem;
+}
+.wo-radar__dot--later {
+    background: transparent;
+    color: var(--lane, #94a3b8);
+    box-shadow: none;
+}
+.wo-radar__dot--soon {
+    filter: brightness(1.05);
+}
+.wo-radar__dot--critical {
+    box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--lane, #94a3b8) 28%, transparent),
+        0 0 14px color-mix(in srgb, var(--lane, #94a3b8) 45%, transparent);
+}
+/* Overdue keeps lane color; red comes from the zone gradient behind. */
+.wo-radar__dot--overdue {
+    border-color: var(--lane, #94a3b8);
+    background: var(--lane, #94a3b8);
+    color: #0b1220;
+    box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--lane, #94a3b8) 30%, transparent),
+        0 0 14px color-mix(in srgb, var(--lane, #94a3b8) 40%, transparent);
+}
+.wo-radar__dot:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+    z-index: 3;
+}
+.wo-radar__axis-row {
+    display: grid;
+    grid-template-columns: 10rem minmax(0, 1fr);
+    min-height: 1.55rem;
+}
+.wo-radar__axis-spacer {
+    border-right: 1px solid rgba(148, 163, 184, 0.1);
+    background: rgba(255, 255, 255, 0.015);
+}
+.wo-radar__axis {
+    position: relative;
+    height: 1.55rem;
+}
+.wo-radar__axis span {
+    position: absolute;
+    top: 0.3rem;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    white-space: nowrap;
+}
+.wo-radar__mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.wo-radar__mobile-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 10px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    background: rgba(255, 255, 255, 0.03);
+    color: inherit;
+    text-decoration: none;
+}
+.wo-radar__mobile-row:hover {
+    border-color: rgba(96, 165, 250, 0.35);
+    background: rgba(59, 130, 246, 0.06);
+}
+.wo-radar__mobile-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+.wo-radar__mobile-due {
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.wo-radar__overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.wo-radar__panel {
+    width: min(420px, calc(100vw - 24px));
+    max-height: min(70vh, 560px);
+    overflow: auto;
+    background: rgba(13, 18, 30, 0.96);
+    border-color: var(--glass-border) !important;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}
+.wo-radar__panel-line {
+    display: block;
+    padding: 0.65rem 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    color: inherit;
+}
+.wo-radar__panel-line:last-child {
+    border-bottom: 0;
+}
+.wo-radar__panel-line:hover {
+    color: var(--primary);
+}
 .wo-demand-trend__legend {
     font-size: 0.72rem;
     color: var(--text-muted);

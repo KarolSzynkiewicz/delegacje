@@ -96,8 +96,7 @@
         'toSendDemandByProject' => $toSendDemandByProject,
         'toSendStayingPeople' => $toSendStayingPeople,
         'toSendLeavingPeople' => $toSendLeavingPeople,
-        'expiringItems' => $expiringItems,
-        'projectsEndingThisMonth' => $projectsEndingThisMonth,
+        'deadlineRadar' => $deadlineRadar,
     ])
 
     @include('weekly-overview.partials.staffing-demand-matrix', [

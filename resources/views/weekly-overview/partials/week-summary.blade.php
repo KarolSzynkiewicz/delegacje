@@ -138,40 +138,6 @@
 </style>
 
 @php
-    $vehiclesList = collect();
-    foreach ($expiringItems['vehicle_inspections'] as $vehicle) {
-        $vehiclesList->push([
-            'vehicle' => $vehicle,
-            'type' => 'inspection',
-            'date' => $vehicle->inspection_valid_to,
-        ]);
-    }
-    foreach ($expiringItems['vehicle_insurance'] as $vehicle) {
-        $vehiclesList->push([
-            'vehicle' => $vehicle,
-            'type' => 'insurance',
-            'date' => $vehicle->insurance_valid_to,
-        ]);
-    }
-    foreach ($expiringItems['vehicle_ac'] ?? [] as $vehicle) {
-        $vehiclesList->push([
-            'vehicle' => $vehicle,
-            'type' => 'ac',
-            'date' => $vehicle->ac_wazne_do,
-        ]);
-    }
-    $vehiclesList = $vehiclesList->sortBy('date');
-
-    $expiringDocsCount = $expiringItems['documents']->count();
-    $expiringLeasesCount = $expiringItems['accommodations']->count();
-    $expiringVehicleIssuesCount = $vehiclesList->count();
-    $projectsEndingThisMonthCount = $projectsEndingThisMonth->count();
-
-    $hasExpiringItems = $expiringDocsCount > 0
-        || $expiringVehicleIssuesCount > 0
-        || $expiringLeasesCount > 0
-        || $projectsEndingThisMonthCount > 0;
-
     $pl = function (int $n, string $one, string $few, string $many): string {
         $mod10 = $n % 10;
         $mod100 = $n % 100;
@@ -366,62 +332,10 @@
         </div>
 
         <div class="mt-3 pt-3 border-top" style="border-color: var(--glass-border) !important;">
-            <p class="small text-muted mb-3 mb-lg-2">Terminy wygasające oraz projekty kończące się w <strong>tym miesiącu</strong> (dokumenty, najmy, data końca projektu). Auta: OC, AC i przegląd w tym miesiącu oraz już po terminie.</p>
-            <div class="row g-3">
-                <div class="col-6 col-lg-3">
-                    <button
-                        type="button"
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="Lista dokumentów"
-                    @click.prevent="openPanel('expiring-documents', $event)"
-                    >
-                        <i class="bi bi-file-earmark-text weekly-logistics-metric__icon" aria-hidden="true"></i>
-                        <div class="weekly-logistics-metric__label">Dokumenty</div>
-                        <div class="weekly-logistics-metric__value">{{ $expiringDocsCount }}</div>
-                    </button>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <button
-                        type="button"
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="Lista najmów"
-                    @click.prevent="openPanel('expiring-leases', $event)"
-                    >
-                        <i class="bi bi-house-door weekly-logistics-metric__icon" aria-hidden="true"></i>
-                        <div class="weekly-logistics-metric__label">Najmy</div>
-                        <div class="weekly-logistics-metric__value">{{ $expiringLeasesCount }}</div>
-                    </button>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <button
-                        type="button"
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="OC, AC i przegląd — liczba terminów w tym miesiącu oraz już po terminie. Auto może mieć kilka."
-                    @click.prevent="openPanel('expiring-vehicles', $event)"
-                    >
-                        <i class="bi bi-car-front weekly-logistics-metric__icon" aria-hidden="true"></i>
-                        <div class="weekly-logistics-metric__label">Auta</div>
-                        <div class="weekly-logistics-metric__value">{{ $expiringVehicleIssuesCount }}</div>
-                    </button>
-                </div>
-                <div class="col-6 col-lg-3">
-                    <button
-                        type="button"
-                        class="weekly-logistics-metric p-3 text-center h-100 w-100 border-0 d-flex flex-column align-items-center justify-content-center"
-                    data-tip="Lista projektów z datą zakończenia w tym miesiącu"
-                    @click.prevent="openPanel('expiring-projects', $event)"
-                    >
-                        <i class="bi bi-kanban weekly-logistics-metric__icon" aria-hidden="true"></i>
-                        <div class="weekly-logistics-metric__label">Projekty</div>
-                        <div class="weekly-logistics-metric__value">{{ $projectsEndingThisMonthCount }}</div>
-                    </button>
-                </div>
-            </div>
+            @include('weekly-overview.partials.deadline-radar', [
+                'deadlineRadar' => $deadlineRadar,
+            ])
         </div>
-
-        @if(! $hasExpiringItems)
-            <p class="text-muted small text-center mb-0 mt-3">Brak dokumentów, ubezpieczeń, najmów i projektów kończących się w tym miesiącu.</p>
-        @endif
     </x-ui.card>
 
     <template x-if="active">
@@ -923,112 +837,6 @@
                     @endif
                 </div>
 
-                <div x-show="active === 'expiring-documents'" x-cloak>
-                    @if($expiringItems['documents']->isNotEmpty())
-                        <div class="small">
-                            @foreach($expiringItems['documents'] as $document)
-                                <div class="weekly-summary-popover-line">
-                                    <a href="{{ route('employee-documents.edit', $document) }}" class="text-decoration-none d-block">
-                                        <span class="fw-semibold">{{ $document->employee->full_name }}</span>
-                                        <span class="text-muted"> — {{ $document->document->name ?? 'Dokument' }}</span>
-                                        @if($document->type)
-                                            <span class="text-muted"> ({{ $document->type }})</span>
-                                        @endif
-                                        <div class="mt-1">
-                                            <i class="bi bi-calendar-event text-warning"></i>
-                                            <span class="text-muted">Ważny do:</span> {{ $document->valid_to->format('d.m.Y') }}
-                                        </div>
-                                    </a>
-                                </div>
-                            @endforeach
-                        </div>
-                        <div class="text-center mt-2 pt-2 border-top" style="border-color: var(--glass-border) !important;">
-                            <a href="{{ route('employee-documents.index', ['filterStatus' => 'wygasa_wkrotce']) }}" class="small">Pełna lista dokumentów</a>
-                        </div>
-                    @else
-                        <p class="text-muted small mb-0">Brak dokumentów wygasających w tym miesiącu.</p>
-                    @endif
-                </div>
-
-                <div x-show="active === 'expiring-leases'" x-cloak>
-                    @if($expiringItems['accommodations']->isNotEmpty())
-                        <div class="small">
-                            @foreach($expiringItems['accommodations'] as $accommodation)
-                                <div class="weekly-summary-popover-line">
-                                    <a href="{{ route('accommodations.edit', $accommodation) }}" class="text-decoration-none d-block">
-                                        <span class="fw-semibold">{{ $accommodation->name }}</span>
-                                        @if($accommodation->address)
-                                            <div class="text-muted small">{{ $accommodation->address }}</div>
-                                        @endif
-                                        <div class="mt-1">
-                                            <i class="bi bi-calendar-event text-warning"></i>
-                                            <span class="text-muted">Najem do:</span> {{ $accommodation->lease_end_date?->format('d.m.Y') ?? '—' }}
-                                        </div>
-                                    </a>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="text-muted small mb-0">Brak najmów kończących się w tym miesiącu.</p>
-                    @endif
-                </div>
-
-                <div x-show="active === 'expiring-vehicles'" x-cloak>
-                    @if($vehiclesList->isNotEmpty())
-                        <p class="text-muted small mb-2">OC, AC i przegląd z terminem w tym miesiącu albo już po terminie.</p>
-                        <div class="small">
-                            @foreach($vehiclesList as $item)
-                                @php
-                                    $vehicle = $item['vehicle'];
-                                    $type = $item['type'];
-                                    $date = $item['date'];
-                                    $overdue = $date && $date->copy()->startOfDay()->lt(\Carbon\Carbon::today());
-                                @endphp
-                                <div class="weekly-summary-popover-line">
-                                    <a href="{{ route('vehicles.edit', $vehicle) }}" class="text-decoration-none d-block">
-                                        <span class="fw-semibold">{{ $vehicle->registration_number }}</span>
-                                        <span class="text-muted small ms-1">{{ trim($vehicle->brand.' '.$vehicle->model) }}</span>
-                                        <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
-                                            @if($type === 'inspection')
-                                                <x-ui.badge variant="warning" class="small">Przegląd</x-ui.badge>
-                                            @elseif($type === 'ac')
-                                                <x-ui.badge variant="info" class="small">AC</x-ui.badge>
-                                            @else
-                                                <x-ui.badge variant="danger" class="small">OC</x-ui.badge>
-                                            @endif
-                                            <span><i class="bi bi-calendar-event"></i> {{ $date->format('d.m.Y') }}</span>
-                                            @if($overdue)
-                                                <span class="text-danger">po terminie</span>
-                                            @endif
-                                        </div>
-                                    </a>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="text-muted small mb-0">Brak kończących się lub przeterminowanych terminów OC, AC lub przeglądu.</p>
-                    @endif
-                </div>
-
-                <div x-show="active === 'expiring-projects'" x-cloak>
-                    @if($projectsEndingThisMonth->isNotEmpty())
-                        <div class="small">
-                            @foreach($projectsEndingThisMonth as $project)
-                                <div class="weekly-summary-popover-line">
-                                    <a href="{{ route('projects.show', $project) }}" class="text-decoration-none d-block">
-                                        <span class="fw-semibold">{{ $project->name }}</span>
-                                        <div class="mt-1">
-                                            <i class="bi bi-calendar-event text-warning"></i>
-                                            <span class="text-muted">Koniec:</span> {{ $project->end_date->format('d.m.Y') }}
-                                        </div>
-                                    </a>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <p class="text-muted small mb-0">Brak projektów z datą zakończenia w tym miesiącu.</p>
-                    @endif
-                </div>
             </div>
         </div>
     </template>
@@ -1074,10 +882,6 @@ document.addEventListener('alpine:init', () => {
                 'field-vehicles': 'Auta w terenie (tydzień)',
                 bench: 'Ławka',
                 'to-send': 'Do dosłania',
-                'expiring-documents': 'Dokumenty (miesiąc)',
-                'expiring-leases': 'Najmy (miesiąc)',
-                'expiring-vehicles': 'Auta (OC / AC / przegląd)',
-                'expiring-projects': 'Projekty (miesiąc)',
             };
 
             return map[this.active] || '';
@@ -1093,10 +897,6 @@ document.addEventListener('alpine:init', () => {
                 'field-vehicles': 'bi-car-front',
                 bench: 'bi-person-workspace',
                 'to-send': 'bi-box-arrow-up-right',
-                'expiring-documents': 'bi-file-earmark-text',
-                'expiring-leases': 'bi-house',
-                'expiring-vehicles': 'bi-car-front',
-                'expiring-projects': 'bi-kanban',
             };
 
             return map[this.active] || 'bi-info-circle';

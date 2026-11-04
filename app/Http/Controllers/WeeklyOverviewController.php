@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PlanningWeek;
 use App\Models\Project;
-use App\Services\ExpiringDocumentsService;
+use App\Services\DeadlineRadarService;
 use App\Services\WeeklyDashboardKpiService;
 use App\Services\WeeklyOverviewService;
 use App\Services\WeeklyStabilityService;
@@ -18,7 +18,7 @@ class WeeklyOverviewController extends Controller
     public function __construct(
         protected WeeklyOverviewService $weeklyOverviewService,
         protected WeeklyStabilityService $stabilityService,
-        protected ExpiringDocumentsService $expiringDocumentsService,
+        protected DeadlineRadarService $deadlineRadarService,
         protected WeeklyDashboardKpiService $weeklyDashboardKpiService
     ) {}
 
@@ -116,17 +116,8 @@ class WeeklyOverviewController extends Controller
         // Terminated employees who still have dangling assignments in this week
         $terminatedEmployeesWithAssignments = $this->weeklyOverviewService->getTerminatedEmployeesWithAssignments($weekStart, $weekEnd);
 
-        // Get expiring documents, vehicle inspections, and leases for this month
-        $expiringItems = $this->expiringDocumentsService->getExpiringThisMonth();
-
-        $monthStart = Carbon::now()->startOfMonth();
-        $monthEnd = Carbon::now()->endOfMonth();
-        $projectsEndingThisMonth = Project::query()
-            ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')])
-            ->orderBy('end_date')
-            ->orderBy('name')
-            ->get();
+        // Anchor = Monday of the week being reviewed (not wall-clock today).
+        $deadlineRadar = $this->deadlineRadarService->build($weekStart->copy()->startOfDay());
 
         $employeesInFieldCount = $this->weeklyDashboardKpiService->countEmployeesInFieldForWeek($weekStart, $weekEnd);
         $employeesNeededCount = $this->weeklyDashboardKpiService->totalDemandForWeek($weekStart, $weekEnd);
@@ -160,7 +151,7 @@ class WeeklyOverviewController extends Controller
         $planningWeek = PlanningWeek::forDate($weekStart);
         $staffingDemandMatrix = $this->weeklyDashboardKpiService->staffingDemandMatrix($weekStart, 4, $projectId);
 
-        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'allTransfers', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'expiringItems', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'projectsEndingThisMonth', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel', 'housingOccupied', 'housingCapacity', 'housingHouses', 'vehicleOccupied', 'vehicleCapacity', 'fieldVehicles', 'benchWithRotation', 'benchWithoutRotation', 'benchWithPeople', 'benchWithoutPeople', 'benchDayLabel', 'toSendCount', 'toSendNextDemand', 'toSendStaying', 'toSendDemandByProject', 'toSendStayingPeople', 'toSendLeavingPeople', 'planningWeek', 'staffingDemandMatrix'));
+        return view('weekly-overview.index', compact('weeks', 'projects', 'startDate', 'navigation', 'projectId', 'allProjects', 'users', 'returnTrips', 'allDepartures', 'allTransfers', 'departures', 'employeesWithoutProject', 'terminatedEmployeesWithAssignments', 'deadlineRadar', 'employeesInFieldCount', 'employeesNeededCount', 'employeesInFieldByProject', 'preloadedProjectAssignments', 'rotationsEnding', 'rotationHorizonLabel', 'housingOccupied', 'housingCapacity', 'housingHouses', 'vehicleOccupied', 'vehicleCapacity', 'fieldVehicles', 'benchWithRotation', 'benchWithoutRotation', 'benchWithPeople', 'benchWithoutPeople', 'benchDayLabel', 'toSendCount', 'toSendNextDemand', 'toSendStaying', 'toSendDemandByProject', 'toSendStayingPeople', 'toSendLeavingPeople', 'planningWeek', 'staffingDemandMatrix'));
     }
 
     /**

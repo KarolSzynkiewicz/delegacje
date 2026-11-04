@@ -175,36 +175,7 @@ final class DummyWorld
             'toSendLeavingPeople' => collect([
                 (object) ['id' => $people[3]->id, 'name' => $people[3]->full_name, 'rotation_end' => $weekStart->copy()->addDays(4)],
             ]),
-            'expiringItems' => [
-                'documents' => $docs,
-                'accommodations' => collect([
-                    new SnapRecord([
-                        'id' => 61,
-                        'name' => 'Papenburg — Am Deich 12',
-                        'address' => 'Am Deich 12, Papenburg',
-                        'lease_end_date' => $this->today->copy()->endOfMonth(),
-                    ]),
-                ]),
-                'vehicle_inspections' => collect([
-                    new SnapRecord([
-                        'id' => 21,
-                        'registration_number' => 'GDA 8K21',
-                        'brand' => 'VW',
-                        'model' => 'Transporter',
-                        'inspection_valid_to' => $this->today->copy()->addDays(18),
-                        'insurance_valid_to' => $this->today->copy()->addMonths(2),
-                    ]),
-                ]),
-                'vehicle_insurance' => collect(),
-                'vehicle_ac' => collect(),
-            ],
-            'projectsEndingThisMonth' => collect([
-                new SnapRecord([
-                    'id' => 52,
-                    'name' => 'HDW Kilonia — pokład',
-                    'end_date' => $this->today->copy()->endOfMonth()->subDays(3),
-                ]),
-            ]),
+            'deadlineRadar' => $this->deadlineRadar($docs, $people),
             'projectCard' => [
                 'name' => 'Meyer Werft — blok 7',
                 'location' => 'Papenburg',
@@ -214,6 +185,129 @@ final class DummyWorld
                     ['role' => 'Dekarz', 'need' => 1, 'have' => 0],
                 ],
                 'assigned' => [$people[0], $people[1], $people[4]],
+            ],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, SnapRecord>  $docs
+     * @param  list<SnapRecord>  $people
+     * @return array<string, mixed>
+     */
+    private function deadlineRadar(Collection $docs, array $people): array
+    {
+        $docDue = $this->today->copy()->addDays(12);
+        $leaseDue = $this->today->copy()->addDays(22);
+        $projectDue = $this->today->copy()->addDays(18);
+        $rotationDue = $this->today->copy()->addDays(4);
+        $inspectionDue = $this->today->copy()->addDays(9);
+
+        $items = [
+            [
+                'id' => 'document-31',
+                'lane' => 'documents',
+                'due_on' => $docDue->toDateString(),
+                'due_label' => $docDue->format('d.m.Y'),
+                'days' => 12,
+                'plot_offset' => 12,
+                'overdue' => false,
+                'urgency' => 'soon',
+                'title' => $docs[0]->employee->full_name ?? $people[0]->full_name,
+                'subtitle' => 'Uprawnienia spawalnicze MAG',
+                'url' => '#',
+                'badge' => null,
+            ],
+            [
+                'id' => 'lease-61',
+                'lane' => 'leases',
+                'due_on' => $leaseDue->toDateString(),
+                'due_label' => $leaseDue->format('d.m.Y'),
+                'days' => 22,
+                'plot_offset' => 22,
+                'overdue' => false,
+                'urgency' => 'later',
+                'title' => 'Papenburg — Am Deich 12',
+                'subtitle' => 'Am Deich 12, Papenburg',
+                'url' => '#',
+                'badge' => 'Najem',
+            ],
+            [
+                'id' => 'project-52',
+                'lane' => 'projects',
+                'due_on' => $projectDue->toDateString(),
+                'due_label' => $projectDue->format('d.m.Y'),
+                'days' => 18,
+                'plot_offset' => 18,
+                'overdue' => false,
+                'urgency' => 'later',
+                'title' => 'HDW Kilonia — pokład',
+                'subtitle' => 'Koniec projektu',
+                'url' => '#',
+                'badge' => null,
+            ],
+            [
+                'id' => 'rotation-71',
+                'lane' => 'rotations',
+                'due_on' => $rotationDue->toDateString(),
+                'due_label' => $rotationDue->format('d.m.Y'),
+                'days' => 4,
+                'plot_offset' => 4,
+                'overdue' => false,
+                'urgency' => 'critical',
+                'title' => $people[3]->full_name,
+                'subtitle' => 'Koniec rotacji',
+                'url' => '#',
+                'badge' => null,
+            ],
+            [
+                'id' => 'vehicle-21-Przegląd',
+                'lane' => 'vehicles',
+                'due_on' => $inspectionDue->toDateString(),
+                'due_label' => $inspectionDue->format('d.m.Y'),
+                'days' => 9,
+                'plot_offset' => 9,
+                'overdue' => false,
+                'urgency' => 'soon',
+                'title' => 'GDA 8K21',
+                'subtitle' => 'VW Transporter',
+                'url' => '#',
+                'badge' => 'Przegląd',
+            ],
+        ];
+
+        $clusters = collect($items)->map(fn (array $item) => [
+            'key' => $item['lane'].'|'.$item['due_on'],
+            'lane' => $item['lane'],
+            'due_on' => $item['due_on'],
+            'due_label' => $item['due_label'],
+            'days' => $item['days'],
+            'plot_offset' => $item['plot_offset'],
+            'count' => 1,
+            'count_label' => '1',
+            'show_count' => false,
+            'overdue' => false,
+            'urgency' => $item['urgency'],
+            'item_ids' => [$item['id']],
+        ])->values()->all();
+
+        return [
+            'today' => $this->today->toDateString(),
+            'plot_start_offset' => -7,
+            'plot_end_offset' => 30,
+            'forward_days' => 30,
+            'lanes' => [
+                ['key' => 'projects', 'label' => 'Projekty', 'color' => '#3b82f6', 'count' => 1],
+                ['key' => 'leases', 'label' => 'Najmy', 'color' => '#10b981', 'count' => 1],
+                ['key' => 'rotations', 'label' => 'Rotacje', 'color' => '#f59e0b', 'count' => 1],
+                ['key' => 'vehicles', 'label' => 'Auta', 'color' => '#60a5fa', 'count' => 1],
+                ['key' => 'documents', 'label' => 'Dokumenty', 'color' => '#a855f7', 'count' => 1],
+            ],
+            'items' => $items,
+            'clusters' => $clusters,
+            'kpis' => [
+                'within_7' => 1,
+                'overdue' => 0,
+                'monitored' => 5,
             ],
         ];
     }
