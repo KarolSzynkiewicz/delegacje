@@ -57,7 +57,7 @@
     .weekly-summary-popover-backdrop {
         position: fixed;
         inset: 0;
-        z-index: 10050;
+        z-index: 1080;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -474,6 +474,8 @@
         </div>
     </x-ui.card>
 
+    {{-- Teleport: inaczej backdrop-filter na sąsiednich kartach / wrapperze chowa panel pod spodem. --}}
+    <template x-teleport="body">
     <template x-if="active">
         <div
             class="weekly-summary-popover-backdrop"
@@ -972,6 +974,7 @@
 
             </div>
         </div>
+    </template>
     </template>
 </div>
 

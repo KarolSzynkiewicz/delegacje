@@ -149,8 +149,15 @@
         @endforelse
     </div>
 
-    <template x-if="activeCluster">
-        <div class="wo-radar__overlay" @click.self="closeCluster()">
+    {{-- Teleport do body: .card ma backdrop-filter i więzi position:fixed — panel lądował pod kolejną kartą. --}}
+    <template x-teleport="body">
+        <div
+            class="wo-radar__overlay"
+            x-show="activeCluster"
+            x-cloak
+            @click.self="closeCluster()"
+            @keydown.escape.window="activeCluster && closeCluster()"
+        >
             <div class="wo-radar__panel rounded-3 border p-3" @click.stop>
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                     <div>
