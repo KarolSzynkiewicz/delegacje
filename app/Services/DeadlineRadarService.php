@@ -106,6 +106,8 @@ final class DeadlineRadarService
     }
 
     /**
+     * Dokumenty okresowe aktywnych pracowników (bez zwolnionych — ich terminy nie są zagrożeniem).
+     *
      * @return Collection<int, array<string, mixed>>
      */
     private function documentItems(Carbon $windowStart, Carbon $windowEnd, Carbon $today): Collection
@@ -114,6 +116,7 @@ final class DeadlineRadarService
             ->where('kind', 'okresowy')
             ->whereNotNull('valid_to')
             ->whereBetween('valid_to', [$windowStart->toDateString(), $windowEnd->toDateString()])
+            ->whereHas('employee', fn ($query) => $query->whereNull('terminated_at'))
             ->with(['employee', 'document'])
             ->orderBy('valid_to')
             ->get()
@@ -133,9 +136,6 @@ final class DeadlineRadarService
             });
     }
 
-    /**
-     * @return Collection<int, array<string, mixed>>
-     */
     /**
      * Najmy od poniedziałku tygodnia w przód (bez historycznie zakończonych).
      *

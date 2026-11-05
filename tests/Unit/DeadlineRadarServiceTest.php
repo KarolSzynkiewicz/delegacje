@@ -167,6 +167,44 @@ class DeadlineRadarServiceTest extends TestCase
         $this->assertTrue($items->contains(fn ($item) => $item['title'] === 'Projekt w tym tygodniu'));
     }
 
+    public function test_documents_of_terminated_employees_are_excluded_from_radar(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-05'));
+        $monday = Carbon::parse('2026-11-02');
+        $docType = Document::factory()->create(['name' => 'Pasport']);
+
+        $active = Employee::factory()->create([
+            'first_name' => 'Aktualny',
+            'last_name' => 'Pracownik',
+            'terminated_at' => null,
+        ]);
+        $former = Employee::factory()->create([
+            'first_name' => 'Byly',
+            'last_name' => 'Pracownik',
+            'terminated_at' => '2026-09-01',
+        ]);
+
+        EmployeeDocument::factory()->create([
+            'employee_id' => $active->id,
+            'document_id' => $docType->id,
+            'kind' => 'okresowy',
+            'valid_to' => '2026-11-10',
+        ]);
+        EmployeeDocument::factory()->create([
+            'employee_id' => $former->id,
+            'document_id' => $docType->id,
+            'kind' => 'okresowy',
+            'valid_to' => '2026-11-08',
+        ]);
+
+        $radar = app(DeadlineRadarService::class)->build($monday);
+        $docItems = collect($radar['items'])->where('lane', 'documents');
+
+        $this->assertCount(1, $docItems);
+        $this->assertSame($active->full_name, $docItems->first()['title']);
+        $this->assertFalse($docItems->contains(fn ($item) => str_contains($item['title'], 'Byly')));
+    }
+
     public function test_anchor_is_reviewed_week_monday_not_wall_clock_today(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-11-04')); // Wednesday
