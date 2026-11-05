@@ -1,8 +1,11 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center gap-2">
             <h2 class="fw-semibold fs-4 mb-0">Pojazd</h2>
-            <x-ui.button variant="ghost" href="{{ route('vehicles.index') }}">Wróć do listy</x-ui.button>
+            <x-ui.button variant="ghost" href="{{ route('vehicles.index') }}" class="btn-sm flex-shrink-0">
+                <span class="d-none d-sm-inline">Wróć do listy</span>
+                <span class="d-sm-none"><i class="bi bi-arrow-left me-1"></i>Lista</span>
+            </x-ui.button>
         </div>
     </x-slot>
 
@@ -79,11 +82,15 @@
                                     <i class="bi bi-pencil me-1"></i>Edytuj
                                 </x-ui.button>
                                 <x-ui.button variant="ghost" type="button" class="btn-sm" data-bs-toggle="collapse" data-bs-target="#veh-place-panel" aria-expanded="{{ $errors->has('placement') ? 'true' : 'false' }}">
-                                    <i class="bi bi-geo-alt me-1"></i>Popraw lokalizację
+                                    <i class="bi bi-geo-alt me-1"></i>
+                                    <span class="d-none d-md-inline">Popraw lokalizację</span>
+                                    <span class="d-md-none">Lokalizacja</span>
                                 </x-ui.button>
                                 @if($vehicle->isRetired())
                                     <x-ui.button variant="ghost" type="submit" form="veh-reinstate" class="btn-sm">
-                                        <i class="bi bi-arrow-counterclockwise me-1"></i>Przywróć do floty
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i>
+                                        <span class="d-none d-md-inline">Przywróć do floty</span>
+                                        <span class="d-md-none">Przywróć</span>
                                     </x-ui.button>
                                 @else
                                     <x-ui.button variant="danger" type="button" class="btn-sm" data-bs-toggle="collapse" data-bs-target="#veh-retire-panel" aria-expanded="{{ $errors->has('reason') ? 'true' : 'false' }}">
@@ -96,7 +103,7 @@
 
                     <h1 class="emp-hero__name font-mono">{{ $vehicle->registration_number }}</h1>
                     @if($brandLine !== '')
-                        <p class="text-muted mb-0">{{ $brandLine }}</p>
+                        <p class="emp-hero__brand">{{ $brandLine }}</p>
                     @endif
 
                     <div class="veh-crew">
@@ -111,12 +118,17 @@
                                 <div class="veh-crew__name">{{ $person->full_name }}</div>
                             </a>
                         @endforeach
-                        @for($empty = 0; $empty < $emptySeats; $empty++)
-                            <div class="veh-crew__person">
-                                <div class="veh-seat-empty"></div>
-                                <div class="veh-crew__role">Wolne miejsce</div>
+                        @if($emptySeats > 0)
+                            <div class="veh-crew__empties" aria-label="{{ $emptySeats }} wolnych miejsc">
+                                @for($empty = 0; $empty < $emptySeats; $empty++)
+                                    <div class="veh-crew__person veh-crew__person--empty">
+                                        <div class="veh-seat-empty" aria-hidden="true"></div>
+                                        <div class="veh-crew__role">Wolne miejsce</div>
+                                    </div>
+                                @endfor
+                                <span class="veh-crew__empties-count">{{ $emptySeats }} wolne</span>
                             </div>
-                        @endfor
+                        @endif
                     </div>
 
                     @if($canEditVehicle)

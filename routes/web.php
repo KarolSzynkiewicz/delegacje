@@ -492,12 +492,16 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::resource('accommodations', AccommodationController::class);
         Route::resource('companies', CompanyController::class);
         Route::resource('company-assignments', CompanyAssignmentController::class);
+        // Najmy = część mieszkania (te same uprawnienia co accommodations.*, nie osobny zasób leases.*)
         Route::post('accommodations/{accommodation}/leases', [AccommodationController::class, 'storeLease'])
-            ->name('accommodations.leases.store');
+            ->name('accommodations.leases.store')
+            ->defaults('resource', 'accommodations');
         Route::put('accommodations/{accommodation}/leases/{lease}', [AccommodationController::class, 'updateLease'])
-            ->name('accommodations.leases.update');
+            ->name('accommodations.leases.update')
+            ->defaults('resource', 'accommodations');
         Route::delete('accommodations/{accommodation}/leases/{lease}', [AccommodationController::class, 'destroyLease'])
-            ->name('accommodations.leases.destroy');
+            ->name('accommodations.leases.destroy')
+            ->defaults('resource', 'accommodations');
 
         // Vehicle Repairs (książka serwisowa)
         Route::get('vehicle-repairs/{vehicleRepair}/complete', [\App\Http\Controllers\VehicleRepairController::class, 'completeForm'])

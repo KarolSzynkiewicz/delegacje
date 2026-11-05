@@ -24,7 +24,7 @@ final class DeadlineRadarService
     public const PLOT_OVERDUE_DAYS = 7;
 
     /**
-     * @param  Carbon|null  $anchor  Reference day for “dziś” on the plot.
+     * @param  Carbon|null  $anchor  Week Monday on the plot (not wall-clock “today”).
      *                               Weekly overview passes the reviewed week’s Monday.
      * @return array{
      *     today: string,
@@ -41,7 +41,6 @@ final class DeadlineRadarService
     public function build(?Carbon $anchor = null): array
     {
         $today = ($anchor ?? Carbon::today()->startOfWeek())->copy()->startOfDay();
-        $isCurrentWeek = $today->isSameDay(Carbon::today()->startOfWeek());
         $windowStart = $today->copy()->subDays(self::OVERDUE_LOOKBACK_DAYS);
         $windowEnd = $today->copy()->addDays(self::FORWARD_DAYS);
 
@@ -73,7 +72,8 @@ final class DeadlineRadarService
 
         return [
             'today' => $today->toDateString(),
-            'anchor_label' => $isCurrentWeek ? 'dziś' : 'pon '.$today->format('d.m'),
+            // Kotwica osi to zawsze poniedziałek przeglądanego tygodnia — nie „dziś” z zegara.
+            'anchor_label' => 'pon '.$today->format('d.m'),
             'plot_start_offset' => -self::PLOT_OVERDUE_DAYS,
             'plot_end_offset' => self::FORWARD_DAYS,
             'forward_days' => self::FORWARD_DAYS,
@@ -326,7 +326,7 @@ final class DeadlineRadarService
 
     /**
      * Future items: one cluster per lane+day.
-     * Overdue items: one cluster per lane (no date split), pinned left of "dziś".
+     * Overdue items: one cluster per lane (no date split), pinned left of week Monday.
      *
      * @param  Collection<int, array<string, mixed>>  $items
      * @return list<array<string, mixed>>

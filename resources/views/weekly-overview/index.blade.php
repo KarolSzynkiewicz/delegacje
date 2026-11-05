@@ -96,11 +96,6 @@
         'toSendDemandByProject' => $toSendDemandByProject,
         'toSendStayingPeople' => $toSendStayingPeople,
         'toSendLeavingPeople' => $toSendLeavingPeople,
-        'deadlineRadar' => $deadlineRadar,
-    ])
-
-    @include('weekly-overview.partials.staffing-demand-matrix', [
-        'staffingDemandMatrix' => $staffingDemandMatrix,
     ])
 
     <div class="mb-4" id="week-comments">
@@ -111,6 +106,16 @@
             button-text="Dodaj komentarz"
         />
     </div>
+
+    @include('weekly-overview.partials.staffing-demand-matrix', [
+        'staffingDemandMatrix' => $staffingDemandMatrix,
+    ])
+
+    <x-ui.card class="mb-4" id="deadline-radar">
+        @include('weekly-overview.partials.deadline-radar', [
+            'deadlineRadar' => $deadlineRadar,
+        ])
+    </x-ui.card>
 
     <!-- Sekcja: Pracownicy bez projektu, ale z autem lub domem -->
     @if(isset($employeesWithoutProject) && $employeesWithoutProject->isNotEmpty())
@@ -958,10 +963,28 @@
                 });
             }
 
-            function initDemandTrendChart() {
-                if (!window.Chart) return;
-                const canvas = document.getElementById('wo-demand-trend-chart');
-                if (!canvas) return;
+            function whenVisible(el, callback) {
+                if (!el || typeof callback !== 'function') return;
+                if (el.dataset.woChartReady === '1') return;
+                const run = () => {
+                    if (el.dataset.woChartReady === '1') return;
+                    el.dataset.woChartReady = '1';
+                    callback();
+                };
+                if (typeof IntersectionObserver === 'undefined') {
+                    run();
+                    return;
+                }
+                const io = new IntersectionObserver((entries) => {
+                    if (!entries.some((entry) => entry.isIntersecting)) return;
+                    io.disconnect();
+                    run();
+                }, { threshold: 0.2, rootMargin: '0px 0px -6% 0px' });
+                io.observe(el);
+            }
+
+            function initDemandTrendChart(canvas) {
+                if (!window.Chart || !canvas) return;
 
                 let payload = null;
                 try {
@@ -1062,6 +1085,7 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         interaction: { mode: 'index', intersect: false },
+                        animation: { duration: 750 },
                         plugins: {
                             legend: { display: false },
                             tooltip: {
@@ -1097,6 +1121,79 @@
                 });
             }
 
+            function initDemandDonut(canvas) {
+                if (!window.Chart || !canvas) return;
+                const labels = JSON.parse(canvas.dataset.labels || '[]');
+                const values = JSON.parse(canvas.dataset.values || '[]');
+                const colors = JSON.parse(canvas.dataset.colors || '[]');
+                if (!labels.length) return;
+                const chartColors = colors.length ? colors : labels.map((_, i) => mkColor(i));
+                new Chart(canvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: chartColors.map(c => mkAlpha(c, 0.55)),
+                            borderColor: chartColors,
+                            borderWidth: 2,
+                            hoverOffset: 4,
+                        }],
+                    },
+                    options: {
+                        responsive: false,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        animation: { animateRotate: true, duration: 850 },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` ${ctx.label}: ${ctx.raw} potrzebnych`,
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+
+            function initFulfillDonut(canvas) {
+                if (!window.Chart || !canvas) return;
+                const labels = JSON.parse(canvas.dataset.labels || '[]');
+                const values = JSON.parse(canvas.dataset.values || '[]');
+                const colors = JSON.parse(canvas.dataset.colors || '[]');
+                const gaps = JSON.parse(canvas.dataset.gaps || '[]');
+                if (!values.length) return;
+                new Chart(canvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: colors.map((c, i) => gaps[i] ? c : mkAlpha(c, 0.7)),
+                            borderColor: colors.map((c, i) => gaps[i] ? 'transparent' : c),
+                            borderWidth: colors.map((_, i) => gaps[i] ? 0 : 2),
+                            hoverOffset: colors.map((_, i) => gaps[i] ? 0 : 4),
+                        }],
+                    },
+                    options: {
+                        responsive: false,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        animation: { animateRotate: true, duration: 850 },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                filter: (item) => !gaps[item.dataIndex],
+                                callbacks: {
+                                    label: ctx => ` ${ctx.label}: ${ctx.raw}`,
+                                },
+                            },
+                        },
+                    },
+                });
+            }
+
             function initDemandCharts() {
                 if (!window.Chart) return;
 
@@ -1105,77 +1202,15 @@
                 Chart.defaults.font.family = "'Space Grotesk', system-ui, sans-serif";
                 Chart.defaults.font.size = 11;
 
-                initDemandTrendChart();
-
-                // Main demand donut (roles × needed only)
-                document.querySelectorAll('.wo-demand-chart').forEach(canvas => {
-                    const labels = JSON.parse(canvas.dataset.labels || '[]');
-                    const values = JSON.parse(canvas.dataset.values || '[]');
-                    const colors = JSON.parse(canvas.dataset.colors || '[]');
-                    if (!labels.length) return;
-                    const chartColors = colors.length ? colors : labels.map((_, i) => mkColor(i));
-                    new Chart(canvas.getContext('2d'), {
-                        type: 'doughnut',
-                        data: {
-                            labels,
-                            datasets: [{
-                                data: values,
-                                backgroundColor: chartColors.map(c => mkAlpha(c, 0.55)),
-                                borderColor: chartColors,
-                                borderWidth: 2,
-                                hoverOffset: 4,
-                            }],
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            cutout: '70%',
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    callbacks: {
-                                        label: ctx => ` ${ctx.label}: ${ctx.raw} potrzebnych`,
-                                    },
-                                },
-                            },
-                        },
-                    });
+                // Animacje startują dopiero gdy wykres wchodzi w viewport.
+                whenVisible(document.getElementById('wo-demand-trend-chart'), () => {
+                    initDemandTrendChart(document.getElementById('wo-demand-trend-chart'));
                 });
-
-                // Fulfillment donuts: assigned seniority slices + empty remainder to needed
-                document.querySelectorAll('.wo-fulfill-chart').forEach(canvas => {
-                    const labels = JSON.parse(canvas.dataset.labels || '[]');
-                    const values = JSON.parse(canvas.dataset.values || '[]');
-                    const colors = JSON.parse(canvas.dataset.colors || '[]');
-                    const gaps = JSON.parse(canvas.dataset.gaps || '[]');
-                    if (!values.length) return;
-                    new Chart(canvas.getContext('2d'), {
-                        type: 'doughnut',
-                        data: {
-                            labels,
-                            datasets: [{
-                                data: values,
-                                backgroundColor: colors.map((c, i) => gaps[i] ? c : mkAlpha(c, 0.7)),
-                                borderColor: colors.map((c, i) => gaps[i] ? 'transparent' : c),
-                                borderWidth: colors.map((_, i) => gaps[i] ? 0 : 2),
-                                hoverOffset: colors.map((_, i) => gaps[i] ? 0 : 4),
-                            }],
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            cutout: '70%',
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    filter: (item) => !gaps[item.dataIndex],
-                                    callbacks: {
-                                        label: ctx => ` ${ctx.label}: ${ctx.raw}`,
-                                    },
-                                },
-                            },
-                        },
-                    });
+                document.querySelectorAll('.wo-demand-chart').forEach((canvas) => {
+                    whenVisible(canvas, () => initDemandDonut(canvas));
+                });
+                document.querySelectorAll('.wo-fulfill-chart').forEach((canvas) => {
+                    whenVisible(canvas, () => initFulfillDonut(canvas));
                 });
             }
 

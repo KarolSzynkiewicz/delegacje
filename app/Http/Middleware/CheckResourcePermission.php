@@ -71,6 +71,11 @@ class CheckResourcePermission
         if (!$hasPermission && $routeName && str_starts_with($routeName, 'vehicle-repairs.')) {
             $hasPermission = $user->hasPermission('vehicle-assignments.view');
         }
+
+        // Legacy leases.* (sprzed scalenia z accommodations) — ten sam krąg co mieszkania
+        if (!$hasPermission && is_string($permissionName) && str_starts_with($permissionName, 'leases.')) {
+            $hasPermission = $user->hasPermission('accommodations.'.substr($permissionName, strlen('leases.')));
+        }
         
         if (!$hasPermission) {
             Log::warning('CheckResourcePermission: Permission denied', [

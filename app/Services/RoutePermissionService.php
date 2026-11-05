@@ -299,6 +299,8 @@ class RoutePermissionService
             $nestedMappings = [
                 'vehicles' => 'vehicle-assignments',
                 'accommodations' => 'accommodation-assignments',
+                // accommodations.leases.* → accommodations.* (okres najmu to część mieszkania)
+                'leases' => 'accommodations',
             ];
 
             return $nestedMappings[$lastPart] ?? $lastPart;
@@ -430,7 +432,12 @@ class RoutePermissionService
     public function clearCache(): void
     {
         Cache::forget('all_route_permissions');
-        // Note: Individual route permissions are cached with key "route_permission:{routeName}"
-        // They will expire after 1h, or you can clear all cache with Cache::flush()
+
+        foreach (Route::getRoutes() as $route) {
+            $routeName = $route->getName();
+            if ($routeName) {
+                Cache::forget("route_permission:{$routeName}");
+            }
+        }
     }
 }

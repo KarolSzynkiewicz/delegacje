@@ -37,8 +37,13 @@
         'toSendDemandByProject' => $w['toSendDemandByProject'],
         'toSendStayingPeople' => $w['toSendStayingPeople'],
         'toSendLeavingPeople' => $w['toSendLeavingPeople'],
-        'deadlineRadar' => $w['deadlineRadar'],
     ])
+
+    <x-ui.card class="mt-3 mb-3">
+        @include('weekly-overview.partials.deadline-radar', [
+            'deadlineRadar' => $w['deadlineRadar'],
+        ])
+    </x-ui.card>
 
     <x-ui.card label="{{ $project['name'] }} · {{ $project['location'] }}" class="mt-3">
         <div class="row g-3">

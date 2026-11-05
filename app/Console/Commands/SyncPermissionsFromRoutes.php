@@ -58,10 +58,29 @@ class SyncPermissionsFromRoutes extends Command
         
         $bar->finish();
         $this->newLine(2);
+
+        // Usuń osierocone leases.* (scalane z accommodations.*)
+        $obsolete = Permission::query()
+            ->where('guard_name', 'web')
+            ->where('name', 'like', 'leases.%')
+            ->get();
+        $deleted = 0;
+        foreach ($obsolete as $permission) {
+            $permission->roles()->detach();
+            if (method_exists($permission, 'users')) {
+                $permission->users()->detach();
+            }
+            $permission->delete();
+            $deleted++;
+        }
+
+        $routePermissionService->clearCache();
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
         
         $this->info("Synchronization complete!");
         $this->info("Created: {$created} permissions");
         $this->info("Updated: {$updated} permissions");
+        $this->info("Deleted obsolete leases.*: {$deleted}");
         $this->info("Total route permissions: {$routePermissions->count()}");
         
         return Command::SUCCESS;

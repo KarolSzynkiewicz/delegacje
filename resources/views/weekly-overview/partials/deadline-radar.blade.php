@@ -8,12 +8,15 @@
     $plotEnd = (int) ($deadlineRadar['plot_end_offset'] ?? 30);
     $plotSpan = max(1, $plotEnd - $plotStart);
     $forwardDays = (int) ($deadlineRadar['forward_days'] ?? 30);
-    $anchorLabel = $deadlineRadar['anchor_label'] ?? 'dziś';
+    $anchorLabel = $deadlineRadar['anchor_label'] ?? 'pon';
     $clustersByLane = collect($clusters)->groupBy('lane');
     $markers = [0, 7, 14, 21, 30];
-    $criticalLeft = (($plotStart * -1) / $plotSpan) * 100;
-    $criticalWidth = (14 / $plotSpan) * 100;
-    $todayLeft = (($plotStart * -1) / $plotSpan) * 100;
+    // Strefa bólu: zaległe (lewa krawędź okna) → +14 dni od poniedziałku tygodnia.
+    $criticalStart = $plotStart;
+    $criticalEnd = 14;
+    $criticalLeft = (($criticalStart - $plotStart) / $plotSpan) * 100;
+    $criticalWidth = (($criticalEnd - $criticalStart) / $plotSpan) * 100;
+    $todayLeft = ((0 - $plotStart) / $plotSpan) * 100;
     $mark7Left = ((7 - $plotStart) / $plotSpan) * 100;
 @endphp
 
@@ -47,10 +50,10 @@
             </p>
         </div>
         <div class="wo-radar__kpis">
-            <span class="wo-radar__kpi wo-radar__kpi--warn" title="Terminy w ciągu 7 dni (włącznie z dziś)">
+            <span class="wo-radar__kpi wo-radar__kpi--warn" title="Terminy od poniedziałku tygodnia do +7 dni">
                 Wygasa w 7 dni: <strong>{{ $kpis['within_7'] }}</strong>
             </span>
-            <span class="wo-radar__kpi wo-radar__kpi--danger" title="Terminy już po dacie">
+            <span class="wo-radar__kpi wo-radar__kpi--danger" title="Terminy przed poniedziałkiem przeglądanego tygodnia">
                 Po terminie: <strong>{{ $kpis['overdue'] }}</strong>
             </span>
             <span class="wo-radar__kpi" title="Wszystkie terminy w oknie radaru">
@@ -186,14 +189,22 @@ document.addEventListener('alpine:init', () => {
         clusters: payload.clusters || [],
         items: payload.items || [],
         activeKey: null,
-        booting: true,
+        booting: false,
         init() {
             const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            if (reduce) {
-                this.booting = false;
+            if (reduce || typeof IntersectionObserver === 'undefined') {
                 return;
             }
-            window.setTimeout(() => { this.booting = false; }, 1600);
+            const el = this.$el;
+            const io = new IntersectionObserver((entries) => {
+                if (!entries.some((entry) => entry.isIntersecting)) {
+                    return;
+                }
+                io.disconnect();
+                this.booting = true;
+                window.setTimeout(() => { this.booting = false; }, 1600);
+            }, { threshold: 0.2, rootMargin: '0px 0px -8% 0px' });
+            io.observe(el);
         },
         get activeCluster() {
             if (!this.activeKey) return null;
@@ -232,7 +243,7 @@ document.addEventListener('alpine:init', () => {
             if (!cluster) return '';
             const n = cluster.count || 0;
             if (cluster.overdue) return n + ' po terminie';
-            if (cluster.days === 0) return n + ' dziś';
+            if (cluster.days === 0) return n + ' w poniedziałek';
             if (cluster.days === 1) return n + ' za 1 dzień';
             return n + ' za ' + cluster.days + ' dni';
         },

@@ -54,21 +54,151 @@
         color: var(--text-muted);
         margin-top: 0.3rem;
     }
+    .weekly-summary-popover-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: max(0.85rem, env(safe-area-inset-top)) 0.85rem max(0.85rem, env(safe-area-inset-bottom));
+        background: rgba(2, 6, 14, 0.72);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+    }
     .weekly-logistics-popover-panel {
-        background: rgba(30, 41, 59, 0.97) !important;
+        position: relative;
+        width: min(440px, calc(100vw - 1.7rem));
+        max-height: min(78vh, 640px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0 !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(148, 163, 184, 0.28) !important;
+        background:
+            linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(11, 16, 28, 0.98)) !important;
+        box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+            0 24px 64px rgba(0, 0, 0, 0.55),
+            0 8px 24px rgba(0, 0, 0, 0.35);
+        color: var(--text-main);
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    }
+    .weekly-logistics-popover-panel::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        pointer-events: none;
+    }
+    .weekly-summary-popover-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 1rem 1.05rem 0.85rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+        flex-shrink: 0;
+    }
+    .weekly-summary-popover-head__title {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        min-width: 0;
+    }
+    .weekly-summary-popover-head__icon {
+        width: 2.1rem;
+        height: 2.1rem;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(168, 85, 247, 0.18));
+        border: 1px solid rgba(59, 130, 246, 0.28);
+        color: #93c5fd;
+        font-size: 1rem;
+    }
+    .weekly-summary-popover-head__icon i {
+        color: inherit !important;
+    }
+    .weekly-summary-popover-head h6 {
+        margin: 0;
+        font-size: 0.98rem;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+        line-height: 1.25;
+        color: var(--text-main) !important;
+    }
+    .weekly-summary-popover-body {
+        padding: 0.85rem 1.05rem 1.05rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        min-height: 0;
     }
     .weekly-summary-popover-line {
-        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-        padding-bottom: 0.65rem;
-        margin-bottom: 0.65rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+        padding: 0.7rem 0.1rem;
+        margin: 0;
+        gap: 0.75rem;
     }
     .weekly-summary-popover-line:last-child {
         border-bottom: 0;
-        padding-bottom: 0;
-        margin-bottom: 0;
+        padding-bottom: 0.15rem;
+    }
+    .weekly-summary-popover-line a,
+    .weekly-summary-popover-line .fw-semibold {
+        color: var(--text-main) !important;
+    }
+    .weekly-summary-popover-line a:hover {
+        color: #93c5fd !important;
+    }
+    .weekly-summary-popover-value {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 3.25rem;
+        padding: 0.22rem 0.55rem;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-main) !important;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 0.78rem;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.01em;
+        flex-shrink: 0;
+        line-height: 1.2;
+    }
+    .weekly-summary-popover-lead {
+        margin: 0 0 0.75rem;
+        font-size: 0.8rem;
+        line-height: 1.45;
+        color: var(--text-muted) !important;
+    }
+    .weekly-summary-popover-tip {
+        margin: 0.85rem 0 0;
+        padding: 0.75rem 0.85rem;
+        border-radius: 12px;
+        border: 1px solid rgba(59, 130, 246, 0.22);
+        background: rgba(59, 130, 246, 0.08);
+        font-size: 0.78rem;
+        line-height: 1.5;
+        color: #cbd5e1 !important;
+    }
+    .weekly-summary-popover-section {
+        margin: 0 0 0.45rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted) !important;
     }
     .wo-dep-hero {
         display: flex;
@@ -130,10 +260,22 @@
         white-space: nowrap;
     }
     .weekly-logistics-popover-panel.wo-dep-panel {
-        width: min(720px, calc(100vw - 24px)) !important;
-        max-width: min(720px, calc(100vw - 24px)) !important;
-        /* Pięć wierszy (dzień + awatar 42px + status) mieści się bez scrolla. */
-        max-height: min(92vh, 780px) !important;
+        width: min(720px, calc(100vw - 1.7rem)) !important;
+        max-width: min(720px, calc(100vw - 1.7rem)) !important;
+        max-height: min(88vh, 780px) !important;
+    }
+    @media (max-width: 575.98px) {
+        .weekly-summary-popover-backdrop {
+            align-items: flex-end;
+            padding: 0;
+        }
+        .weekly-logistics-popover-panel,
+        .weekly-logistics-popover-panel.wo-dep-panel {
+            width: 100% !important;
+            max-width: 100% !important;
+            max-height: min(88vh, 720px) !important;
+            border-radius: 16px 16px 0 0 !important;
+        }
     }
 </style>
 
@@ -330,48 +472,38 @@
                 </div>
             </div>
         </div>
-
-        <div class="mt-3 pt-3 border-top" style="border-color: var(--glass-border) !important;">
-            @include('weekly-overview.partials.deadline-radar', [
-                'deadlineRadar' => $deadlineRadar,
-            ])
-        </div>
     </x-ui.card>
 
     <template x-if="active">
         <div
-            class="position-fixed top-0 start-0 w-100 h-100"
-            style="background: rgba(0, 0, 0, 0.55); z-index: 10050;"
+            class="weekly-summary-popover-backdrop"
             @click.self="close()"
         >
             <div
-                x-ref="panel"
-                class="weekly-logistics-popover-panel rounded-3 border p-3"
+                class="weekly-logistics-popover-panel"
                 :class="active === 'departures' || active === 'returns' ? 'wo-dep-panel' : ''"
-                style="
-                    width: min(420px, calc(100vw - 24px));
-                    max-height: min(70vh, 560px);
-                    overflow-y: auto;
-                    border-color: var(--glass-border) !important;
-                    color: var(--text-main);
-                "
+                role="dialog"
+                aria-modal="true"
+                :aria-label="panelTitle()"
                 @click.stop
             >
-                <div class="d-flex justify-content-between align-items-start gap-2 border-bottom pb-2 mb-2" style="border-color: var(--glass-border) !important;">
-                    {{-- Jeden tytuł: x-show + Bootstrap d-inline-flex psowało ukrywanie (display !important) --}}
-                    <h6 class="fw-semibold mb-0 d-flex align-items-center gap-2 flex-wrap" :class="active === 'departures' || active === 'returns' ? 'fs-6' : 'small'" style="letter-spacing: 0.02em;">
-                        <i class="bi flex-shrink-0" :class="panelIconClass()" x-show="active !== 'departures' && active !== 'returns'"></i>
-                        <span x-text="panelTitle()"></span>
-                    </h6>
-                    <button type="button" class="btn-close flex-shrink-0" aria-label="Zamknij" @click="close()"></button>
+                <div class="weekly-summary-popover-head">
+                    <div class="weekly-summary-popover-head__title">
+                        <span class="weekly-summary-popover-head__icon" aria-hidden="true">
+                            <i class="bi" :class="panelIconClass()"></i>
+                        </span>
+                        <h6 x-text="panelTitle()"></h6>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white flex-shrink-0 mt-1" aria-label="Zamknij" @click="close()"></button>
                 </div>
 
+                <div class="weekly-summary-popover-body">
                 <div x-show="active === 'rotations-ending'" x-cloak>
                     @if(collect($rotationsEnding ?? [])->isNotEmpty())
-                        <p class="text-muted small mb-2">Koniec rotacji w oknie {{ $rotationHorizonLabel }} (ten tydzień i przyszła środa włącznie).</p>
-                        <ul class="mb-0 small list-unstyled">
+                        <p class="weekly-summary-popover-lead">Koniec rotacji w oknie {{ $rotationHorizonLabel }} (ten tydzień i przyszła środa włącznie).</p>
+                        <ul class="mb-0 list-unstyled">
                             @foreach($rotationsEnding as $rotation)
-                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-center">
                                     @if($rotation->employee)
                                         <a href="{{ route('employees.rotations.show', [$rotation->employee, $rotation]) }}" class="text-decoration-none min-w-0 flex-grow-1">
                                             <span class="fw-semibold">{{ $rotation->employee->full_name }}</span>
@@ -379,12 +511,12 @@
                                     @else
                                         <span class="fw-semibold">—</span>
                                     @endif
-                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $rotation->end_date->format('d.m.Y') }}</span>
+                                    <span class="weekly-summary-popover-value">{{ $rotation->end_date->format('d.m.Y') }}</span>
                                 </li>
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-0">Nikt nie kończy rotacji w tym tygodniu ani do najbliższej środy po nim.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Nikt nie kończy rotacji w tym tygodniu ani do najbliższej środy po nim.</p>
                     @endif
                 </div>
 
@@ -432,51 +564,51 @@
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-0">Brak transferów w tym tygodniu.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Brak transferów w tym tygodniu.</p>
                     @endif
                 </div>
 
                 <div x-show="active === 'housing'" x-cloak>
-                    <p class="text-muted small mb-2">Osoby w domu / miejsca. Suma to {{ $housingOccupied }}/{{ $housingCapacity }}. Pusty dom też jest na liście. Kto zmienia dom w tygodniu, liczy się w każdym.</p>
+                    <p class="weekly-summary-popover-lead">Osoby w domu / miejsca. Suma to {{ $housingOccupied }}/{{ $housingCapacity }}. Pusty dom też jest na liście. Kto zmienia dom w tygodniu, liczy się w każdym.</p>
                     @if($housingHouses->isNotEmpty())
-                        <ul class="mb-0 small list-unstyled">
+                        <ul class="mb-0 list-unstyled">
                             @foreach($housingHouses->sortByDesc('occupied') as $house)
-                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-center">
                                     <a href="{{ route('accommodations.show', $house->id) }}" class="text-decoration-none min-w-0 flex-grow-1">
                                         <span class="fw-semibold">{{ $house->name }}</span>
                                     </a>
-                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $house->occupied }}/{{ $house->capacity }}</span>
+                                    <span class="weekly-summary-popover-value">{{ $house->occupied }}/{{ $house->capacity }}</span>
                                 </li>
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-0">W tym tygodniu nie ma domów własnych ani wynajętych.</p>
+                        <p class="weekly-summary-popover-lead mb-0">W tym tygodniu nie ma domów własnych ani wynajętych.</p>
                     @endif
                 </div>
 
                 <div x-show="active === 'field-vehicles'" x-cloak>
-                    <p class="text-muted small mb-2">Osoby z przypisań / fotele. Suma to {{ $vehicleOccupied }}/{{ $vehicleCapacity }}. Tylko auta poza bazą, bez serwisu i bez wyjazdu, zjazdu albo transferu w tym tygodniu.</p>
+                    <p class="weekly-summary-popover-lead">Osoby z przypisań / fotele. Suma to {{ $vehicleOccupied }}/{{ $vehicleCapacity }}. Tylko auta poza bazą, bez serwisu i bez wyjazdu, zjazdu albo transferu w tym tygodniu.</p>
                     @if($fieldVehicles->isNotEmpty())
-                        <ul class="mb-0 small list-unstyled">
+                        <ul class="mb-0 list-unstyled">
                             @foreach($fieldVehicles->sortByDesc('occupied') as $vehicle)
-                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-center">
                                     <a href="{{ route('vehicles.show', $vehicle->id) }}" class="text-decoration-none min-w-0 flex-grow-1">
                                         <span class="fw-semibold">{{ $vehicle->name }}</span>
                                     </a>
-                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $vehicle->occupied }}/{{ $vehicle->capacity }}</span>
+                                    <span class="weekly-summary-popover-value">{{ $vehicle->occupied }}/{{ $vehicle->capacity }}</span>
                                 </li>
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-0">Żadne auto nie jest w tym tygodniu w terenie.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Żadne auto nie jest w tym tygodniu w terenie.</p>
                     @endif
                 </div>
 
                 <div x-show="active === 'bench'" x-cloak>
-                    <p class="text-muted small mb-2">Stan na {{ $benchDayLabel }}. W bazie z rotacją: {{ $benchWithRotation }}. W bazie bez rotacji: {{ $benchWithoutRotation }}. Rotacja liczy się, gdy obejmuje ten dzień albo zaczyna się do końca okna {{ $rotationWindow }}.</p>
-                    <p class="small fw-semibold mb-1">W bazie z rotacją</p>
+                    <p class="weekly-summary-popover-lead">Stan na {{ $benchDayLabel }}. W bazie z rotacją: {{ $benchWithRotation }}. W bazie bez rotacji: {{ $benchWithoutRotation }}. Rotacja liczy się, gdy obejmuje ten dzień albo zaczyna się do końca okna {{ $rotationWindow }}.</p>
+                    <p class="weekly-summary-popover-section">W bazie z rotacją</p>
                     @if($benchWithPeople->isNotEmpty())
-                        <ul class="mb-3 small list-unstyled">
+                        <ul class="mb-3 list-unstyled">
                             @foreach($benchWithPeople as $person)
                                 <li class="weekly-summary-popover-line">
                                     <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none">
@@ -486,11 +618,11 @@
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-3">Nikt.</p>
+                        <p class="weekly-summary-popover-lead mb-3">Nikt.</p>
                     @endif
-                    <p class="small fw-semibold mb-1">W bazie bez rotacji</p>
+                    <p class="weekly-summary-popover-section">W bazie bez rotacji</p>
                     @if($benchWithoutPeople->isNotEmpty())
-                        <ul class="mb-0 small list-unstyled">
+                        <ul class="mb-0 list-unstyled">
                             @foreach($benchWithoutPeople as $person)
                                 <li class="weekly-summary-popover-line">
                                     <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none">
@@ -500,35 +632,35 @@
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-0">Nikt.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Nikt.</p>
                     @endif
                 </div>
 
                 <div x-show="active === 'to-send'" x-cloak>
-                    <p class="text-muted small mb-2">
+                    <p class="weekly-summary-popover-lead">
                         Popyt przyszłego tygodnia {{ $toSendNextDemand }}
                         − zostają {{ $toSendStaying }}
                         = <span class="fw-semibold">{{ $toSendCount }}</span>@if($toSendCount < 0) (nadmiar)@endif.
                         Odpadają osoby, których rotacja kończy się w oknie {{ $rotationWindow }}.
                     </p>
-                    <p class="small fw-semibold mb-1">Popyt przyszłego tygodnia</p>
+                    <p class="weekly-summary-popover-section">Popyt przyszłego tygodnia</p>
                     @if($toSendDemandByProject->isNotEmpty())
-                        <ul class="mb-3 small list-unstyled">
+                        <ul class="mb-3 list-unstyled">
                             @foreach($toSendDemandByProject as $row)
-                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-center">
                                     <a href="{{ route('projects.show', $row->project_id) }}" class="text-decoration-none min-w-0 flex-grow-1">
                                         <span class="fw-semibold">{{ $row->project_name }}</span>
                                     </a>
-                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ $row->needed }}</span>
+                                    <span class="weekly-summary-popover-value">{{ $row->needed }}</span>
                                 </li>
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-3">Brak popytu.</p>
+                        <p class="weekly-summary-popover-lead mb-3">Brak popytu.</p>
                     @endif
-                    <p class="small fw-semibold mb-1">Zostają na przyszły tydzień</p>
+                    <p class="weekly-summary-popover-section">Zostają na przyszły tydzień</p>
                     @if($toSendStayingPeople->isNotEmpty())
-                        <ul class="mb-3 small list-unstyled">
+                        <ul class="mb-3 list-unstyled">
                             @foreach($toSendStayingPeople as $person)
                                 <li class="weekly-summary-popover-line">
                                     <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none">
@@ -538,24 +670,24 @@
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-3">Nikt z przypisaniem nie zostaje.</p>
+                        <p class="weekly-summary-popover-lead mb-3">Nikt z przypisaniem nie zostaje.</p>
                     @endif
-                    <p class="small fw-semibold mb-1">Odchodzą — rotacja kończy się w oknie</p>
+                    <p class="weekly-summary-popover-section">Odchodzą — rotacja kończy się w oknie</p>
                     @if($toSendLeavingPeople->isNotEmpty())
-                        <ul class="mb-0 small list-unstyled">
+                        <ul class="mb-0 list-unstyled">
                             @foreach($toSendLeavingPeople as $person)
-                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-center">
                                     <a href="{{ route('employees.show', $person->id) }}" class="text-decoration-none min-w-0 flex-grow-1">
                                         <span class="fw-semibold">{{ $person->name }}</span>
                                     </a>
                                     @if($person->rotation_end)
-                                        <span class="text-muted flex-shrink-0 tabular-nums">{{ \Illuminate\Support\Carbon::parse($person->rotation_end)->format('d.m.Y') }}</span>
+                                        <span class="weekly-summary-popover-value">{{ \Illuminate\Support\Carbon::parse($person->rotation_end)->format('d.m.Y') }}</span>
                                     @endif
                                 </li>
                             @endforeach
                         </ul>
                     @else
-                        <p class="text-muted small mb-0">Nikt z przypisanych na przyszły tydzień nie kończy rotacji w tym oknie.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Nikt z przypisanych na przyszły tydzień nie kończy rotacji w tym oknie.</p>
                     @endif
                 </div>
 
@@ -684,27 +816,27 @@
                             </table>
                         </div>
                     @else
-                        <p class="text-muted small mb-0">Brak zjazdów w tym tygodniu.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Brak zjazdów w tym tygodniu.</p>
                     @endif
                 </div>
 
                 <div x-show="active === 'employees-by-project'" x-cloak>
                     @if($employeesInFieldByProject->isNotEmpty())
-                        <ul class="mb-0 small list-unstyled">
+                        <ul class="mb-0 list-unstyled">
                             @foreach($employeesInFieldByProject as $row)
-                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-start gap-2">
+                                <li class="weekly-summary-popover-line d-flex justify-content-between align-items-center">
                                     <a href="{{ route('projects.show', $row->project_id) }}" class="text-decoration-none min-w-0 flex-grow-1">
                                         <span class="fw-semibold">{{ $row->project_name }}</span>
                                     </a>
-                                    <span class="text-muted flex-shrink-0 tabular-nums">{{ (int) $row->employee_count }}/{{ (int) ($row->needed_count ?? 0) }}</span>
+                                    <span class="weekly-summary-popover-value">{{ (int) $row->employee_count }}/{{ (int) ($row->needed_count ?? 0) }}</span>
                                 </li>
                             @endforeach
                         </ul>
-                        <p class="text-muted small mb-0 mt-2 pt-2 border-top" style="border-color: var(--glass-border) !important;">
+                        <p class="weekly-summary-popover-tip">
                             Przy każdym kierunku: przypisani / zapotrzebowanie. Na kafelku {{ $employeesInFieldCount }}/{{ $employeesNeededCount }} to unikalne osoby wobec sumy popytu ze wszystkich kierunków. Suma osób po projektach może być wyższa, jeśli ta sama osoba jest w kilku projektach.
                         </p>
                     @else
-                        <p class="text-muted small mb-0">Brak przypisań do projektów przecinających ten tydzień.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Brak przypisań do projektów przecinających ten tydzień.</p>
                     @endif
                 </div>
 
@@ -833,8 +965,9 @@
                             </table>
                         </div>
                     @else
-                        <p class="text-muted small mb-0">Brak wyjazdów w tym tygodniu.</p>
+                        <p class="weekly-summary-popover-lead mb-0">Brak wyjazdów w tym tygodniu.</p>
                     @endif
+                </div>
                 </div>
 
             </div>
@@ -852,24 +985,15 @@ document.addEventListener('alpine:init', () => {
     window.__weeklySummaryPopoverDataRegistered = true;
     Alpine.data('weeklySummaryPopover', () => ({
         active: null,
-        clientX: 0,
-        clientY: 0,
         openPanel(type, event) {
             event.preventDefault();
             event.stopPropagation();
             this.active = type;
-            this.clientX = event.clientX;
-            this.clientY = event.clientY;
-            this.$nextTick(() => {
-                this.$nextTick(() => {
-                    if (this.$refs.panel) {
-                        this.placePanel(this.$refs.panel);
-                    }
-                });
-            });
+            document.documentElement.style.overflow = 'hidden';
         },
         close() {
             this.active = null;
+            document.documentElement.style.overflow = '';
         },
         panelTitle() {
             const map = {
@@ -877,9 +1001,9 @@ document.addEventListener('alpine:init', () => {
                 transfers: 'Transfery (tydzień)',
                 returns: 'Zjazdy (tydzień)',
                 departures: 'Wyjazdy (tydzień)',
-                'employees-by-project': 'Pracownicy wg projektu (tydzień)',
+                'employees-by-project': 'Pracownicy wg projektu',
                 housing: 'Domy (tydzień)',
-                'field-vehicles': 'Auta w terenie (tydzień)',
+                'field-vehicles': 'Auta w terenie',
                 bench: 'Ławka',
                 'to-send': 'Do dosłania',
             };
@@ -891,7 +1015,7 @@ document.addEventListener('alpine:init', () => {
                 'rotations-ending': 'bi-hourglass-bottom',
                 transfers: 'bi-arrow-left-right',
                 returns: 'bi-arrow-return-left',
-                departures: 'bi-arrow-right',
+                departures: 'bi-arrow-right-circle',
                 'employees-by-project': 'bi-people',
                 housing: 'bi-house-door',
                 'field-vehicles': 'bi-car-front',
@@ -900,45 +1024,6 @@ document.addEventListener('alpine:init', () => {
             };
 
             return map[this.active] || 'bi-info-circle';
-        },
-        placePanel(el) {
-            if (!el) {
-                return;
-            }
-            const x = this.clientX;
-            const y = this.clientY;
-            el.style.position = 'fixed';
-            el.style.zIndex = '10051';
-            const wide = this.active === 'departures' || this.active === 'returns';
-            const panelWidth = wide ? 'min(720px, calc(100vw - 24px))' : 'min(420px, calc(100vw - 24px))';
-            el.style.width = panelWidth;
-            el.style.maxWidth = panelWidth;
-            let left = x;
-            let top = y + 8;
-            el.style.left = left + 'px';
-            el.style.top = top + 'px';
-            el.style.transform = 'translate(-50%, 0)';
-            this.$nextTick(() => {
-                const r = el.getBoundingClientRect();
-                let sx = 0;
-                let sy = 0;
-                if (r.left < 8) {
-                    sx = 8 - r.left;
-                }
-                if (r.right > window.innerWidth - 8) {
-                    sx = window.innerWidth - 8 - r.right;
-                }
-                if (r.top < 8) {
-                    sy = 8 - r.top;
-                }
-                if (r.bottom > window.innerHeight - 8) {
-                    sy = window.innerHeight - 8 - r.bottom;
-                }
-                if (sx !== 0 || sy !== 0) {
-                    el.style.left = (left + sx) + 'px';
-                    el.style.top = (top + sy) + 'px';
-                }
-            });
         },
     }));
 });

@@ -123,7 +123,7 @@ class DeadlineRadarServiceTest extends TestCase
         $nextWeek = app(DeadlineRadarService::class)->build(Carbon::parse('2026-11-09')); // next Mon
 
         $this->assertSame('2026-11-02', $currentWeek['today']);
-        $this->assertSame('dziś', $currentWeek['anchor_label']);
+        $this->assertSame('pon 02.11', $currentWeek['anchor_label']);
         $this->assertSame('2026-11-09', $nextWeek['today']);
         $this->assertSame('pon 09.11', $nextWeek['anchor_label']);
 
