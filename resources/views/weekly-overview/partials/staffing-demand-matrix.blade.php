@@ -97,27 +97,25 @@
         </div>
 
         <div class="wo-demand-trend mt-4 pt-3">
-            <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
-                <div>
-                    <h3 class="wo-demand-trend__title mb-1">Popyt w czasie</h3>
-                    <p class="small text-muted mb-0">
-                        Zapotrzebowanie vs przypisani w tygodniu, z podziałem na projekty
-                    </p>
-                </div>
-                <ul class="wo-demand-trend__legend list-unstyled mb-0 d-flex flex-wrap gap-3">
-                    <li><span class="wo-demand-trend__swatch wo-demand-trend__swatch--needed"></span>Popyt razem</li>
-                    <li><span class="wo-demand-trend__swatch wo-demand-trend__swatch--assigned"></span>Przypisani</li>
-                    <li><span class="wo-demand-trend__swatch wo-demand-trend__swatch--gap"></span>Luka</li>
-                    <li><span class="wo-demand-trend__swatch wo-demand-trend__swatch--project"></span>Popyt projektu</li>
-                </ul>
+            <div class="mb-3">
+                <h3 class="wo-demand-trend__title mb-1">Popyt w czasie</h3>
+                <p class="small text-muted mb-0">
+                    Najedź na linię — podświetli się na liście. Checkboxem włączasz / wyłączasz konkretną warstwę.
+                </p>
             </div>
-            <div class="wo-demand-trend__canvas-wrap">
-                <canvas
-                    id="wo-demand-trend-chart"
-                    class="wo-demand-trend-chart"
-                    aria-label="Wykres popytu i przypisań w kolejnych tygodniach"
-                    data-chart='@json($chartPayload)'
-                ></canvas>
+            <div class="wo-demand-trend__layout">
+                <div class="wo-demand-trend__canvas-wrap">
+                    <canvas
+                        id="wo-demand-trend-chart"
+                        class="wo-demand-trend-chart"
+                        aria-label="Wykres popytu i przypisań w kolejnych tygodniach"
+                        data-chart='@json($chartPayload)'
+                    ></canvas>
+                </div>
+                <div class="wo-demand-trend__layers" aria-label="Warstwy wykresu">
+                    <div class="wo-demand-trend__layers-title">Warstwy</div>
+                    <ul class="wo-demand-trend__layer-list list-unstyled mb-0" id="wo-demand-trend-layers"></ul>
+                </div>
             </div>
         </div>
     </x-ui.card>

@@ -998,43 +998,136 @@
                 const projects = payload.projects || [];
                 if (!labels.length) return;
 
+                const wrap = canvas.closest('.wo-demand-trend');
+                const layerList = wrap ? wrap.querySelector('#wo-demand-trend-layers') : null;
+                const gapFill = {
+                    target: '-1',
+                    above: 'rgba(59, 130, 246, 0.08)',
+                    below: 'rgba(168, 85, 247, 0.32)',
+                };
+                const projectPalette = [
+                    '#94a3b8', '#38bdf8', '#a78bfa', '#34d399', '#fbbf24',
+                    '#fb7185', '#22d3ee', '#c084fc', '#4ade80', '#f472b6',
+                ];
+
+                const layerOn = {
+                    needed: true,
+                    assigned: true,
+                    gap: true,
+                };
+                projects.forEach((_, i) => { layerOn['project:' + i] = true; });
+
+                let hoverKey = null;
+                let hoverPointIndex = null;
+
                 const pointLabelPlugin = {
                     id: 'woDemandTrendLabels',
-                    afterDatasetsDraw(chart) {
-                        const { ctx } = chart;
+                    afterDatasetsDraw(chartInstance) {
+                        const { ctx } = chartInstance;
                         ctx.save();
-                        ctx.font = "600 11px 'JetBrains Mono', 'Space Grotesk', monospace";
-                        chart.data.datasets.forEach((dataset, datasetIndex) => {
-                            if (!dataset.woPointLabels) return;
-                            const meta = chart.getDatasetMeta(datasetIndex);
+                        chartInstance.data.datasets.forEach((dataset, datasetIndex) => {
+                            if (dataset.woOn === false) return;
+                            const showAll = !!dataset.woPointLabels;
+                            const showHover = dataset.woKind === 'project'
+                                && hoverKey === dataset.woKey
+                                && dataset.woOn !== false;
+                            if (!showAll && !showHover) return;
+
+                            const meta = chartInstance.getDatasetMeta(datasetIndex);
                             meta.data.forEach((point, index) => {
                                 const value = dataset.data[index];
                                 if (value == null || Number.isNaN(value)) return;
+                                // Projekty: liczby tylko przy hover (cała seria albo podkreślony punkt).
+                                if (showHover && !showAll) {
+                                    if (hoverPointIndex != null && index !== hoverPointIndex) return;
+                                }
+                                const emphasize = showHover && (hoverPointIndex == null || index === hoverPointIndex);
                                 const above = dataset.woLabelSide !== 'below';
-                                ctx.fillStyle = dataset.borderColor || '#fff';
+                                ctx.font = emphasize
+                                    ? "700 12px 'JetBrains Mono', 'Space Grotesk', monospace"
+                                    : "600 11px 'JetBrains Mono', 'Space Grotesk', monospace";
+                                ctx.fillStyle = dataset.woBorderOn || dataset.borderColor || '#fff';
                                 ctx.textAlign = 'center';
                                 ctx.textBaseline = above ? 'bottom' : 'top';
-                                ctx.fillText(String(value), point.x, point.y + (above ? -8 : 8));
+                                ctx.fillText(String(value), point.x, point.y + (above ? -9 : 9));
                             });
                         });
                         ctx.restore();
                     },
                 };
 
-                const projectDatasets = projects.map((project) => ({
-                    label: project.label,
-                    data: project.data || [],
-                    borderColor: 'rgba(148, 163, 184, 0.35)',
-                    backgroundColor: 'transparent',
-                    borderWidth: 1.25,
-                    pointRadius: 0,
-                    pointHoverRadius: 3,
-                    tension: 0.25,
-                    fill: false,
-                    order: 3,
-                }));
+                const projectDatasets = projects.map((project, i) => {
+                    const color = projectPalette[i % projectPalette.length];
+                    const r = parseInt(color.slice(1, 3), 16);
+                    const g = parseInt(color.slice(3, 5), 16);
+                    const b = parseInt(color.slice(5, 7), 16);
+                    return {
+                        label: project.label,
+                        data: project.data || [],
+                        borderColor: color,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.75,
+                        pointRadius: 3.5,
+                        pointHoverRadius: 6,
+                        pointHitRadius: 18,
+                        pointBackgroundColor: color,
+                        pointBorderColor: '#0b1220',
+                        pointBorderWidth: 1.5,
+                        tension: 0.25,
+                        fill: false,
+                        order: 3,
+                        woKey: 'project:' + i,
+                        woKind: 'project',
+                        woOn: true,
+                        woLabelSide: 'above',
+                        woBorderOn: color,
+                        woBorderOff: `rgba(${r},${g},${b},0.14)`,
+                        woBorderDim: `rgba(${r},${g},${b},0.28)`,
+                    };
+                });
 
-                new Chart(canvas.getContext('2d'), {
+                /** Najbliższy punkt w promieniu — puste miejsce nie przełącza „losowej” warstwy. */
+                const pickNearest = (event, maxDist = 16) => {
+                    const hits = chart.getElementsAtEventForMode(
+                        event,
+                        'nearest',
+                        { intersect: false, axis: 'xy' },
+                        false
+                    );
+                    if (!hits.length || event.x == null || event.y == null) {
+                        return { key: null, index: null };
+                    }
+
+                    let bestDs = null;
+                    let bestIndex = null;
+                    let bestDist = Infinity;
+                    hits.forEach((hit) => {
+                        const ds = chart.data.datasets[hit.datasetIndex];
+                        if (!ds?.woKey) return;
+                        const el = hit.element;
+                        if (!el || el.x == null || el.y == null) return;
+                        const dist = Math.hypot(el.x - event.x, el.y - event.y);
+                        if (dist > maxDist || dist > bestDist) return;
+                        if (dist === bestDist && bestDs && ds.woOn === false && bestDs.woOn !== false) return;
+                        // Przy bliskim remisie wolimy projekt (kropki pod sumami).
+                        if (
+                            dist === bestDist
+                            && bestDs
+                            && bestDs.woKind !== 'project'
+                            && ds.woKind === 'project'
+                        ) {
+                            bestDs = ds;
+                            bestIndex = hit.index;
+                            return;
+                        }
+                        bestDist = dist;
+                        bestDs = ds;
+                        bestIndex = hit.index;
+                    });
+                    return { key: bestDs?.woKey || null, index: bestIndex };
+                };
+
+                const chart = new Chart(canvas.getContext('2d'), {
                     type: 'line',
                     data: {
                         labels,
@@ -1047,7 +1140,8 @@
                                 backgroundColor: '#f1f5f9',
                                 borderWidth: 2.5,
                                 pointRadius: 4,
-                                pointHoverRadius: 5,
+                                pointHoverRadius: 6,
+                                pointHitRadius: 14,
                                 pointBackgroundColor: '#0b1220',
                                 pointBorderColor: '#f1f5f9',
                                 pointBorderWidth: 2,
@@ -1056,6 +1150,9 @@
                                 order: 1,
                                 woPointLabels: true,
                                 woLabelSide: 'above',
+                                woKey: 'needed',
+                                woKind: 'needed',
+                                woOn: true,
                             },
                             {
                                 label: 'Przypisani',
@@ -1065,19 +1162,19 @@
                                 borderWidth: 2.25,
                                 borderDash: [6, 5],
                                 pointRadius: 4,
-                                pointHoverRadius: 5,
+                                pointHoverRadius: 6,
+                                pointHitRadius: 14,
                                 pointBackgroundColor: '#0b1220',
                                 pointBorderColor: '#60a5fa',
                                 pointBorderWidth: 2,
                                 tension: 0.28,
-                                fill: {
-                                    target: '-1',
-                                    above: 'rgba(59, 130, 246, 0.08)',
-                                    below: 'rgba(168, 85, 247, 0.32)',
-                                },
+                                fill: gapFill,
                                 order: 2,
                                 woPointLabels: true,
                                 woLabelSide: 'below',
+                                woKey: 'assigned',
+                                woKind: 'assigned',
+                                woOn: true,
                             },
                         ],
                     },
@@ -1085,17 +1182,26 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         interaction: { mode: 'index', intersect: false },
-                        animation: { duration: 750 },
+                        animation: { duration: 450 },
+                        onHover(event) {
+                            const picked = pickNearest(event, 20);
+                            const changed = picked.key !== hoverKey || picked.index !== hoverPointIndex;
+                            hoverKey = picked.key;
+                            hoverPointIndex = picked.index;
+                            if (changed) {
+                                syncLayerHover();
+                                emphasizeHover();
+                            }
+                            canvas.style.cursor = picked.key ? 'pointer' : 'crosshair';
+                        },
+                        onClick(event) {
+                            const picked = pickNearest(event, 16);
+                            if (!picked.key) return;
+                            setLayer(picked.key, !layerOn[picked.key]);
+                        },
                         plugins: {
                             legend: { display: false },
-                            tooltip: {
-                                callbacks: {
-                                    label(ctx) {
-                                        const name = ctx.dataset.label || '';
-                                        return ` ${name}: ${ctx.raw}`;
-                                    },
-                                },
-                            },
+                            tooltip: { enabled: false },
                         },
                         scales: {
                             x: {
@@ -1119,6 +1225,161 @@
                     },
                     plugins: [pointLabelPlugin],
                 });
+
+                const buildLayerList = () => {
+                    if (!layerList) return;
+                    const items = [
+                        { key: 'needed', label: 'Popyt razem', swatch: '#f1f5f9', kind: 'line' },
+                        { key: 'assigned', label: 'Przypisani', swatch: '#60a5fa', kind: 'dash' },
+                        { key: 'gap', label: 'Luka', swatch: 'rgba(168,85,247,0.55)', kind: 'gap' },
+                        ...projects.map((project, i) => ({
+                            key: 'project:' + i,
+                            label: project.label,
+                            swatch: projectPalette[i % projectPalette.length],
+                            kind: 'line',
+                        })),
+                    ];
+                    layerList.innerHTML = items.map((item) => {
+                        const swatchClass = item.kind === 'dash'
+                            ? 'wo-demand-trend__layer-swatch--dash'
+                            : (item.kind === 'gap'
+                                ? 'wo-demand-trend__layer-swatch--gap'
+                                : 'wo-demand-trend__layer-swatch--line');
+                        const swatchStyle = item.kind === 'dash'
+                            ? `border-top-color:${item.swatch};`
+                            : `background:${item.swatch};`;
+                        return `
+                        <li>
+                            <label class="wo-demand-trend__layer" data-wo-layer="${item.key}">
+                                <input type="checkbox" class="wo-demand-trend__layer-check" data-wo-layer-check="${item.key}" checked>
+                                <span class="wo-demand-trend__layer-swatch ${swatchClass}" style="${swatchStyle}" aria-hidden="true"></span>
+                                <span class="wo-demand-trend__layer-label" title="${item.label.replace(/"/g, '&quot;')}">${item.label}</span>
+                            </label>
+                        </li>`;
+                    }).join('');
+
+                    layerList.querySelectorAll('[data-wo-layer-check]').forEach((input) => {
+                        input.addEventListener('change', () => {
+                            setLayer(input.dataset.woLayerCheck, input.checked);
+                        });
+                    });
+                    layerList.querySelectorAll('[data-wo-layer]').forEach((row) => {
+                        row.addEventListener('mouseenter', () => {
+                            hoverKey = row.dataset.woLayer;
+                            hoverPointIndex = null; // cała seria projektu
+                            syncLayerHover();
+                            emphasizeHover();
+                        });
+                        row.addEventListener('mouseleave', () => {
+                            if (hoverKey === row.dataset.woLayer) {
+                                hoverKey = null;
+                                hoverPointIndex = null;
+                                syncLayerHover();
+                                emphasizeHover();
+                            }
+                        });
+                    });
+                };
+
+                const syncLayerHover = () => {
+                    if (!layerList) return;
+                    layerList.querySelectorAll('[data-wo-layer]').forEach((row) => {
+                        row.classList.toggle('is-hover', row.dataset.woLayer === hoverKey);
+                    });
+                };
+
+                const syncLayerChecks = () => {
+                    if (!layerList) return;
+                    layerList.querySelectorAll('[data-wo-layer]').forEach((row) => {
+                        const key = row.dataset.woLayer;
+                        const on = !!layerOn[key];
+                        row.classList.toggle('is-off', !on);
+                        const input = row.querySelector('[data-wo-layer-check]');
+                        if (input && input.checked !== on) input.checked = on;
+                    });
+                };
+
+                const emphasizeHover = () => {
+                    const hoveringProject = hoverKey && hoverKey.startsWith('project:');
+                    chart.data.datasets.forEach((dataset) => {
+                        if (dataset.woKind === 'project') {
+                            const on = dataset.woOn !== false;
+                            const isHover = hoverKey === dataset.woKey;
+                            dataset.borderWidth = !on ? 1 : (isHover ? 3 : 1.75);
+                            dataset.pointRadius = !on ? 0 : (isHover ? 5 : 3.5);
+                            dataset.pointHoverRadius = isHover ? 7 : 6;
+                            if (!on) {
+                                dataset.borderColor = dataset.woBorderOff;
+                                dataset.pointBackgroundColor = 'transparent';
+                                dataset.pointBorderColor = 'transparent';
+                            } else if (isHover) {
+                                dataset.borderColor = dataset.woBorderOn;
+                                dataset.pointBackgroundColor = dataset.woBorderOn;
+                                dataset.pointBorderColor = '#0b1220';
+                            } else if (hoveringProject) {
+                                dataset.borderColor = dataset.woBorderDim;
+                                dataset.pointBackgroundColor = dataset.woBorderDim;
+                                dataset.pointBorderColor = 'rgba(11, 18, 32, 0.5)';
+                            } else {
+                                dataset.borderColor = dataset.woBorderOn;
+                                dataset.pointBackgroundColor = dataset.woBorderOn;
+                                dataset.pointBorderColor = '#0b1220';
+                            }
+                        } else if (dataset.woKind === 'needed' || dataset.woKind === 'assigned') {
+                            const isHover = hoverKey === dataset.woKey;
+                            const base = dataset.woKind === 'needed' ? 2.5 : 2.25;
+                            dataset.borderWidth = dataset.woOn === false ? 1.5 : (isHover ? 3.25 : base);
+                        }
+                    });
+                    chart.update('none');
+                };
+
+                const applyLayers = () => {
+                    chart.data.datasets.forEach((dataset) => {
+                        if (dataset.woKind === 'needed') {
+                            dataset.woOn = layerOn.needed;
+                            dataset.borderColor = layerOn.needed ? '#f1f5f9' : 'rgba(241, 245, 249, 0.12)';
+                            dataset.pointBorderColor = dataset.borderColor;
+                            dataset.pointBackgroundColor = layerOn.needed ? '#0b1220' : 'transparent';
+                            dataset.pointRadius = layerOn.needed ? 4 : 0;
+                            dataset.backgroundColor = layerOn.needed ? '#f1f5f9' : 'transparent';
+                        } else if (dataset.woKind === 'assigned') {
+                            dataset.woOn = layerOn.assigned;
+                            dataset.borderColor = layerOn.assigned ? '#60a5fa' : 'rgba(96, 165, 250, 0.12)';
+                            dataset.pointBorderColor = dataset.borderColor;
+                            dataset.pointBackgroundColor = layerOn.assigned ? '#0b1220' : 'transparent';
+                            dataset.pointRadius = layerOn.assigned ? 4 : 0;
+                            dataset.backgroundColor = layerOn.assigned ? '#60a5fa' : 'transparent';
+                            dataset.fill = layerOn.gap && layerOn.needed && layerOn.assigned ? gapFill : false;
+                        } else if (dataset.woKind === 'project') {
+                            const on = !!layerOn[dataset.woKey];
+                            dataset.woOn = on;
+                            dataset.borderColor = on ? dataset.woBorderOn : dataset.woBorderOff;
+                            dataset.borderWidth = on ? 1.75 : 1;
+                            dataset.pointRadius = on ? 3.5 : 0;
+                            dataset.pointBackgroundColor = on ? dataset.woBorderOn : 'transparent';
+                            dataset.pointBorderColor = on ? '#0b1220' : 'transparent';
+                        }
+                    });
+                    syncLayerChecks();
+                    emphasizeHover();
+                };
+
+                const setLayer = (key, on) => {
+                    if (!(key in layerOn)) return;
+                    layerOn[key] = !!on;
+                    applyLayers();
+                };
+
+                canvas.addEventListener('mouseleave', () => {
+                    hoverKey = null;
+                    hoverPointIndex = null;
+                    syncLayerHover();
+                    emphasizeHover();
+                });
+
+                buildLayerList();
+                applyLayers();
             }
 
             function initDemandDonut(canvas) {
