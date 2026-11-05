@@ -310,3 +310,203 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
     window.clShowBootScreen = show;
     window.clHideBootScreen = hide;
 })();
+
+/**
+ * Globalne wejście przy scrollu / ładowaniu (DRY, lekkie):
+ * - `.cl-reveal` / `<x-ui.card reveal>`
+ * - `[data-cl-reveal-rows]` → wiersze tabeli
+ * - `[data-cl-reveal-items]` → siatki/listy (auta, domy, li…)
+ * - `[data-cl-count]` → jeden wspólny rAF, limit naraz
+ */
+(function initClReveal() {
+    if (typeof window === 'undefined') return;
+
+    const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const COUNT_DURATION = 720;
+    const COUNT_CAP = 18;
+    const ITEM_STAGGER_CAP = 10;
+    const ITEM_STAGGER_MS = 45;
+    const HOST_SELECTOR = '[data-cl-reveal-rows], [data-cl-reveal-items]';
+
+    /** Wspólna pętla — N cyferek ≠ N requestAnimationFrame. */
+    const countJobs = [];
+    let countRaf = 0;
+
+    const tickCounts = (now) => {
+        let alive = false;
+        for (let i = 0; i < countJobs.length; i += 1) {
+            const job = countJobs[i];
+            if (job.done) continue;
+            if (job.start == null) job.start = now;
+            const t = Math.min(1, (now - job.start) / COUNT_DURATION);
+            const eased = 1 - (1 - t) ** 3;
+            job.el.textContent = String(Math.round(job.target * eased));
+            if (t < 1) alive = true;
+            else job.done = true;
+        }
+        if (alive) {
+            countRaf = requestAnimationFrame(tickCounts);
+        } else {
+            countRaf = 0;
+            countJobs.length = 0;
+        }
+    };
+
+    const enqueueCount = (el, target) => {
+        el.textContent = '0';
+        countJobs.push({ el, target, start: null, done: false });
+        if (!countRaf) countRaf = requestAnimationFrame(tickCounts);
+    };
+
+    const snapCount = (el, target) => {
+        el.textContent = String(Math.round(target));
+    };
+
+    const animateCount = (el) => {
+        if (!(el instanceof Element) || el.dataset.clCounted === '1') return false;
+        el.dataset.clCounted = '1';
+
+        const raw = el.getAttribute('data-cl-count');
+        const target = Number(raw);
+        if (!Number.isFinite(target)) {
+            if (raw != null) el.textContent = raw;
+            return false;
+        }
+
+        if (reduceMotion()) {
+            snapCount(el, target);
+            return false;
+        }
+
+        enqueueCount(el, target);
+        return true;
+    };
+
+    const runCounts = (scope) => {
+        if (!(scope instanceof Element)) return;
+        const nodes = [];
+        if (scope.hasAttribute('data-cl-count')) nodes.push(scope);
+        scope.querySelectorAll('[data-cl-count]').forEach((el) => nodes.push(el));
+
+        let animated = 0;
+        nodes.forEach((el) => {
+            if (el.dataset.clCounted === '1') return;
+            const raw = el.getAttribute('data-cl-count');
+            const target = Number(raw);
+            if (!Number.isFinite(target)) {
+                animateCount(el);
+                return;
+            }
+            if (animated < COUNT_CAP) {
+                if (animateCount(el)) animated += 1;
+            } else {
+                el.dataset.clCounted = '1';
+                snapCount(el, target);
+            }
+        });
+    };
+
+    const markRevealed = (el, delayMs = 0, { counts = true } = {}) => {
+        if (!(el instanceof Element) || el.classList.contains('is-revealed')) return;
+        if (reduceMotion()) {
+            el.classList.add('is-revealed');
+            if (counts) runCounts(el);
+            return;
+        }
+        if (delayMs) el.style.setProperty('--cl-reveal-delay', `${delayMs}ms`);
+        requestAnimationFrame(() => {
+            el.classList.add('is-revealed');
+            if (counts) {
+                window.setTimeout(() => runCounts(el), delayMs + 280);
+            }
+        });
+    };
+
+    const hostItemSelector = (host) => {
+        if (host.hasAttribute('data-cl-reveal-items')) {
+            const custom = host.getAttribute('data-cl-reveal-items');
+            return custom && custom !== '' ? custom : ':scope > *';
+        }
+        const rows = host.getAttribute('data-cl-reveal-rows');
+        return rows && rows !== '' ? rows : 'tbody > tr, tfoot > tr';
+    };
+
+    const hostItemClass = (host) => (
+        host.hasAttribute('data-cl-reveal-items') ? 'cl-reveal-item' : 'cl-reveal-row'
+    );
+
+    const prepareHost = (host) => {
+        if (!(host instanceof Element) || host.dataset.clItemsPrepared === '1') return;
+        host.dataset.clItemsPrepared = '1';
+        if (reduceMotion()) return;
+        const cls = hostItemClass(host);
+        host.querySelectorAll(hostItemSelector(host)).forEach((item) => {
+            item.classList.add(cls);
+        });
+    };
+
+    const revealHost = (host) => {
+        if (!(host instanceof Element) || host.dataset.clItemsDone === '1') return;
+        host.dataset.clItemsDone = '1';
+        prepareHost(host);
+
+        const cls = hostItemClass(host);
+        const items = Array.from(host.querySelectorAll(hostItemSelector(host)));
+        items.forEach((item, index) => {
+            item.classList.add(cls);
+            const delay = index < ITEM_STAGGER_CAP ? index * ITEM_STAGGER_MS : 0;
+            markRevealed(item, delay, { counts: false });
+        });
+
+        const hostDelay = Math.min(items.length, ITEM_STAGGER_CAP) * ITEM_STAGGER_MS;
+        window.setTimeout(() => runCounts(host), hostDelay + 200);
+    };
+
+    const pendingHosts = (root) => Array.from(
+        root.querySelectorAll(`${HOST_SELECTOR}:not([data-cl-items-done])`)
+    );
+
+    const scan = (root = document) => {
+        const blocks = Array.from(root.querySelectorAll('.cl-reveal:not(.is-revealed)'));
+        const hosts = pendingHosts(root);
+
+        if (!blocks.length && !hosts.length) return;
+
+        hosts.forEach(prepareHost);
+
+        if (reduceMotion() || typeof IntersectionObserver === 'undefined') {
+            blocks.forEach((el) => markRevealed(el));
+            hosts.forEach((host) => revealHost(host));
+            return;
+        }
+
+        let stagger = 0;
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const el = entry.target;
+                if (el.matches(HOST_SELECTOR)) {
+                    revealHost(el);
+                } else {
+                    markRevealed(el, Math.min(stagger, 5) * 70);
+                    stagger += 1;
+                }
+                io.unobserve(el);
+            });
+        }, { threshold: 0.08, rootMargin: '0px 0px -4% 0px' });
+
+        blocks.forEach((el) => io.observe(el));
+        hosts.forEach((el) => io.observe(el));
+    };
+
+    window.clRevealScan = scan;
+
+    const boot = () => scan();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot, { once: true });
+    } else {
+        boot();
+    }
+
+    document.addEventListener('livewire:navigated', boot);
+})();

@@ -47,7 +47,7 @@
     @endif
 
     <!-- Nawigacja między tygodniami -->
-    <x-ui.period-nav>
+    <x-ui.period-nav class="cl-reveal mb-4">
         <x-slot name="prev">
             <x-ui.button variant="ghost" href="{{ $navigation['prevUrl'] }}" class="w-100">
                 <i class="bi bi-chevron-left"></i>
@@ -98,7 +98,7 @@
         'toSendLeavingPeople' => $toSendLeavingPeople,
     ])
 
-    <div class="mb-4" id="week-comments">
+    <div class="mb-4 cl-reveal" id="week-comments">
         <x-comments
             :commentable="$planningWeek"
             label="Komentarze tygodnia"
@@ -111,7 +111,7 @@
         'staffingDemandMatrix' => $staffingDemandMatrix,
     ])
 
-    <x-ui.card class="mb-4" id="deadline-radar">
+    <x-ui.card reveal class="mb-4" id="deadline-radar">
         @include('weekly-overview.partials.deadline-radar', [
             'deadlineRadar' => $deadlineRadar,
         ])
@@ -130,7 +130,7 @@
                             $accommodationAssignments = $employeeData['accommodation_assignments'];
                         @endphp
                         <div class="col-md-6 col-lg-4">
-                            <x-ui.card>
+                            <x-ui.card reveal>
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <x-employee-cell :employee="$employee" />
                                 </div>
@@ -227,7 +227,7 @@
                             $accommodationAssignments = $employeeData['accommodation_assignments'];
                         @endphp
                         <div class="col-md-6 col-lg-4">
-                            <x-ui.card>
+                            <x-ui.card reveal>
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <x-employee-cell :employee="$employee" />
                                     <x-ui.badge variant="danger">Zwolniony</x-ui.badge>
@@ -309,7 +309,7 @@
             $planner2Url = route('weekly-overview.planner2', ['start_date' => $weekStart, 'project_id' => $project->id]);
         @endphp
 
-        <x-ui.card class="mb-4">
+        <x-ui.card reveal class="mb-4">
             <!-- Row1: Nazwa projektu/lokalizacja + statystyki -->
             <div class="mb-3">
                 <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
@@ -626,7 +626,7 @@
                                 $projectVehicles = collect($weekData['vehicles'] ?? []);
                             @endphp
                             @if($projectVehicles->isNotEmpty())
-                                <div class="row g-3">
+                                <div class="row g-3" data-cl-reveal-items>
                                     @foreach($projectVehicles->take(9) as $vehicleData)
                                         @include('weekly-overview.partials.vehicle-card', [
                                             'vehicleData' => $vehicleData,
@@ -653,7 +653,7 @@
                                     <span class="card-label">Pojazdy w serwisie</span>
                                 </div>
                                 @if($serviceRepairs->isNotEmpty())
-                                    <ul class="list-unstyled mb-0 small">
+                                    <ul class="list-unstyled mb-0 small" data-cl-reveal-items>
                                         @foreach($serviceRepairs as $repairData)
                                             @php
                                                 $repair = $repairData['repair'];
@@ -693,7 +693,7 @@
                                 $projectAccommodations = collect($weekData['accommodations'] ?? []);
                             @endphp
                             @if($projectAccommodations->isNotEmpty())
-                                <div class="row g-3">
+                                <div class="row g-3" data-cl-reveal-items>
                                     @foreach($projectAccommodations->take(9) as $accommodationData)
                                         @php $accommodation = $accommodationData['accommodation']; @endphp
                                         @include('weekly-overview.partials.accommodation-card', [
@@ -849,7 +849,7 @@
                                 ->values();
                         @endphp
                         <div class="table-responsive">
-                            <table class="table align-middle weekly-overview-assigned-table">
+                            <table class="table align-middle weekly-overview-assigned-table" data-cl-reveal-rows>
                                 <thead>
                                     <tr>
                                         <th class="wo-sortable" data-sort-dir="asc">
@@ -927,7 +927,7 @@
             @endif
         </x-ui.card>
     @empty
-        <x-ui.card>
+        <x-ui.card reveal>
             <x-ui.empty-state 
                 icon="folder"
                 message="Brak projektów do wyświetlenia."
@@ -1248,10 +1248,11 @@
                         const swatchStyle = item.kind === 'dash'
                             ? `border-top-color:${item.swatch};`
                             : `background:${item.swatch};`;
+                        const safeId = 'wo-layer-' + String(item.key).replace(/[^a-zA-Z0-9_-]/g, '-');
                         return `
                         <li>
-                            <label class="wo-demand-trend__layer" data-wo-layer="${item.key}">
-                                <input type="checkbox" class="wo-demand-trend__layer-check" data-wo-layer-check="${item.key}" checked>
+                            <label class="form-check form-check-compact wo-demand-trend__layer" data-wo-layer="${item.key}" for="${safeId}">
+                                <input type="checkbox" class="form-check-input" id="${safeId}" data-wo-layer-check="${item.key}" checked>
                                 <span class="wo-demand-trend__layer-swatch ${swatchClass}" style="${swatchStyle}" aria-hidden="true"></span>
                                 <span class="wo-demand-trend__layer-label" title="${item.label.replace(/"/g, '&quot;')}">${item.label}</span>
                             </label>
@@ -1380,6 +1381,12 @@
 
                 buildLayerList();
                 applyLayers();
+                // Lekki stagger listy warstw — ten sam globalny cl-reveal.
+                if (layerList && window.clRevealScan) {
+                    delete layerList.dataset.clItemsPrepared;
+                    delete layerList.dataset.clItemsDone;
+                    window.clRevealScan(wrap || document);
+                }
             }
 
             function initDemandDonut(canvas) {

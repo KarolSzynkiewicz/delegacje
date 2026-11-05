@@ -1,6 +1,7 @@
 @props([
     'label' => null,
     'variant' => 'default', // default, hover, elevated
+    'reveal' => false, // scroll/load entrance via global .cl-reveal
 ])
 
 @php
@@ -9,6 +10,9 @@
         $classes .= ' card-hover';
     } elseif ($variant === 'elevated') {
         $classes .= ' card-elevated';
+    }
+    if ($reveal) {
+        $classes .= ' cl-reveal';
     }
 @endphp
 

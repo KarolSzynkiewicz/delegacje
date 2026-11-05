@@ -346,7 +346,7 @@
     x-data="weeklySummaryPopover"
     @keydown.escape.window="active && close()"
 >
-    <x-ui.card label="Podsumowanie tygodnia" class="mb-4 mt-3">
+    <x-ui.card reveal label="Podsumowanie tygodnia" class="mb-4 mt-3">
         <div class="row g-3">
             <div class="col-6 col-lg-3">
                 <button

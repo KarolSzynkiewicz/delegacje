@@ -32,7 +32,7 @@
 @endphp
 
 @if(count($weeks) > 0 && count($rows) > 0)
-    <x-ui.card class="mb-4 wo-demand-matrix-card">
+    <x-ui.card reveal class="mb-4 wo-demand-matrix-card">
         <div class="mb-3">
             <h3 class="h5 mb-1">Zapotrzebowanie na ludzi</h3>
             <p class="small text-muted mb-0">
@@ -41,7 +41,7 @@
         </div>
 
         <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 wo-demand-matrix">
+            <table class="table table-sm align-middle mb-0 wo-demand-matrix" data-cl-reveal-rows>
                 <thead>
                     <tr>
                         <th scope="col" class="wo-demand-matrix__project">Projekt</th>
@@ -73,7 +73,7 @@
                                     'wo-demand-cell--current-week' => $weeks[$i]['is_current'] ?? false,
                                     'wo-demand-cell--previous-week' => $weeks[$i]['is_previous'] ?? false,
                                 ])>
-                                    {{ $cell['assigned'] }}/{{ $cell['needed'] }}
+                                    {{ (int) $cell['assigned'] }}/{{ (int) $cell['needed'] }}
                                 </td>
                             @endforeach
                         </tr>
@@ -88,7 +88,7 @@
                                 'wo-demand-cell--current-week' => $weeks[$i]['is_current'] ?? false,
                                 'wo-demand-cell--previous-week' => $weeks[$i]['is_previous'] ?? false,
                             ])>
-                                {{ $cell['assigned'] }}/{{ $cell['needed'] }}
+                                <span data-cl-count="{{ (int) $cell['assigned'] }}">{{ (int) $cell['assigned'] }}</span>/<span data-cl-count="{{ (int) $cell['needed'] }}">{{ (int) $cell['needed'] }}</span>
                             </td>
                         @endforeach
                     </tr>
@@ -114,7 +114,7 @@
                 </div>
                 <div class="wo-demand-trend__layers" aria-label="Warstwy wykresu">
                     <div class="wo-demand-trend__layers-title">Warstwy</div>
-                    <ul class="wo-demand-trend__layer-list list-unstyled mb-0" id="wo-demand-trend-layers"></ul>
+                    <ul class="wo-demand-trend__layer-list list-unstyled mb-0" id="wo-demand-trend-layers" data-cl-reveal-items></ul>
                 </div>
             </div>
         </div>

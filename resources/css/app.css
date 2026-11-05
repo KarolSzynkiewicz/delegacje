@@ -968,16 +968,16 @@ body {
     overscroll-behavior: contain;
     padding: 0.35rem;
 }
-.wo-demand-trend__layer {
+.wo-demand-trend__layer.form-check {
     display: flex;
     align-items: center;
     gap: 0.55rem;
     width: 100%;
-    margin: 0;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid transparent;
+    margin: 0 0 2px;
+    padding: 0.4rem 0.5rem !important;
+    border: 1px solid transparent !important;
     border-radius: 8px;
-    background: transparent;
+    background: transparent !important;
     color: var(--text-main);
     font-size: 0.78rem;
     font-weight: 550;
@@ -988,8 +988,8 @@ body {
 }
 .wo-demand-trend__layer:hover,
 .wo-demand-trend__layer.is-hover {
-    background: rgba(59, 130, 246, 0.12);
-    border-color: rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.12) !important;
+    border-color: rgba(59, 130, 246, 0.35) !important;
 }
 .wo-demand-trend__layer.is-off {
     color: var(--text-muted);
@@ -997,13 +997,11 @@ body {
 .wo-demand-trend__layer.is-off .wo-demand-trend__layer-label {
     opacity: 0.72;
 }
-.wo-demand-trend__layer-check {
-    width: 1rem;
-    height: 1rem;
+.wo-demand-trend__layer .form-check-input {
+    width: 16px;
+    height: 16px;
     margin: 0;
     flex-shrink: 0;
-    accent-color: var(--primary);
-    cursor: pointer;
 }
 .wo-demand-trend__layer-swatch {
     width: 0.85rem;
@@ -3022,6 +3020,39 @@ td:has(.avatar-stack:hover),
 
 /* --- SEKCJE --- */
 /* Zdefiniowane w sekcji Typography Scale */
+
+/* --- SCROLL / LOAD REVEAL (global, DRY) ---
+   Karty: opacity + lekki translate. Pozycje listy/siatki/wiersze: sam fade.
+   Bez blur. Atrybuty: data-cl-reveal-rows | data-cl-reveal-items. */
+.cl-reveal {
+    opacity: 0;
+    transform: translateY(0.7rem);
+    transition:
+        opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--cl-reveal-delay, 0ms);
+}
+.cl-reveal-row,
+.cl-reveal-item {
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--cl-reveal-delay, 0ms);
+}
+.cl-reveal.is-revealed,
+.cl-reveal-row.is-revealed,
+.cl-reveal-item.is-revealed {
+    opacity: 1;
+    transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+    .cl-reveal,
+    .cl-reveal-row,
+    .cl-reveal-item {
+        opacity: 1;
+        transform: none;
+        transition: none;
+    }
+}
 
 /* --- UTILITY --- */
 .text-primary-ui {
