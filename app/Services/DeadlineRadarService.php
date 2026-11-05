@@ -14,6 +14,9 @@ use Illuminate\Support\Collection;
  * Rolling 30-day deadline radar for the weekly overview.
  *
  * Lanes: documents, leases, projects, rotations, vehicles (OC+AC+inspection).
+ *
+ * Overdue (before week Monday) only for documents + vehicles — past-ended
+ * projects/leases/rotations are historical facts, not actionable debt.
  */
 final class DeadlineRadarService
 {
@@ -46,9 +49,9 @@ final class DeadlineRadarService
 
         $items = collect()
             ->merge($this->documentItems($windowStart, $windowEnd, $today))
-            ->merge($this->leaseItems($windowStart, $windowEnd, $today))
-            ->merge($this->projectItems($windowStart, $windowEnd, $today))
-            ->merge($this->rotationItems($windowStart, $windowEnd, $today))
+            ->merge($this->leaseItems($windowEnd, $today))
+            ->merge($this->projectItems($windowEnd, $today))
+            ->merge($this->rotationItems($windowEnd, $today))
             ->merge($this->vehicleItems($windowEnd, $today))
             ->sortBy([
                 ['days', 'asc'],
@@ -133,12 +136,17 @@ final class DeadlineRadarService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    private function leaseItems(Carbon $windowStart, Carbon $windowEnd, Carbon $today): Collection
+    /**
+     * Najmy od poniedziałku tygodnia w przód (bez historycznie zakończonych).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function leaseItems(Carbon $windowEnd, Carbon $today): Collection
     {
         return AccommodationLease::query()
             ->where('type', 'wynajmowany')
             ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$windowStart->toDateString(), $windowEnd->toDateString()])
+            ->whereBetween('end_date', [$today->toDateString(), $windowEnd->toDateString()])
             ->with('accommodation')
             ->orderBy('end_date')
             ->get()
@@ -162,13 +170,15 @@ final class DeadlineRadarService
     }
 
     /**
+     * Projekty od poniedziałku tygodnia w przód (bez historycznie zakończonych).
+     *
      * @return Collection<int, array<string, mixed>>
      */
-    private function projectItems(Carbon $windowStart, Carbon $windowEnd, Carbon $today): Collection
+    private function projectItems(Carbon $windowEnd, Carbon $today): Collection
     {
         return Project::query()
             ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$windowStart->toDateString(), $windowEnd->toDateString()])
+            ->whereBetween('end_date', [$today->toDateString(), $windowEnd->toDateString()])
             ->orderBy('end_date')
             ->orderBy('name')
             ->get()
@@ -189,13 +199,15 @@ final class DeadlineRadarService
     }
 
     /**
+     * Rotacje od poniedziałku tygodnia w przód (bez historycznie zakończonych).
+     *
      * @return Collection<int, array<string, mixed>>
      */
-    private function rotationItems(Carbon $windowStart, Carbon $windowEnd, Carbon $today): Collection
+    private function rotationItems(Carbon $windowEnd, Carbon $today): Collection
     {
         return Rotation::query()
             ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$windowStart->toDateString(), $windowEnd->toDateString()])
+            ->whereBetween('end_date', [$today->toDateString(), $windowEnd->toDateString()])
             ->with('employee')
             ->orderBy('end_date')
             ->get()

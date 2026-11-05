@@ -849,7 +849,11 @@
                                 ->values();
                         @endphp
                         <div class="table-responsive">
-                            <table class="table align-middle weekly-overview-assigned-table" data-cl-reveal-rows>
+                            <table
+                                class="table align-middle weekly-overview-assigned-table"
+                                data-cl-reveal-rows
+                                aria-label="Przypisani pracownicy"
+                            >
                                 <thead>
                                     <tr>
                                         <th class="wo-sortable" data-sort-dir="asc">

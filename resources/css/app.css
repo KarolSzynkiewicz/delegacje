@@ -753,7 +753,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
     .wo-radar__icon-sweep,
     .wo-radar--boot .wo-radar__scan,
-    .wo-radar--boot .wo-radar__dot {
+    .wo-radar--boot .wo-radar__dot,
+    .wo-radar__dot--overdue {
         animation: none !important;
     }
     .wo-radar--boot .wo-radar__dot {
@@ -839,8 +840,23 @@ body {
     background: var(--lane, #94a3b8);
     color: #0b1220;
     box-shadow:
-        0 0 0 3px color-mix(in srgb, var(--lane, #94a3b8) 30%, transparent),
-        0 0 14px color-mix(in srgb, var(--lane, #94a3b8) 40%, transparent);
+        0 0 0 3px color-mix(in srgb, var(--lane, #94a3b8) 26%, transparent),
+        0 0 10px color-mix(in srgb, var(--lane, #94a3b8) 28%, transparent);
+    /* Delikatny pulse tylko na poświacie — bez skali, żeby nie rzucało w oczy. */
+    animation: wo-radar-overdue-pulse 3.2s ease-in-out infinite;
+}
+@keyframes wo-radar-overdue-pulse {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 3px color-mix(in srgb, var(--lane, #94a3b8) 22%, transparent),
+            0 0 8px color-mix(in srgb, var(--lane, #94a3b8) 22%, transparent);
+    }
+    50% {
+        box-shadow:
+            0 0 0 4px color-mix(in srgb, var(--lane, #94a3b8) 34%, transparent),
+            0 0 14px color-mix(in srgb, var(--lane, #94a3b8) 36%, transparent);
+    }
 }
 .wo-radar__dot:hover {
     transform: translate(-50%, -50%) scale(1.1);
@@ -3032,22 +3048,38 @@ td:has(.avatar-stack:hover),
         transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
     transition-delay: var(--cl-reveal-delay, 0ms);
 }
-.cl-reveal-row,
+/* Karty siatki / li — fade na samym elemencie. */
 .cl-reveal-item {
     opacity: 0;
-    transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
     transition-delay: var(--cl-reveal-delay, 0ms);
 }
-.cl-reveal.is-revealed,
-.cl-reveal-row.is-revealed,
 .cl-reveal-item.is-revealed {
+    opacity: 1;
+}
+/*
+ * Wiersze tabeli: opacity na <tr> jest ignorowane w Chromium/WebKit.
+ * Fade idzie na komórkach — wtedy scroll-reveal w „Przypisani” jest widoczny.
+ */
+.cl-reveal-row > th,
+.cl-reveal-row > td {
+    opacity: 0;
+    transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--cl-reveal-delay, 0ms);
+}
+.cl-reveal-row.is-revealed > th,
+.cl-reveal-row.is-revealed > td {
+    opacity: 1;
+}
+.cl-reveal.is-revealed {
     opacity: 1;
     transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
     .cl-reveal,
-    .cl-reveal-row,
-    .cl-reveal-item {
+    .cl-reveal-item,
+    .cl-reveal-row > th,
+    .cl-reveal-row > td {
         opacity: 1;
         transform: none;
         transition: none;

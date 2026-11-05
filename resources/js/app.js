@@ -326,6 +326,9 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
     const COUNT_CAP = 18;
     const ITEM_STAGGER_CAP = 10;
     const ITEM_STAGGER_MS = 45;
+    /** Tabele załogi — dłuższy stagger, żeby „Przypisani” było widać. */
+    const ROW_STAGGER_CAP = 18;
+    const ROW_STAGGER_MS = 55;
     const HOST_SELECTOR = '[data-cl-reveal-rows], [data-cl-reveal-items]';
 
     /** Wspólna pętla — N cyferek ≠ N requestAnimationFrame. */
@@ -406,18 +409,32 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
         });
     };
 
+    const blockingRevealParent = (el) => {
+        const parent = el.closest('.cl-reveal');
+        if (!parent || parent === el || parent.classList.contains('is-revealed')) return null;
+        return parent;
+    };
+
     const markRevealed = (el, delayMs = 0, { counts = true } = {}) => {
         if (!(el instanceof Element) || el.classList.contains('is-revealed')) return;
         if (reduceMotion()) {
             el.classList.add('is-revealed');
             if (counts) runCounts(el);
+            el.dispatchEvent(new CustomEvent('cl-revealed', { bubbles: false }));
             return;
         }
         if (delayMs) el.style.setProperty('--cl-reveal-delay', `${delayMs}ms`);
         requestAnimationFrame(() => {
             el.classList.add('is-revealed');
+            el.dispatchEvent(new CustomEvent('cl-revealed', { bubbles: false }));
             if (counts) {
                 window.setTimeout(() => runCounts(el), delayMs + 280);
+            }
+            // Listy/tabele w środku karty startują dopiero po wejściu rodzica.
+            if (el.classList.contains('cl-reveal')) {
+                window.setTimeout(() => {
+                    pendingHosts(el).forEach((host) => tryRevealHost(host));
+                }, delayMs + 80);
             }
         });
     };
@@ -435,6 +452,13 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
         host.hasAttribute('data-cl-reveal-items') ? 'cl-reveal-item' : 'cl-reveal-row'
     );
 
+    const hostStagger = (host) => {
+        if (host.hasAttribute('data-cl-reveal-rows')) {
+            return { cap: ROW_STAGGER_CAP, ms: ROW_STAGGER_MS };
+        }
+        return { cap: ITEM_STAGGER_CAP, ms: ITEM_STAGGER_MS };
+    };
+
     const prepareHost = (host) => {
         if (!(host instanceof Element) || host.dataset.clItemsPrepared === '1') return;
         host.dataset.clItemsPrepared = '1';
@@ -451,15 +475,43 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
         prepareHost(host);
 
         const cls = hostItemClass(host);
+        const { cap, ms } = hostStagger(host);
         const items = Array.from(host.querySelectorAll(hostItemSelector(host)));
         items.forEach((item, index) => {
             item.classList.add(cls);
-            const delay = index < ITEM_STAGGER_CAP ? index * ITEM_STAGGER_MS : 0;
+            const delay = index < cap ? index * ms : 0;
             markRevealed(item, delay, { counts: false });
         });
 
-        const hostDelay = Math.min(items.length, ITEM_STAGGER_CAP) * ITEM_STAGGER_MS;
+        const hostDelay = Math.min(items.length, cap) * ms;
         window.setTimeout(() => runCounts(host), hostDelay + 200);
+    };
+
+    const hostInView = (host) => {
+        const rect = host.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        // Lekki margines — animacja startuje gdy tabela/lista wchodzi w kadr.
+        return rect.bottom > 48 && rect.top < vh - 48;
+    };
+
+    const tryRevealHost = (host) => {
+        if (!(host instanceof Element) || host.dataset.clItemsDone === '1') return false;
+        const blocked = blockingRevealParent(host);
+        if (blocked) {
+            prepareHost(host);
+            if (host.dataset.clWaitingParent !== '1') {
+                host.dataset.clWaitingParent = '1';
+                blocked.addEventListener('cl-revealed', () => {
+                    delete host.dataset.clWaitingParent;
+                    // Nie odpalaj poza ekranem — zostaw IntersectionObserverowi przy scrollu.
+                    if (hostInView(host)) tryRevealHost(host);
+                }, { once: true });
+            }
+            return false;
+        }
+        if (!hostInView(host)) return false;
+        revealHost(host);
+        return true;
     };
 
     const pendingHosts = (root) => Array.from(
@@ -486,14 +538,17 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
                 if (!entry.isIntersecting) return;
                 const el = entry.target;
                 if (el.matches(HOST_SELECTOR)) {
-                    revealHost(el);
+                    if (tryRevealHost(el)) {
+                        io.unobserve(el);
+                    }
+                    // Zablokowane przez rodzica — zostają w IO / czekają na cl-revealed.
                 } else {
                     markRevealed(el, Math.min(stagger, 5) * 70);
                     stagger += 1;
+                    io.unobserve(el);
                 }
-                io.unobserve(el);
             });
-        }, { threshold: 0.08, rootMargin: '0px 0px -4% 0px' });
+        }, { threshold: 0.06, rootMargin: '0px 0px -3% 0px' });
 
         blocks.forEach((el) => io.observe(el));
         hosts.forEach((el) => io.observe(el));
@@ -509,4 +564,19 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
     }
 
     document.addEventListener('livewire:navigated', boot);
+
+    // Po rozwinięciu „Lista” — odtwórz wejście wierszy Przypisanych.
+    document.addEventListener('shown.bs.collapse', (event) => {
+        const panel = event.target;
+        if (!(panel instanceof Element)) return;
+        panel.querySelectorAll(HOST_SELECTOR).forEach((host) => {
+            delete host.dataset.clItemsDone;
+            delete host.dataset.clItemsPrepared;
+            host.querySelectorAll('.cl-reveal-row, .cl-reveal-item').forEach((item) => {
+                item.classList.remove('is-revealed', 'cl-reveal-row', 'cl-reveal-item');
+                item.style.removeProperty('--cl-reveal-delay');
+            });
+        });
+        scan(panel);
+    });
 })();

@@ -106,6 +106,67 @@ class DeadlineRadarServiceTest extends TestCase
         $this->assertSame('Zaległe', $overdueVehicleClusters[0]['due_label']);
     }
 
+    public function test_overdue_dots_only_for_vehicles_and_documents_not_ended_projects_leases_rotations(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-05'));
+        $monday = Carbon::parse('2026-11-02');
+
+        $employee = Employee::factory()->create();
+        $docType = Document::factory()->create();
+
+        // Historycznie zakończone — nie powinny trafić na radar.
+        Project::factory()->create(['name' => 'Stary projekt', 'end_date' => '2026-10-20']);
+        Rotation::factory()->create([
+            'employee_id' => $employee->id,
+            'start_date' => '2026-09-01',
+            'end_date' => '2026-10-15',
+        ]);
+        $house = Accommodation::factory()->create(['name' => 'Stary dom']);
+        AccommodationLease::create([
+            'accommodation_id' => $house->id,
+            'type' => 'wynajmowany',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-10-10',
+        ]);
+
+        // Zaległe, które zostają (auta / dokumenty).
+        EmployeeDocument::factory()->create([
+            'employee_id' => $employee->id,
+            'document_id' => $docType->id,
+            'kind' => 'okresowy',
+            'valid_to' => '2026-10-25',
+        ]);
+        Vehicle::factory()->create([
+            'registration_number' => 'DOC-KEEP-OVERDUE',
+            'inspection_valid_to' => '2026-10-20',
+        ]);
+
+        // Kończące się od poniedziałku — nadal widoczne.
+        Project::factory()->create(['name' => 'Projekt w tym tygodniu', 'end_date' => '2026-11-04']);
+        Rotation::factory()->create([
+            'employee_id' => Employee::factory()->create()->id,
+            'start_date' => '2026-10-01',
+            'end_date' => '2026-11-06',
+        ]);
+
+        $radar = app(DeadlineRadarService::class)->build($monday);
+        $items = collect($radar['items']);
+        $overdueClusters = collect($radar['clusters'])->where('overdue', true);
+
+        $this->assertFalse($items->contains(fn ($item) => $item['lane'] === 'projects' && $item['overdue']));
+        $this->assertFalse($items->contains(fn ($item) => $item['lane'] === 'leases' && $item['overdue']));
+        $this->assertFalse($items->contains(fn ($item) => $item['lane'] === 'rotations' && $item['overdue']));
+        $this->assertTrue($items->contains(fn ($item) => $item['lane'] === 'documents' && $item['overdue']));
+        $this->assertTrue($items->contains(fn ($item) => $item['lane'] === 'vehicles' && $item['overdue']));
+
+        $this->assertSame(
+            ['documents', 'vehicles'],
+            $overdueClusters->pluck('lane')->sort()->values()->all()
+        );
+
+        $this->assertTrue($items->contains(fn ($item) => $item['title'] === 'Projekt w tym tygodniu'));
+    }
+
     public function test_anchor_is_reviewed_week_monday_not_wall_clock_today(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-11-04')); // Wednesday
