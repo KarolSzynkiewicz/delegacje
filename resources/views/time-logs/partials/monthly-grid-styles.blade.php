@@ -1,4 +1,71 @@
 <style>
+    .monthly-grid-layer-toggle {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        padding: 0.28rem;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        background: rgba(255, 255, 255, 0.03);
+    }
+    .monthly-grid-layer-toggle__btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.45rem 0.85rem;
+        border-radius: 9px;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.82rem;
+        font-weight: 600;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .monthly-grid-layer-toggle__btn:hover {
+        color: var(--text-main);
+        background: rgba(59, 130, 246, 0.1);
+    }
+    .monthly-grid-layer-toggle__btn.is-active {
+        color: #fff;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+    }
+    .monthly-grid-layer-toggle__count {
+        margin-left: 0.4rem;
+        padding: 0.1rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-family: 'JetBrains Mono', monospace;
+        background: rgba(245, 158, 11, 0.25);
+        color: #fde68a;
+    }
+    .monthly-grid-layer-toggle__btn.is-active .monthly-grid-layer-toggle__count {
+        background: rgba(255, 255, 255, 0.22);
+        color: #fff;
+    }
+    .monthly-grid-discrepancies th {
+        font-size: 0.78rem;
+        white-space: nowrap;
+    }
+    .monthly-grid-discrepancies__row--open td {
+        background: rgba(245, 158, 11, 0.06);
+    }
+    .time-input--settled {
+        border-color: rgba(168, 85, 247, 0.45);
+        background: rgba(168, 85, 247, 0.08);
+    }
+    .time-logs-monthly-grid-root #timeLogsGrid .time-input--client:not(.disabled-input) {
+        border-color: rgba(96, 165, 250, 0.45);
+        background: rgba(59, 130, 246, 0.06);
+    }
+    .time-logs-monthly-grid-root #timeLogsGrid .mismatch-cell .time-input,
+    .time-logs-monthly-grid-root #timeLogsGrid .time-input--mismatch {
+        background: rgba(245, 158, 11, 0.12) !important;
+        border-color: rgba(245, 158, 11, 0.45) !important;
+    }
+    .legend-mismatch {
+        border-radius: 4px;
+        background: rgba(245, 158, 11, 0.25);
+        border: 1px solid rgba(245, 158, 11, 0.45);
+    }
+
     /* Mobile-first: bez 100vw (unikamy poziomego scrolla całej strony), tabela przewijana wewnątrz karty */
     .time-logs-monthly-grid-root {
         width: 100%;

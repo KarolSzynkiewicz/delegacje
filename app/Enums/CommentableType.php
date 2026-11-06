@@ -4,6 +4,7 @@ namespace App\Enums;
 
 use App\Models\Accommodation;
 use App\Models\ApprovalRequest;
+use App\Models\Client;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\ForumPost;
@@ -28,6 +29,7 @@ enum CommentableType: string
     case LOCATION = 'location';
     case EMPLOYEE = 'employee';
     case COMPANY = 'company';
+    case CLIENT = 'client';
     case RECRUITMENT_PROCESS = 'recruitment_process';
     case RECRUITMENT_CANDIDATE = 'recruitment_candidate';
     case SPRINT = 'sprint';
@@ -46,6 +48,7 @@ enum CommentableType: string
             self::LOCATION => Location::class,
             self::EMPLOYEE => Employee::class,
             self::COMPANY => Company::class,
+            self::CLIENT => Client::class,
             self::RECRUITMENT_PROCESS => RecruitmentProcess::class,
             self::RECRUITMENT_CANDIDATE => RecruitmentCandidate::class,
             self::SPRINT => Sprint::class,
@@ -66,6 +69,7 @@ enum CommentableType: string
             Location::class => self::LOCATION,
             Employee::class => self::EMPLOYEE,
             Company::class => self::COMPANY,
+            Client::class => self::CLIENT,
             RecruitmentProcess::class => self::RECRUITMENT_PROCESS,
             RecruitmentCandidate::class => self::RECRUITMENT_CANDIDATE,
             Sprint::class => self::SPRINT,

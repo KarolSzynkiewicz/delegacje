@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\TimeLog;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -300,6 +301,9 @@ class TimeLogService
                 }
                 $timeLogsByProjectEmployee[$key][$day] = [
                     'hours' => $timeLog->hours_worked,
+                    'client_hours' => $timeLog->client_hours,
+                    'settled_hours' => $timeLog->settled_hours,
+                    'mismatch' => $timeLog->hasClientMismatch(),
                     'time_log_id' => $timeLog->id,
                     'assignment_id' => $assignmentId,
                 ];
@@ -403,6 +407,99 @@ class TimeLogService
     }
 
     /**
+     * Skopiuj hours_worked → client_hours tam, gdzie klient jeszcze nie ma warstwy.
+     * Wywoływane przy wejściu w tryb „wersja klienta” w monthly-grid.
+     *
+     * @param  array<int>|null  $projectIds
+     */
+    public function seedClientHoursFromInternal(string $month, ?array $projectIds = null): int
+    {
+        $currentDate = Carbon::parse($month.'-01');
+        $monthStart = $currentDate->copy()->startOfMonth();
+        $monthEnd = $currentDate->copy()->endOfMonth()->endOfDay();
+
+        $query = TimeLog::query()
+            ->whereNull('client_hours')
+            ->whereNotNull('hours_worked')
+            ->whereBetween('start_time', [$monthStart, $monthEnd]);
+
+        if ($projectIds !== null && $projectIds !== []) {
+            $query->whereHas('projectAssignment', function ($q) use ($projectIds) {
+                $q->whereIn('project_id', $projectIds);
+            });
+        }
+
+        // Jedno UPDATE z kopiowaniem kolumny — bez N× save.
+        return $query->update([
+            'client_hours' => DB::raw('hours_worked'),
+        ]);
+    }
+
+    /**
+     * Lista rozbieżności nasze ↔ klient w miesiącu (do ustalenia konsensusu).
+     *
+     * @param  array<int>|null  $projectIds
+     * @return list<array{
+     *     time_log_id: int,
+     *     assignment_id: int,
+     *     project_id: int,
+     *     project_name: string,
+     *     employee_id: int,
+     *     employee_name: string,
+     *     date: string,
+     *     day_label: string,
+     *     hours_worked: float,
+     *     client_hours: float,
+     *     settled_hours: float|null
+     * }>
+     */
+    public function getHourDiscrepancies(string $month, ?array $projectIds = null): array
+    {
+        $currentDate = Carbon::parse($month.'-01');
+        $monthStart = $currentDate->copy()->startOfMonth();
+        $monthEnd = $currentDate->copy()->endOfMonth()->endOfDay();
+
+        $query = TimeLog::query()
+            ->with(['projectAssignment.project', 'projectAssignment.employee'])
+            ->whereNotNull('client_hours')
+            ->whereBetween('start_time', [$monthStart, $monthEnd])
+            ->whereRaw('ABS(COALESCE(hours_worked, 0) - client_hours) > 0.001')
+            ->orderBy('start_time');
+
+        if ($projectIds !== null && $projectIds !== []) {
+            $query->whereHas('projectAssignment', function ($q) use ($projectIds) {
+                $q->whereIn('project_id', $projectIds);
+            });
+        }
+
+        return $query->get()
+            ->map(function (TimeLog $log) {
+                $assignment = $log->projectAssignment;
+                $employee = $assignment?->employee;
+                $project = $assignment?->project;
+                $date = $log->start_time->copy()->startOfDay();
+
+                return [
+                    'time_log_id' => $log->id,
+                    'assignment_id' => (int) $log->project_assignment_id,
+                    'project_id' => (int) ($assignment?->project_id ?? 0),
+                    'project_name' => $project?->name ?? '—',
+                    'employee_id' => (int) ($assignment?->employee_id ?? 0),
+                    'employee_name' => $employee
+                        ? trim($employee->last_name.', '.$employee->first_name)
+                        : '—',
+                    'date' => $date->toDateString(),
+                    'day_label' => $date->format('d.m.Y'),
+                    'hours_worked' => (float) ($log->hours_worked ?? 0),
+                    'client_hours' => (float) $log->client_hours,
+                    'settled_hours' => $log->settled_hours !== null ? (float) $log->settled_hours : null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * Bulk update time logs.
      *
      * @param  array  $entries  [
@@ -413,10 +510,16 @@ class TimeLogService
      *                          ],
      *                          ...
      *                          ]
+     * @param  string  $layer  internal|client|settled
      * @return array ['created' => int, 'updated' => int, 'deleted' => int, 'errors' => array]
      */
-    public function bulkUpdateTimeLogs(array $entries): array
+    public function bulkUpdateTimeLogs(array $entries, string $layer = 'internal'): array
     {
+        $layer = match ($layer) {
+            'client' => 'client',
+            'settled' => 'settled',
+            default => 'internal',
+        };
         $results = [
             'created' => 0,
             'updated' => 0,
@@ -504,20 +607,28 @@ class TimeLogService
                 $timeLogKey = $assignmentId.'_'.$date->format('Y-m-d');
                 $timeLog = $existingTimeLogs->get($timeLogKey);
 
-                if ($hours > 0) {
+                if ($layer === 'client') {
+                    $this->applyClientLayerHours($assignment, $date, $hours, $timeLog, $existingTimeLogs, $timeLogKey, $results);
+                } elseif ($layer === 'settled') {
+                    $this->applySettledLayerHours($hours, $timeLog, $results, $entry);
+                } elseif ($hours > 0) {
                     if ($timeLog) {
-                        // Update existing
                         $this->updateTimeLogWithAssignment($timeLog, $assignment, $date, $hours);
                         $results['updated']++;
                     } else {
-                        // Create new
                         $this->createTimeLog($assignment, $date, $hours);
                         $results['created']++;
                     }
-                } else {
-                    // Delete if hours is 0 or empty
-                    if ($timeLog) {
+                } elseif ($timeLog) {
+                    // Puste wewnętrzne: nie kasuj wiersza, jeśli klient już coś ma.
+                    if ($timeLog->client_hours !== null) {
+                        $timeLog->hours_worked = 0;
+                        $timeLog->end_time = $date->copy()->setTime(8, 0);
+                        $timeLog->save();
+                        $results['updated']++;
+                    } else {
                         $timeLog->delete();
+                        $existingTimeLogs->forget($timeLogKey);
                         $results['deleted']++;
                     }
                 }
@@ -538,5 +649,60 @@ class TimeLogService
         }
 
         return $results;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<string, TimeLog>  $existingTimeLogs
+     * @param  array{created: int, updated: int, deleted: int, errors: array}  $results
+     */
+    private function applyClientLayerHours(
+        ProjectAssignment $assignment,
+        Carbon $date,
+        float $hours,
+        ?TimeLog $timeLog,
+        $existingTimeLogs,
+        string $timeLogKey,
+        array &$results
+    ): void {
+        if ($timeLog) {
+            $timeLog->client_hours = $hours;
+            $timeLog->save();
+            $results['updated']++;
+
+            return;
+        }
+
+        if ($hours <= 0) {
+            return;
+        }
+
+        // Klient zgłasza godziny, których jeszcze nie mamy — utwórz wiersz z 0 wewnętrznych.
+        $created = $this->createTimeLog($assignment, $date, 0);
+        $created->client_hours = $hours;
+        $created->save();
+        $existingTimeLogs->put($timeLogKey, $created);
+        $results['created']++;
+    }
+
+    /**
+     * @param  array{created: int, updated: int, deleted: int, errors: array}  $results
+     * @param  array<string, mixed>  $entry
+     */
+    private function applySettledLayerHours(float $hours, ?TimeLog $timeLog, array &$results, array $entry): void
+    {
+        if (! $timeLog) {
+            $results['errors'][] = [
+                'assignment_id' => $entry['assignment_id'] ?? null,
+                'date' => $entry['date'] ?? null,
+                'message' => 'Brak wpisu czasu — najpierw zapisz godziny nasze lub klienta.',
+            ];
+
+            return;
+        }
+
+        // Puste pole = wyczyść konsensus (wraca do „do ustalenia”).
+        $timeLog->settled_hours = $hours > 0 ? $hours : null;
+        $timeLog->save();
+        $results['updated']++;
     }
 }

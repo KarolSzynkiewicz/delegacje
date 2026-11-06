@@ -27,8 +27,11 @@ class Project extends Model
      */
     protected $fillable = [
         'location_id',
+        'client_id',
+        'client_contact_id',
         'name',
         'description',
+        'arrangements',
         'status',
         'type',
         'client_name',
@@ -60,6 +63,48 @@ class Project extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    /**
+     * CRM client that owns this project.
+     */
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * Person of contact at the client (optional — legacy projects may lack one).
+     */
+    public function clientContact(): BelongsTo
+    {
+        return $this->belongsTo(ClientContact::class);
+    }
+
+    /**
+     * Registered CRM contact attempts / settlements for this project.
+     */
+    public function clientContactAttempts(): HasMany
+    {
+        return $this->hasMany(ClientContactAttempt::class)->latest('contacted_at');
+    }
+
+    /**
+     * Ordered project milestones / checklist.
+     */
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(ProjectMilestone::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /**
+     * Prefer linked CRM client name; fall back to legacy free-text.
+     */
+    public function clientLabel(): string
+    {
+        return $this->client?->name
+            ?? $this->client_name
+            ?? '—';
     }
 
     /**

@@ -254,6 +254,7 @@ class Comment extends Model implements TaskSubject
             $morph instanceof Location => route('locations.show', $morph),
             $morph instanceof Employee => route('employees.show', $morph),
             $morph instanceof Company => route('companies.show', $morph),
+            $morph instanceof Client => route('clients.show', $morph),
             $morph instanceof RecruitmentProcess => route('recruitment-processes.show', $morph),
             $morph instanceof RecruitmentCandidate => route('recruitment-processes.index'),
             $morph instanceof Sprint => route('sprints.show', $morph),

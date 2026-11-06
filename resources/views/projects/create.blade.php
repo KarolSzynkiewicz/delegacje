@@ -45,14 +45,12 @@
                         />
                     </div>
 
-                    <div class="mb-3">
-                        <x-ui.input 
-                            type="text" 
-                            name="client_name" 
-                            label="Klient"
-                            value="{{ old('client_name') }}"
-                        />
-                    </div>
+                    @include('projects.partials.client-contact-fields', [
+                        'clients' => $clients,
+                        'selectedClientId' => $selectedClientId ?? null,
+                        'contactsByClient' => $contactsByClient ?? [],
+                        'project' => null,
+                    ])
 
                     <div class="mb-3">
                         <x-ui.input 
@@ -62,6 +60,17 @@
                             value="{{ old('description') }}"
                             rows="4"
                         />
+                    </div>
+
+                    <div class="mb-3">
+                        <x-ui.input
+                            type="textarea"
+                            name="arrangements"
+                            label="Ustalenia"
+                            value="{{ old('arrangements') }}"
+                            rows="3"
+                        />
+                        <div class="form-text">Wymagania techniczne / co zapewniamy pracownikom (np. BHP, sprzęt, dojazd).</div>
                     </div>
 
                     <div class="mb-3">

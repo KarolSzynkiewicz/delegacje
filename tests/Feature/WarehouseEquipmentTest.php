@@ -817,7 +817,7 @@ class WarehouseEquipmentTest extends TestCase
         $service->consumeItems([['variant_id' => $variant->id, 'quantity' => 1]], $this->warehouse, $home, 'do kotła');
         $service->consumeItems([['variant_id' => $variant->id, 'quantity' => 3]], $this->warehouse, $project, 'na budowę');
 
-        $this->get(route('vehicles.show', $vehicle))
+        $this->get(route('vehicles.show', ['vehicle' => $vehicle, 'tab' => 'consumptions']))
             ->assertOk()
             ->assertSee('Rozchód z magazynu')
             ->assertSee('Olej silnikowy')
@@ -831,6 +831,7 @@ class WarehouseEquipmentTest extends TestCase
             ->assertSee('do kotła')
             ->assertDontSee('wymiana oleju');
 
+        // Projekt: lista tylko w zakładce Informacje (domyślna).
         $this->get(route('projects.show', $project))
             ->assertOk()
             ->assertSee('Rozchód z magazynu')

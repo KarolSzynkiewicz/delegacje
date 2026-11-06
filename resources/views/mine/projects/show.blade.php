@@ -13,11 +13,9 @@
         </x-ui.page-header>
     </x-slot>
 
-    <div class="container-xxl">
-        <div class="row">
-            <div class="col-md-12">
-                <livewire:project-tabs :project="$project" :isMineView="true" />
-            </div>
-        </div>
+    <div class="container-xxl pj-shell">
+        @include('livewire.partials.project-show-styles')
+        @include('projects.partials.project-hero', ['project' => $project->loadMissing(['client', 'clientContact', 'location'])])
+        <livewire:project-tabs :project="$project" :isMineView="true" />
     </div>
 </x-app-layout>

@@ -44,7 +44,15 @@
             <div class="small text-muted mt-1">{{ $typeInfo }}</div>
         @endif
     </td>
-    <td class="d-none d-md-table-cell">{{ $project->client_name ?? '-' }}</td>
+    <td class="d-none d-md-table-cell">
+        @if($project->client)
+            <a href="{{ route('clients.show', $project->client) }}" class="text-primary text-decoration-none">
+                {{ $project->client->name }}
+            </a>
+        @else
+            {{ $project->client_name ?? '-' }}
+        @endif
+    </td>
     <td>
         @if($project->location)
             <div><i class="bi bi-geo-alt text-muted me-1"></i>{{ $project->location->name }}</div>

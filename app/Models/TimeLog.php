@@ -21,6 +21,8 @@ class TimeLog extends Model
         'start_time',
         'end_time',
         'hours_worked',
+        'client_hours',
+        'settled_hours',
         'notes',
     ];
 
@@ -33,7 +35,29 @@ class TimeLog extends Model
         'start_time' => 'datetime',
         'end_time' => 'datetime',
         'hours_worked' => 'decimal:2',
+        'client_hours' => 'decimal:2',
+        'settled_hours' => 'decimal:2',
     ];
+
+    /**
+     * Czy warstwa klienta różni się od wewnętrznej (po skopiowaniu / nadpisaniu).
+     */
+    public function hasClientMismatch(float $epsilon = 0.001): bool
+    {
+        if ($this->client_hours === null) {
+            return false;
+        }
+
+        return abs((float) $this->client_hours - (float) ($this->hours_worked ?? 0)) > $epsilon;
+    }
+
+    /**
+     * Czy konsensus jest już ustawiony.
+     */
+    public function hasSettledHours(): bool
+    {
+        return $this->settled_hours !== null;
+    }
 
     /**
      * Boot the model.

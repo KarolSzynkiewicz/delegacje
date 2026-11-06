@@ -1,5 +1,6 @@
 import './bootstrap';
 import { registerAssignmentTimeline } from './assignment-timeline';
+import { registerProjectDemandTimeline } from './project-demand-timeline';
 import './dashboard-snaps';
 import './procedure-run-flow';
 import './forum-composer';
@@ -125,6 +126,7 @@ document.addEventListener('livewire:init', () => {
  */
 document.addEventListener('alpine:init', () => {
     registerAssignmentTimeline(window.Alpine);
+    registerProjectDemandTimeline(window.Alpine);
 
     window.Alpine.data('subtaskMention', (users, wireProperty) => ({
         users: users || [],
@@ -564,6 +566,15 @@ window.attachVehicleDocumentConfirmToForm = function (formEl, selectName, payloa
     }
 
     document.addEventListener('livewire:navigated', boot);
+
+    // Livewire 3 morph: nowe .cl-reveal / hosty w DOM po update komponentu.
+    document.addEventListener('livewire:init', () => {
+        if (!window.Livewire?.hook) return;
+        window.Livewire.hook('morph.updated', ({ el }) => {
+            if (!(el instanceof Element)) return;
+            window.setTimeout(() => scan(el), 0);
+        });
+    });
 
     // Po rozwinięciu „Lista” — odtwórz wejście wierszy Przypisanych.
     document.addEventListener('shown.bs.collapse', (event) => {

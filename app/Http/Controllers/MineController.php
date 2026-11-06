@@ -297,13 +297,24 @@ class MineController extends Controller
         }
 
         $gridProjectIds = $projectId ? [(int) $projectId] : null;
+        $layer = match ($request->query('layer', 'internal')) {
+            'client' => 'client',
+            'discrepancies' => 'discrepancies',
+            default => 'internal',
+        };
+        if ($layer === 'client' && $gridProjectIds) {
+            $this->timeLogService->seedClientHoursFromInternal($month, $gridProjectIds);
+        }
+
         $data = $this->timeLogService->getMonthlyGridData($month, $gridProjectIds);
         $data['isMineRoute'] = true; // Flag dla widoku, żeby linki prowadziły do /mine/*
         $data['availableProjects'] = $projectsForDropdown;
         $data['selectedProjectId'] = $projectId ? (int) $projectId : null;
         $data['userPage'] = $userPage;
         $data['userPerPage'] = $userPerPage;
-        
+        $data['hoursLayer'] = $layer;
+        $data['hourDiscrepancies'] = $this->timeLogService->getHourDiscrepancies($month, $gridProjectIds);
+
         return view('time-logs.monthly-grid', $data);
     }
 }

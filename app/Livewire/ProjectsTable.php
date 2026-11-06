@@ -72,7 +72,7 @@ class ProjectsTable extends Component
 
     public function render()
     {
-        $query = Project::with(['location', 'currentSiteLead.employee']);
+        $query = Project::with(['location', 'client', 'currentSiteLead.employee']);
 
         if ($this->filterProjectIds && is_array($this->filterProjectIds) && ! empty($this->filterProjectIds)) {
             $query->whereIn('id', $this->filterProjectIds);
@@ -84,7 +84,11 @@ class ProjectsTable extends Component
             if (strlen($searchTerm) >= 2) {
                 $query->where(function ($q) use ($searchTerm) {
                     $q->where('name', 'like', '%'.$searchTerm.'%')
-                        ->orWhere('client_name', 'like', '%'.$searchTerm.'%');
+                        ->orWhere('client_name', 'like', '%'.$searchTerm.'%')
+                        ->orWhereHas('client', function ($clientQuery) use ($searchTerm) {
+                            $clientQuery->where('name', 'like', '%'.$searchTerm.'%')
+                                ->orWhere('short_name', 'like', '%'.$searchTerm.'%');
+                        });
                 });
             }
         }

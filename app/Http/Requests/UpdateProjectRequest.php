@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ClientType;
 use App\Enums\ProjectStatus;
 use App\Enums\ProjectType;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,8 +29,22 @@ class UpdateProjectRequest extends FormRequest
         
         $rules = [
             'location_id' => ['required', 'exists:locations,id'],
+            'client_id' => [
+                'nullable',
+                Rule::exists('clients', 'id')->where(fn ($q) => $q->where('type', ClientType::Client->value)),
+            ],
+            'client_contact_id' => [
+                'nullable',
+                Rule::exists('client_contacts', 'id')->where(function ($q) {
+                    $clientId = $this->input('client_id');
+                    if ($clientId) {
+                        $q->where('client_id', $clientId);
+                    }
+                }),
+            ],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'arrangements' => ['nullable', 'string'],
             'status' => ['required', Rule::enum(ProjectStatus::class)],
             'type' => ['required', Rule::enum(ProjectType::class)],
             'client_name' => ['nullable', 'string', 'max:255'],
@@ -65,6 +80,7 @@ class UpdateProjectRequest extends FormRequest
             'name.required' => 'Nazwa projektu jest wymagana.',
             'status.required' => 'Status projektu jest wymagany.',
             'type.required' => 'Typ projektu jest wymagany.',
+            'client_contact_id.exists' => 'Wybrana osoba kontaktowa nie należy do tego klienta.',
             'budget.numeric' => 'Budżet musi być liczbą.',
             'budget.min' => 'Budżet nie może być ujemny.',
             'hourly_rate.numeric' => 'Stawka za godzinę musi być liczbą.',
@@ -73,6 +89,18 @@ class UpdateProjectRequest extends FormRequest
             'contract_amount.min' => 'Kwota kontraktu nie może być ujemna.',
             'currency.size' => 'Kod waluty musi składać się z 3 znaków.',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (! $this->filled('client_id')) {
+            $this->merge([
+                'client_id' => null,
+                'client_contact_id' => null,
+            ]);
+        } elseif (! $this->filled('client_contact_id')) {
+            $this->merge(['client_contact_id' => null]);
+        }
     }
 }
 

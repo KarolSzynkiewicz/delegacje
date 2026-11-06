@@ -490,6 +490,22 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
             ->defaults('resource', 'vehicles');
         Route::resource('vehicles', VehicleController::class);
         Route::resource('accommodations', AccommodationController::class);
+        // Stare URL /clients → /counterparties (nazwy routów zostają clients.*).
+        Route::permanentRedirect('clients', 'counterparties');
+        Route::permanentRedirect('clients/create', 'counterparties/create');
+        Route::permanentRedirect('clients/{client}/edit', 'counterparties/{client}/edit');
+        Route::permanentRedirect('clients/{client}', 'counterparties/{client}');
+        Route::resource('counterparties', \App\Http\Controllers\ClientController::class)
+            ->parameters(['counterparties' => 'client'])
+            ->names([
+                'index' => 'clients.index',
+                'create' => 'clients.create',
+                'store' => 'clients.store',
+                'show' => 'clients.show',
+                'edit' => 'clients.edit',
+                'update' => 'clients.update',
+                'destroy' => 'clients.destroy',
+            ]);
         Route::resource('companies', CompanyController::class);
         Route::resource('company-assignments', CompanyAssignmentController::class);
         // Najmy = część mieszkania (te same uprawnienia co accommodations.*, nie osobny zasób leases.*)

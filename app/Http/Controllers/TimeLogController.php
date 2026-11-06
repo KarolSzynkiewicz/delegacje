@@ -239,12 +239,23 @@ class TimeLogController extends Controller
         // (Zostawiamy UX: użytkownik nadal może wybrać dowolny projekt, nawet jeśli w danym miesiącu nie ma przypisań.)
         $gridProjectIds = $projectId ? [(int) $projectId] : null;
 
+        $layer = match ($request->query('layer', 'internal')) {
+            'client' => 'client',
+            'discrepancies' => 'discrepancies',
+            default => 'internal',
+        };
+        if ($layer === 'client' && $gridProjectIds) {
+            $this->timeLogService->seedClientHoursFromInternal($month, $gridProjectIds);
+        }
+
         $data = $this->timeLogService->getMonthlyGridData($month, $gridProjectIds);
         $data['availableProjects'] = $projectsForDropdown;
         $data['selectedProjectId'] = $projectId ? (int) $projectId : null;
         $data['isMineRoute'] = false;
         $data['userPage'] = $userPage;
         $data['userPerPage'] = $userPerPage;
+        $data['hoursLayer'] = $layer;
+        $data['hourDiscrepancies'] = $this->timeLogService->getHourDiscrepancies($month, $gridProjectIds);
 
         return view('time-logs.monthly-grid', $data);
     }
@@ -638,10 +649,21 @@ class TimeLogController extends Controller
                 ->withInput();
         }
 
-        // Middleware już sprawdził uprawnienia - można aktualizować wszystkie
-        $results = $this->timeLogService->bulkUpdateTimeLogs($entries);
+        $layer = match ($request->input('layer', 'internal')) {
+            'client' => 'client',
+            'settled' => 'settled',
+            default => 'internal',
+        };
 
-        $message = 'Zaktualizowano: ' . $results['created'] . ' utworzono, ' . $results['updated'] . ' zaktualizowano, ' . $results['deleted'] . ' usunięto.';
+        // Middleware już sprawdził uprawnienia - można aktualizować wszystkie
+        $results = $this->timeLogService->bulkUpdateTimeLogs($entries, $layer);
+
+        $layerLabel = match ($layer) {
+            'client' => ' (wersja klienta)',
+            'settled' => ' (konsensus)',
+            default => '',
+        };
+        $message = 'Zaktualizowano'.$layerLabel.': ' . $results['created'] . ' utworzono, ' . $results['updated'] . ' zaktualizowano, ' . $results['deleted'] . ' usunięto.';
         
         if (count($results['errors']) > 0) {
             $errorMessages = [];
@@ -660,14 +682,35 @@ class TimeLogController extends Controller
             ]);
         }
 
+        $redirectTo = $this->safeRedirectTarget($request->input('redirect_to'));
+
         if (count($results['errors']) > 0) {
-            return redirect()->back()
+            return redirect()->to($redirectTo ?? url()->previous())
                 ->with('error', $message)
                 ->with('bulkErrors', $results['errors'])
                 ->withInput();
         }
 
-        return redirect()->back()
+        return redirect()->to($redirectTo ?? url()->previous())
             ->with('success', $message);
+    }
+
+    private function safeRedirectTarget(mixed $target): ?string
+    {
+        if (! is_string($target) || $target === '') {
+            return null;
+        }
+
+        // Tylko lokalne ścieżki / URL-e aplikacji — bez open redirect.
+        if (str_starts_with($target, '/') && ! str_starts_with($target, '//')) {
+            return $target;
+        }
+
+        $appUrl = rtrim((string) config('app.url'), '/');
+        if ($appUrl !== '' && str_starts_with($target, $appUrl.'/')) {
+            return $target;
+        }
+
+        return null;
     }
 }

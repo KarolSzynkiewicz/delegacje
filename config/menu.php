@@ -25,6 +25,7 @@ return [
         'label' => 'Zasoby',
         'icon' => 'bi bi-boxes',
         'items' => [
+            'clients',
             'projects',
             'vehicles',
             'accommodations',

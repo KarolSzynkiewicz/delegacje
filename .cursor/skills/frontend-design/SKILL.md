@@ -83,6 +83,46 @@ per-row action buttons. Keep motion effects **opt-in via a class**
 (`.xuiv2-magnetic`) on curated CTAs only. The cursor glow itself is safe
 globally because it's O(1) — one element, no DOM scanning.
 
+## Motion — soft load / scroll reveals (required on new UI)
+
+Subtle entrance motion is part of the ChronoLogic feel. Prefer the **existing
+global system** — do not invent GSAP timelines, parallax stacks, or
+per-mousemove transforms on content.
+
+**What already exists** (`resources/css/app.css` + `resources/js/app.js`
+`initClReveal`):
+
+| Hook | Effect |
+|------|--------|
+| `.cl-reveal` / `<x-ui.card reveal>` | Soft fade + slight `translateY` on enter |
+| `[data-cl-reveal-rows]` on a table host | Staggered fade of `tbody/tfoot tr` (cells, not the `<tr>` — Chromium ignores opacity on rows) |
+| `[data-cl-reveal-items]` on a grid/list | Staggered fade of children (`:scope > *` or custom selector in the attribute value) |
+| `[data-cl-count]` | Shared rAF count-up when a revealed ancestor enters |
+
+IntersectionObserver drives scroll; a short stagger runs on first paint for
+above-the-fold blocks. `window.clRevealScan(root?)` re-scans after Livewire
+morph / collapse expand. Always honor `prefers-reduced-motion: reduce`
+(system already snaps to final state — never bypass it).
+
+**Rules when building or restyling a page:**
+
+1. **Section cards / heroes / panels** get reveal. Prefer
+   `<x-ui.card reveal>` or add `cl-reveal` to custom shells (`.pj-hero`,
+   `.pj-panel`, CRM hero panels). Do **not** leave a new glass section
+   popping in with zero motion.
+2. **Dense data tables** use `data-cl-reveal-rows` on the scroll host (or the
+   table wrapper) — not per-cell animations.
+3. **Card grids / avatar lists** use `data-cl-reveal-items`.
+4. Keep motion **light**: opacity + small Y (≤ ~0.7rem), ≤ ~750ms ease, short
+   stagger caps (already in JS). No blur, no scale bounce, no infinite
+   content pulse on static pages.
+5. After Livewire DOM swaps that inject new `.cl-reveal` / hosts, call
+   `window.clRevealScan?.(root)` (global boot already listens to
+   `livewire:navigated` and `livewire:morphed` / morph hooks — don't
+   duplicate heavy observers).
+6. Landing/auth may keep their own CSS keyframes (marquee, boot) — still
+   respect reduced motion; don't port those loops into CRUD screens.
+
 ## Buttons, cards, headers
 
 - `.btn-primary` — always the primary→accent gradient (`app.css` ~line 260).

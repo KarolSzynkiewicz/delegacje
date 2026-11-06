@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\ProjectType;
+use App\Models\Client;
 use App\Models\Location;
 use App\Models\Project;
 use Illuminate\Database\Seeder;
@@ -76,12 +77,21 @@ class ProjectSeeder extends Seeder
 
         $created = 0;
 
+        $resolveClientId = static function (string $clientName): int {
+            return Client::query()->firstOrCreate(
+                ['name' => $clientName],
+                ['is_active' => true, 'country' => 'PL']
+            )->id;
+        };
+
         // Tworzenie projektów z kwotą zakontraktowaną (4 projekty po 100k)
         foreach ($contractProjects as $projectData) {
+            $clientId = $resolveClientId($projectData['client_name']);
             $project = Project::firstOrCreate(
                 ['name' => $projectData['name']],
                 [
                     'location_id' => $locations->random()->id,
+                    'client_id' => $clientId,
                     'name' => $projectData['name'],
                     'description' => $projectData['description'],
                     'status' => 'active',
@@ -97,15 +107,19 @@ class ProjectSeeder extends Seeder
             );
             if ($project->wasRecentlyCreated) {
                 $created++;
+            } elseif (! $project->client_id) {
+                $project->update(['client_id' => $clientId, 'client_name' => $projectData['client_name']]);
             }
         }
 
         // Tworzenie projektów ze stawką godzinową (4 projekty, stawka 30 EUR)
         foreach ($hourlyProjects as $projectData) {
+            $clientId = $resolveClientId($projectData['client_name']);
             $project = Project::firstOrCreate(
                 ['name' => $projectData['name']],
                 [
                     'location_id' => $locations->random()->id,
+                    'client_id' => $clientId,
                     'name' => $projectData['name'],
                     'description' => $projectData['description'],
                     'status' => 'active',
@@ -121,6 +135,8 @@ class ProjectSeeder extends Seeder
             );
             if ($project->wasRecentlyCreated) {
                 $created++;
+            } elseif (! $project->client_id) {
+                $project->update(['client_id' => $clientId, 'client_name' => $projectData['client_name']]);
             }
         }
 

@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\ProjectType;
+use App\Models\Client;
 use App\Models\Location;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -20,13 +21,16 @@ class ProjectFactory extends Factory
     {
         $type = fake()->randomElement([ProjectType::HOURLY, ProjectType::CONTRACT]);
         
+        $client = Client::factory()->create();
+
         $data = [
             'location_id' => Location::factory(),
+            'client_id' => $client->id,
             'name' => fake()->company(),
             'description' => fake()->sentence(),
             'status' => 'active',
             'type' => $type,
-            'client_name' => fake()->company(),
+            'client_name' => $client->name,
             'budget' => fake()->randomFloat(2, 1000, 100000),
             'currency' => fake()->randomElement(['PLN', 'EUR', 'USD', 'GBP']),
         ];

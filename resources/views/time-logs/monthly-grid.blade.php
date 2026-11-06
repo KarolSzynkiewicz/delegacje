@@ -4,14 +4,22 @@
     <x-slot name="header">
         @php
             $monthlyGridRoute = isset($isMineRoute) && $isMineRoute ? 'mine.time-logs.monthly-grid' : 'time-logs.monthly-grid';
+            $hoursLayer = match ($hoursLayer ?? 'internal') {
+                'client' => 'client',
+                'discrepancies' => 'discrepancies',
+                default => 'internal',
+            };
+            $hourDiscrepancies = $hourDiscrepancies ?? [];
+            $layerParam = ['layer' => $hoursLayer];
             $selectedProjectParam = isset($selectedProjectId) && $selectedProjectId ? ['project_id' => $selectedProjectId] : [];
             $selectedUserParam = isset($userPage) && $userPage ? ['user_page' => $userPage] : [];
+            $gridNavParams = array_merge($selectedProjectParam, $selectedUserParam, $layerParam);
         @endphp
 
         @if(!($isMineRoute ?? false))
             <x-ui.period-nav class="mb-0">
                 <x-slot name="prev">
-                    <x-ui.button variant="ghost" href="{{ route($monthlyGridRoute, array_merge(['month' => $prevMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm w-100">
+                    <x-ui.button variant="ghost" href="{{ route($monthlyGridRoute, array_merge(['month' => $prevMonth], $gridNavParams)) }}" class="btn-sm w-100">
                         <i class="bi bi-chevron-left"></i>
                         <span>Poprzedni miesiąc</span>
                     </x-ui.button>
@@ -20,7 +28,7 @@
                     Ewidencja Godzin – Widok Miesięczny
                 </h2>
                 <x-slot name="next">
-                    <x-ui.button variant="primary" href="{{ route($monthlyGridRoute, array_merge(['month' => $nextMonth], $selectedProjectParam, $selectedUserParam)) }}" class="btn-sm w-100">
+                    <x-ui.button variant="primary" href="{{ route($monthlyGridRoute, array_merge(['month' => $nextMonth], $gridNavParams)) }}" class="btn-sm w-100">
                         <span>Następny miesiąc</span>
                         <i class="bi bi-chevron-right"></i>
                     </x-ui.button>
@@ -41,37 +49,70 @@
                 @php
                     $selectedProjectParamBody = isset($selectedProjectId) && $selectedProjectId ? ['project_id' => $selectedProjectId] : [];
                     $selectedUserParamBody = isset($userPage) && $userPage ? ['user_page' => $userPage] : [];
+                    $layerParamBody = ['layer' => $hoursLayer];
                 @endphp
 
-                @if(isset($availableProjects) && $availableProjects && count($availableProjects) > 0)
-                    <div class="mb-4 d-flex justify-content-stretch justify-content-md-end gap-3 align-items-stretch align-items-md-center flex-column flex-md-row">
-                        <div class="text-center text-md-end">
-                            <div class="small text-muted mb-1">Projekt</div>
-                            <div class="fw-semibold">
-                                @if($selectedProjectId)
-                                    Wybór: {{ $availableProjects->firstWhere('id', $selectedProjectId)->name ?? '-' }}
-                                @else
-                                    Wybór: -
-                                @endif
-                            </div>
-                        </div>
-                        <select
-                            class="form-select monthly-grid-project-select w-100"
-                            onchange="if(this.value) { window.location.href = this.value; }"
+                <div class="mb-4 d-flex flex-column flex-lg-row align-items-stretch align-items-lg-end justify-content-between gap-3">
+                    <div class="monthly-grid-layer-toggle" role="group" aria-label="Warstwa godzin">
+                        <a
+                            href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, $selectedUserParamBody, ['layer' => 'internal'])) }}"
+                            @class(['monthly-grid-layer-toggle__btn', 'is-active' => $hoursLayer === 'internal'])
+                        >Nasze godziny</a>
+                        <a
+                            href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, $selectedUserParamBody, ['layer' => 'client'])) }}"
+                            @class(['monthly-grid-layer-toggle__btn', 'is-active' => $hoursLayer === 'client'])
+                        >Wersja klienta</a>
+                        <a
+                            href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, $selectedUserParamBody, ['layer' => 'discrepancies'])) }}"
+                            @class(['monthly-grid-layer-toggle__btn', 'is-active' => $hoursLayer === 'discrepancies'])
                         >
-                            @foreach($availableProjects as $project)
-                                @php
-                                    $href = route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m'), 'project_id' => $project->id], $selectedUserParamBody));
-                                @endphp
-                                <option
-                                    value="{{ $href }}"
-                                    {{ ($selectedProjectId ?? null) === $project->id ? 'selected' : '' }}
-                                >
-                                    {{ $project->name }}
-                                </option>
-                            @endforeach
-                        </select>
+                            Niezgodności
+                            @if(count($hourDiscrepancies) > 0)
+                                <span class="monthly-grid-layer-toggle__count">{{ count($hourDiscrepancies) }}</span>
+                            @endif
+                        </a>
                     </div>
+
+                    @if(isset($availableProjects) && $availableProjects && count($availableProjects) > 0)
+                        <div class="d-flex justify-content-stretch justify-content-md-end gap-3 align-items-stretch align-items-md-center flex-column flex-md-row">
+                            <div class="text-center text-md-end">
+                                <div class="small text-muted mb-1">Projekt</div>
+                                <div class="fw-semibold">
+                                    @if($selectedProjectId)
+                                        Wybór: {{ $availableProjects->firstWhere('id', $selectedProjectId)->name ?? '-' }}
+                                    @else
+                                        Wybór: -
+                                    @endif
+                                </div>
+                            </div>
+                            <select
+                                class="form-select monthly-grid-project-select w-100"
+                                onchange="if(this.value) { window.location.href = this.value; }"
+                            >
+                                @foreach($availableProjects as $project)
+                                    @php
+                                        $href = route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m'), 'project_id' => $project->id], $selectedUserParamBody, $layerParamBody));
+                                    @endphp
+                                    <option
+                                        value="{{ $href }}"
+                                        {{ ($selectedProjectId ?? null) === $project->id ? 'selected' : '' }}
+                                    >
+                                        {{ $project->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                </div>
+
+                @if($hoursLayer === 'client')
+                    <x-ui.alert variant="info" class="mb-3" title="Wersja klienta">
+                        Startowo skopiowano nasze godziny. Nadpisujesz tylko rozbieżności z listą klienta — nasze wpisy zostają nietknięte.
+                    </x-ui.alert>
+                @elseif($hoursLayer === 'discrepancies')
+                    <x-ui.alert variant="warning" class="mb-3" title="Niezgodności do wyjaśnienia">
+                        Lista dni, gdzie godziny klienta ≠ nasze. Ustal konsensus — zapis trafia do kolumny „ustalone”, bez nadpisywania deklaracji.
+                    </x-ui.alert>
                 @endif
 
                 <!-- Paginacja: 10 userów na stronę -->
@@ -139,9 +180,87 @@
                 </x-ui.alert>
             @endif
 
-            <!-- Formularz do zapisu -->
+            @php
+                $formatGridHours = static function ($hours): string {
+                    if ($hours === '' || $hours === null) {
+                        return '';
+                    }
+                    $hoursFloat = is_numeric($hours) ? (float) $hours : (float) str_replace(',', '.', (string) $hours);
+                    $totalMinutes = (int) round($hoursFloat * 60);
+                    $roundedMinutes = (int) (round($totalMinutes / 15) * 15);
+                    if ($roundedMinutes <= 0) {
+                        return '';
+                    }
+                    $hPart = intdiv($roundedMinutes, 60);
+                    $mPart = $roundedMinutes % 60;
+
+                    return $hPart.':'.str_pad((string) $mPart, 2, '0', STR_PAD_LEFT);
+                };
+            @endphp
+
+            @if($hoursLayer === 'discrepancies')
+            <form method="POST" action="{{ route('time-logs.bulk-update') }}" id="timeLogsDiscrepanciesForm">
+                @csrf
+                <input type="hidden" name="layer" value="settled">
+
+                <div class="card mb-4 monthly-grid-table-card">
+                    <div class="table-responsive">
+                        <table class="table mb-0 align-middle monthly-grid-discrepancies">
+                            <thead class="sticky-top">
+                                <tr>
+                                    <th>Projekt</th>
+                                    <th>Osoba</th>
+                                    <th class="text-nowrap">Dzień</th>
+                                    <th class="text-center text-nowrap">Deklarowane</th>
+                                    <th class="text-center text-nowrap">Wg klienta</th>
+                                    <th class="text-center text-nowrap" style="min-width: 7rem;">Ustalone (konsensus)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($hourDiscrepancies as $row)
+                                    <tr @class(['monthly-grid-discrepancies__row--open' => $row['settled_hours'] === null])>
+                                        <td class="fw-semibold">{{ $row['project_name'] }}</td>
+                                        <td>{{ $row['employee_name'] }}</td>
+                                        <td class="font-mono text-nowrap">{{ $row['day_label'] }}</td>
+                                        <td class="text-center font-mono">{{ $formatGridHours($row['hours_worked']) }}</td>
+                                        <td class="text-center font-mono">{{ $formatGridHours($row['client_hours']) }}</td>
+                                        <td class="p-1">
+                                            <input
+                                                type="text"
+                                                name="entries[{{ $row['assignment_id'] }}][{{ $row['date'] }}]"
+                                                class="form-control form-control-sm text-center time-input time-input--settled"
+                                                value="{{ $formatGridHours($row['settled_hours']) }}"
+                                                inputmode="numeric"
+                                                placeholder="H:MM"
+                                                title="Konsensus po wyjaśnieniu z klientem"
+                                            >
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="text-center py-5 text-muted">
+                                            Brak rozbieżności w tym miesiącu dla wybranego projektu.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                @if(count($hourDiscrepancies) > 0)
+                    <div class="d-flex justify-content-stretch justify-content-md-end mb-4">
+                        <x-ui.button variant="primary" type="submit" class="w-100 w-md-auto">
+                            <i class="bi bi-check-lg"></i> Zapisz konsensus
+                        </x-ui.button>
+                    </div>
+                @endif
+            </form>
+            @else
+            <!-- Formularz do zapisu siatki -->
             <form method="POST" action="{{ route('time-logs.bulk-update') }}" id="timeLogsForm">
                 @csrf
+                <input type="hidden" name="layer" value="{{ $hoursLayer }}">
 
                 <!-- Tabela miesięczna -->
                 <div class="card mb-4 monthly-grid-table-card">
@@ -228,7 +347,13 @@
                                                 $isFuture = $date->isAfter(\Carbon\Carbon::today());
                                                 $isInAssignment = isset($daysInAssignment[$dayNumber]);
                                                 $timeLog = $timeLogs[$dayNumber] ?? null;
-                                                $hours = $timeLog['hours'] ?? '';
+                                                $internalHours = $timeLog['hours'] ?? null;
+                                                $clientHours = $timeLog['client_hours'] ?? null;
+                                                $hours = $hoursLayer === 'client'
+                                                    ? ($clientHours !== null && $clientHours !== '' ? $clientHours : $internalHours)
+                                                    : $internalHours;
+                                                $hours = $hours ?? '';
+                                                $isMismatch = (bool) ($timeLog['mismatch'] ?? false);
 
                                                 // UI: wyświetlaj godziny jako `H:MM` zamiast `5.75`.
                                                 // Wymuszamy skoki co 15 minut (zaokrąglenie do najbliższego kwadransa).
@@ -286,7 +411,7 @@
                                                     $assignmentId = $assignmentData['assignments'][0]->id;
                                                 }
                                             @endphp
-                                            <td class="p-0 {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ $isToday ? 'today-cell' : '' }} {{ (!$isInAssignment || $isFuture) ? 'disabled-cell' : '' }}">
+                                            <td class="p-0 {{ $day['isWeekend'] ? 'weekend-cell' : '' }} {{ $isToday ? 'today-cell' : '' }} {{ (!$isInAssignment || $isFuture) ? 'disabled-cell' : '' }} {{ $isMismatch ? 'mismatch-cell' : '' }}">
                                                 @if($isFuture)
                                                     {{-- Przyszłe dni: nie pozwalamy wpisywać czasu pracy. --}}
                                                     <input
@@ -303,10 +428,11 @@
                                                     <input
                                                         type="text"
                                                         name="entries[{{ $assignmentId }}][{{ $date->format('Y-m-d') }}]"
-                                                        class="form-control form-control-sm text-center time-input"
+                                                        class="form-control form-control-sm text-center time-input {{ $isMismatch ? 'time-input--mismatch' : '' }} {{ $hoursLayer === 'client' ? 'time-input--client' : '' }}"
                                                         value="{{ $hoursText }}"
                                                         inputmode="numeric"
                                                         placeholder=""
+                                                        title="{{ $isMismatch ? 'Rozbieżność: nasze '.number_format((float) ($internalHours ?? 0), 2).'h vs klient '.number_format((float) ($clientHours ?? 0), 2).'h' : '' }}"
                                                     >
                                                 @elseif($hours && $timeLog && isset($timeLog['assignment_id']))
                                                     {{-- Godziny zaksiegowane, ale przypisanie usunięte - pole zablokowane z wartością --}}
@@ -354,7 +480,7 @@
                                 <x-ui.button
                                     variant="ghost"
                                     class="btn-sm"
-                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => max(1, $userPage - 1)])) }}"
+                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, $layerParamBody, ['user_page' => max(1, $userPage - 1)])) }}"
                                 >
                                     <i class="bi bi-chevron-left"></i> Poprzedni
                                 </x-ui.button>
@@ -368,7 +494,7 @@
                                 <x-ui.button
                                     variant="primary"
                                     class="btn-sm"
-                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, ['user_page' => min($totalUserPages, $userPage + 1)])) }}"
+                                    href="{{ route($monthlyGridRoute, array_merge(['month' => $currentDate->format('Y-m')], $selectedProjectParamBody, $layerParamBody, ['user_page' => min($totalUserPages, $userPage + 1)])) }}"
                                 >
                                     Następny <i class="bi bi-chevron-right"></i>
                                 </x-ui.button>
@@ -401,8 +527,13 @@
                         <div class="legend-weekend" style="width: 30px; height: 20px;"></div>
                         <span class="small">Weekend</span>
                     </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="legend-mismatch" style="width: 30px; height: 20px;"></div>
+                        <span class="small">Rozbieżność nasze ↔ klient</span>
+                    </div>
                 </div>
             </x-ui.card>
+            @endif
     </div>
     </div>
 

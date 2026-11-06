@@ -45,6 +45,12 @@ return [
         'label' => 'Procedury',
     ],
 
+    'clients' => [
+        'route' => 'clients.index',
+        'icon' => 'bi bi-person-vcard',
+        'label' => 'Kontrahenci',
+    ],
+
     'projects' => [
         'route' => 'projects.index',
         'icon' => 'bi bi-folder',

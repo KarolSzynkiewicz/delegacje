@@ -32,10 +32,10 @@
         <a href="{{ route($showRoute, $project) }}" class="stretched-link">{{ $project->name }}</a>
     </div>
 
-    @if($project->client_name)
+    @if($project->client || $project->client_name)
         <div class="dt-card__row">
             <span class="dt-card__label">Klient</span>
-            <span class="dt-card__value">{{ $project->client_name }}</span>
+            <span class="dt-card__value">{{ $project->client?->name ?? $project->client_name }}</span>
         </div>
     @endif
 
@@ -65,7 +65,7 @@
     </div>
 
     <div class="dt-card__row">
-        <span class="dt-card__label">Stan</span>
+        <span class="dt-card__label">Wg dat</span>
         <span class="dt-card__value">
             <x-ui.badge variant="{{ $stateVariant }}">{{ $stateLabel }}</x-ui.badge>
         </span>

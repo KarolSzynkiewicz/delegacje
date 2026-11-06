@@ -43,8 +43,8 @@
                 <th class="text-start d-none d-lg-table-cell">Kierownik</th>
                 <x-livewire.sortable-header field="start_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">Data od</x-livewire.sortable-header>
                 <x-livewire.sortable-header field="end_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">Data do</x-livewire.sortable-header>
-                <th class="text-start">Stan</th>
-                <x-livewire.sortable-header field="status" :sortField="$sortField" :sortDirection="$sortDirection">Status</x-livewire.sortable-header>
+                <th class="text-start" title="Wyliczane z dat start/koniec względem dzisiaj">Wg dat</th>
+                <x-livewire.sortable-header field="status" :sortField="$sortField" :sortDirection="$sortDirection" title="Ręczny status projektu (active / completed / on_hold / cancelled)">Status</x-livewire.sortable-header>
                 <th class="text-end">Akcje</th>
             </tr>
         </x-slot:head>
