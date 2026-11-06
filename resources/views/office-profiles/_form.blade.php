@@ -43,7 +43,7 @@
 </div>
 
 <div class="row mb-3">
-    <div class="col-md-4 mb-3 mb-md-0">
+    <div class="col-md-3 mb-3 mb-md-0">
         <x-ui.input
             type="number"
             name="fte"
@@ -56,7 +56,20 @@
             required="true"
         />
     </div>
-    <div class="col-md-4 mb-3 mb-md-0">
+    <div class="col-md-3 mb-3 mb-md-0">
+        <x-ui.input
+            type="number"
+            name="annual_leave_days"
+            id="annual_leave_days"
+            label="Urlop (dni / rok)"
+            value="{{ old('annual_leave_days', $profile?->annual_leave_days ?? 26) }}"
+            step="1"
+            min="0"
+            max="366"
+            required="true"
+        />
+    </div>
+    <div class="col-md-3 mb-3 mb-md-0">
         <x-ui.input
             type="number"
             name="hourly_rate"
@@ -67,7 +80,7 @@
             min="0"
         />
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <x-ui.input
             type="text"
             name="currency"

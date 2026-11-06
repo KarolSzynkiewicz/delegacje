@@ -182,6 +182,7 @@ class OfficeProfilesTable extends Component
             'contract_type' => OfficeContractType::Uop,
             'pay_mode' => OfficePayMode::Hourly,
             'fte' => 1,
+            'annual_leave_days' => 26,
             'hourly_rate' => null,
             'currency' => 'PLN',
             'started_on' => now()->toDateString(),

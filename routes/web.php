@@ -667,6 +667,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::get('office-hours', [\App\Http\Controllers\OfficeHoursController::class, 'index'])
             ->name('office-hours.index')
             ->defaults('resource', 'office-hours');
+        Route::get('office-leave', [\App\Http\Controllers\OfficeLeaveController::class, 'index'])
+            ->name('office-leave.index')
+            ->defaults('resource', 'office-leave');
 
         Route::resource('employee-bank-accounts', \App\Http\Controllers\EmployeeBankAccountController::class)
             ->except(['index']);

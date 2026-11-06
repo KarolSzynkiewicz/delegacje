@@ -19,6 +19,7 @@ class OfficeProfile extends Model
         'contract_type',
         'pay_mode',
         'fte',
+        'annual_leave_days',
         'hourly_rate',
         'currency',
         'started_on',
@@ -31,6 +32,7 @@ class OfficeProfile extends Model
         'contract_type' => OfficeContractType::class,
         'pay_mode' => OfficePayMode::class,
         'fte' => 'decimal:2',
+        'annual_leave_days' => 'integer',
         'hourly_rate' => 'decimal:2',
         'started_on' => 'date',
         'ended_on' => 'date',
@@ -45,6 +47,11 @@ class OfficeProfile extends Model
     public function workDays(): HasMany
     {
         return $this->hasMany(OfficeWorkDay::class);
+    }
+
+    public function leaveAdjustments(): HasMany
+    {
+        return $this->hasMany(OfficeLeaveAdjustment::class)->latest('id');
     }
 
     public function scopeActive(Builder $query): Builder

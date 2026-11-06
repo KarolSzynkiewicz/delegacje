@@ -256,6 +256,12 @@ return [
         'label' => 'Biuro',
     ],
 
+    'office_leave' => [
+        'route' => 'office-leave.index',
+        'icon' => 'bi bi-calendar-heart',
+        'label' => 'Urlopy biurowe',
+    ],
+
     'payrolls' => [
         'route' => 'payrolls.index',
         'icon' => 'bi bi-cash-stack',

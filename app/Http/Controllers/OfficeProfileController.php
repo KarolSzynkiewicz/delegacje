@@ -85,6 +85,7 @@ class OfficeProfileController extends Controller
             'contract_type' => ['required', Rule::enum(OfficeContractType::class)],
             'pay_mode' => ['required', Rule::enum(OfficePayMode::class)],
             'fte' => ['required', 'numeric', 'min:0.01', 'max:1'],
+            'annual_leave_days' => ['required', 'integer', 'min:0', 'max:366'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'currency' => ['required', 'string', 'size:3'],
             'started_on' => ['nullable', 'date'],

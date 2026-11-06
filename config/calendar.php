@@ -3,6 +3,7 @@
 use App\Support\Calendar\Layers\AccommodationAssignmentLayer;
 use App\Support\Calendar\Layers\AccommodationLeaseLayer;
 use App\Support\Calendar\Layers\DepartureLayer;
+use App\Support\Calendar\Layers\OfficeLeaveLayer;
 use App\Support\Calendar\Layers\ProjectAssignmentLayer;
 use App\Support\Calendar\Layers\ReturnTripLayer;
 use App\Support\Calendar\Layers\RotationLayer;
@@ -41,6 +42,8 @@ return [
 
         RotationLayer::class,
         ProjectAssignmentLayer::class,
+
+        OfficeLeaveLayer::class,
     ],
 
     /*
@@ -58,6 +61,7 @@ return [
         'Pojazdy',
         'Zakwaterowanie',
         'Pracownicy',
+        'Biuro',
     ],
 
     /*

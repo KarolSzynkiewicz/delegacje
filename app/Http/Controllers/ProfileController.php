@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Services\ImageService;
+use App\Services\OfficeLeaveBalanceService;
 use App\Support\ProfileDevices;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,13 +18,18 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): View
+    public function edit(Request $request, OfficeLeaveBalanceService $leaveBalance): View
     {
         $user = $request->user();
-        $user->load(['roles', 'managedProjects']);
+        $user->load(['roles', 'managedProjects', 'officeProfile']);
+
+        $leave = $user->officeProfile
+            ? $leaveBalance->forProfile($user->officeProfile)
+            : null;
 
         return view('profile.edit', [
             'user' => $user,
+            'leave' => $leave,
             'sessions' => ProfileDevices::sessions($user),
             'pushDevices' => ProfileDevices::pushDevices($user),
         ]);

@@ -5,6 +5,9 @@
                 <x-ui.button variant="ghost" href="{{ route('office-hours.index') }}" class="btn-sm">
                     Godziny biurowe
                 </x-ui.button>
+                <x-ui.button variant="ghost" href="{{ route('office-leave.index') }}" class="btn-sm">
+                    Urlopy
+                </x-ui.button>
             </x-slot>
         </x-ui.page-header>
     </x-slot>

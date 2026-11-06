@@ -90,6 +90,7 @@ return [
             'payrolls',
             'time_logs',
             'office_profiles',
+            'office_leave',
             'adjustments',
             'advances',
             'employee_rates',

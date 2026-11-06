@@ -184,6 +184,8 @@
             </div>
         </div>
 
+        @include('profile.partials.leave-balance')
+
         @include('profile.partials.delete-user-form')
 
         <x-ui.card>

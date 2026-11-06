@@ -2,8 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\OfficeWorkLocation;
 use App\Livewire\ResourceCalendar;
 use App\Models\Employee;
+use App\Models\OfficeProfile;
+use App\Models\OfficeWorkDay;
 use App\Models\Rotation;
 use App\Models\Sprint;
 use App\Models\User;
@@ -213,5 +216,42 @@ class ResourceCalendarTest extends TestCase
 
         $this->assertNotContains('rotations', $keys->all());
         $this->assertNotContains('tasks', $keys->all());
+        $this->assertNotContains('office_leave', $keys->all());
+    }
+
+    public function test_office_leave_layer_shows_consecutive_absences_as_one_bar(): void
+    {
+        $officeUser = User::factory()->create(['name' => 'Basia Urlop']);
+        $profile = OfficeProfile::factory()->create(['user_id' => $officeUser->id]);
+
+        $monday = CarbonImmutable::today()->startOfMonth()->startOfWeek(CarbonImmutable::MONDAY)->addWeek();
+        foreach ([0, 1, 2] as $offset) {
+            OfficeWorkDay::query()->create([
+                'office_profile_id' => $profile->id,
+                'work_date' => $monday->addDays($offset)->toDateString(),
+                'location' => OfficeWorkLocation::Leave->value,
+                'hours' => 8,
+                'starts_at' => null,
+                'ends_at' => null,
+            ]);
+        }
+
+        $keys = app(CalendarRegistry::class)->visibleFor($this->admin)->keys();
+        $this->assertContains('office_leave', $keys->all());
+
+        $html = Livewire::actingAs($this->admin)
+            ->test(ResourceCalendar::class)
+            ->set('anchor', $monday->toDateString())
+            ->set('search', 'Basia Urlop')
+            ->assertSee('Basia Urlop')
+            ->assertSee('Urlopy biurowe')
+            ->html();
+
+        $this->assertSame(
+            1,
+            substr_count($html, 'wire:key="rc-bar-'),
+            'Trzydniowy urlop biurowy ma być jednym paskiem.'
+        );
+        $this->assertStringContainsString('grid-column: 1 / span 3;', $html);
     }
 }

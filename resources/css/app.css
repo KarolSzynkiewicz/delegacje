@@ -17348,6 +17348,68 @@ h3.profile-card__title {
     padding-top: 0.5rem;
 }
 
+.profile-leave-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-bottom: 1.1rem;
+}
+.profile-leave-kpis--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 991.98px) {
+    .profile-leave-kpis--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+.profile-leave-kpis--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 767.98px) {
+    .profile-leave-kpis--4 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+.profile-leave-kpi {
+    border: 1px solid var(--glass-border);
+    border-radius: 0.75rem;
+    background: rgba(7, 10, 19, 0.35);
+    padding: 0.7rem 0.8rem;
+}
+.profile-leave-kpi__label {
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.25rem;
+}
+.profile-leave-kpi__value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1.1;
+}
+.profile-leave-kpi__value span {
+    font-size: 0.72rem;
+    font-weight: 550;
+    color: var(--text-muted);
+}
+.profile-leave-kpi.is-ok {
+    border-color: rgba(52, 211, 153, 0.35);
+    background: rgba(52, 211, 153, 0.08);
+}
+.profile-leave-kpi.is-zero {
+    border-color: rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.08);
+}
+.profile-leave-kpi.is-over {
+    border-color: rgba(248, 113, 113, 0.4);
+    background: rgba(248, 113, 113, 0.1);
+}
+@media (max-width: 575.98px) {
+    .profile-leave-kpis { grid-template-columns: 1fr; }
+}
+
 .profile-drop {
     display: flex;
     flex-direction: column;

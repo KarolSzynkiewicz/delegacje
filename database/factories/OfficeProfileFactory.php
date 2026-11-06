@@ -22,6 +22,7 @@ class OfficeProfileFactory extends Factory
             'contract_type' => fake()->randomElement(OfficeContractType::cases())->value,
             'pay_mode' => OfficePayMode::Hourly->value,
             'fte' => 1,
+            'annual_leave_days' => 26,
             'hourly_rate' => fake()->randomFloat(2, 40, 120),
             'currency' => 'PLN',
             'started_on' => now()->subMonths(3)->toDateString(),
