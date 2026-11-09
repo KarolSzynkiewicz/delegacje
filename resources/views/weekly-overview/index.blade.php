@@ -117,95 +117,86 @@
         ])
     </x-ui.card>
 
-    <!-- Sekcja: Pracownicy bez projektu, ale z autem lub domem -->
+    <!-- Sekcja: Pracownicy bez projektu (auto / dom / poza bazą) -->
     @if(isset($employeesWithoutProject) && $employeesWithoutProject->isNotEmpty())
         <div class="mt-4">
             <x-ui.alert variant="warning" title="Pracownicy bez projektu">
-                <p class="mb-3">Następujący pracownicy mają przypisane auto lub dom, ale nie są przypisani do żadnego projektu w tym tygodniu:</p>
-                <div class="row g-3">
+                <p class="mb-2 small text-muted">
+                    Mają auto, dom albo są poza bazą, ale bez projektu w tym tygodniu ({{ $employeesWithoutProject->count() }}).
+                </p>
+                <div class="wo-orphan-list" data-cl-reveal-items>
                     @foreach($employeesWithoutProject as $employeeData)
                         @php
                             $employee = $employeeData['employee'];
                             $vehicleAssignments = $employeeData['vehicle_assignments'];
                             $accommodationAssignments = $employeeData['accommodation_assignments'];
+                            $isOutsideBase = $employeeData['is_outside_base'] ?? false;
                         @endphp
-                        <div class="col-md-6 col-lg-4">
-                            <x-ui.card reveal>
-                                <div class="d-flex align-items-center gap-2 mb-2">
-                                    <x-employee-cell :employee="$employee" />
-                                </div>
-                                                @if($employee->roles->count() > 0)
-                                    <div class="mb-2">
-                                        <div class="d-flex flex-wrap gap-1">
-                                            @foreach($employee->roles as $role)
-                                                <x-role-seniority-badge :role="$role" />
-                                            @endforeach
-                                        </div>
-                                    </div>
+                        <div class="wo-orphan-row">
+                            <div class="wo-orphan-row__who min-w-0">
+                                <x-employee-cell :employee="$employee" />
+                            </div>
+                            <div class="wo-orphan-row__meta small text-muted min-w-0">
+                                @if($isOutsideBase)
+                                    <span class="wo-orphan-chip" title="Poza bazą">
+                                        <i class="bi bi-geo-alt"></i>
+                                        poza bazą
+                                    </span>
                                 @endif
-                                <div class="small">
-                                    @if($vehicleAssignments->isNotEmpty())
-                                        <div class="mb-1">
-                                            <i class="bi bi-car-front text-primary"></i>
-                                            <span class="text-muted">Auto:</span>
-                                            @foreach($vehicleAssignments as $assignment)
-                                                @if($assignment->vehicle)
-                                                    <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
-                                                        {{ $assignment->vehicle->registration_number }}
-                                                        @if($assignment->vehicle->brand || $assignment->vehicle->model)
-                                                            ({{ $assignment->vehicle->brand }} {{ $assignment->vehicle->model }})
-                                                        @endif
-                                                    </a>@if(!$loop->last), @endif
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                    @if($accommodationAssignments->isNotEmpty())
-                                        <div>
-                                            <i class="bi bi-house text-success"></i>
-                                            <span class="text-muted">Dom:</span>
-                                            @foreach($accommodationAssignments as $assignment)
-                                                @if($assignment->accommodation)
-                                                    <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-decoration-none" title="Przejdź do przypisania">
-                                                        {{ $assignment->accommodation->name }}
-                                                    </a>@if(!$loop->last), @endif
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
-                                <div class="mt-2">
-                                    @if(isset($allProjects) && $allProjects->isNotEmpty())
-                                        <div class="dropdown" style="position: relative; z-index: 9999;">
-                                            <x-ui.button 
-                                                variant="primary" 
-                                                size="sm"
-                                                data-bs-toggle="dropdown"
-                                                aria-expanded="false"
-                                            >
-                                                <i class="bi bi-person-check"></i> Przypisz projekt
-                                            </x-ui.button>
-                                            <ul class="dropdown-menu" style="background-color: var(--bg-card); opacity: 1; z-index: 9999; position: absolute;">
-                                                @foreach($allProjects as $project)
-                                                    <li>
-                                                        <a class="dropdown-item" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
-                                                            {{ $project->name }}
-                                                        </a>
-                                                    </li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    @else
-                                        <x-ui.button 
-                                            variant="primary" 
-                                            size="sm"
-                                            href="{{ route('projects.index') }}"
+                                @if($vehicleAssignments->isNotEmpty())
+                                    <span class="wo-orphan-chip" title="Pojazd">
+                                        <i class="bi bi-car-front"></i>
+                                        @foreach($vehicleAssignments as $assignment)
+                                            @if($assignment->vehicle)
+                                                <a href="{{ route('vehicle-assignments.show', $assignment) }}" class="text-decoration-none">
+                                                    {{ $assignment->vehicle->registration_number }}
+                                                </a>@if(!$loop->last), @endif
+                                            @endif
+                                        @endforeach
+                                    </span>
+                                @endif
+                                @if($accommodationAssignments->isNotEmpty())
+                                    <span class="wo-orphan-chip" title="Mieszkanie">
+                                        <i class="bi bi-house"></i>
+                                        @foreach($accommodationAssignments as $assignment)
+                                            @if($assignment->accommodation)
+                                                <a href="{{ route('accommodation-assignments.show', $assignment) }}" class="text-decoration-none">
+                                                    {{ $assignment->accommodation->name }}
+                                                </a>@if(!$loop->last), @endif
+                                            @endif
+                                        @endforeach
+                                    </span>
+                                @endif
+                            </div>
+                            <div class="wo-orphan-row__action">
+                                @if(isset($allProjects) && $allProjects->isNotEmpty())
+                                    <div class="dropdown">
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-secondary"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false"
                                         >
-                                            <i class="bi bi-person-check"></i> Przypisz projekt
-                                        </x-ui.button>
-                                    @endif
-                                </div>
-                            </x-ui.card>
+                                            <i class="bi bi-person-check"></i>
+                                            <span class="d-none d-sm-inline">Przypisz</span>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            @foreach($allProjects as $project)
+                                                <li>
+                                                    <a class="dropdown-item" href="{{ route('project-assignments.create', ['project_id' => $project->id, 'employee_id' => $employee->id, 'start_date' => $weeks[0]['start']->format('Y-m-d'), 'end_date' => $weeks[0]['end']->format('Y-m-d')]) }}">
+                                                        {{ $project->name }}
+                                                    </a>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
+                                @else
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ route('projects.index') }}">
+                                        <i class="bi bi-person-check"></i>
+                                        <span class="d-none d-sm-inline">Przypisz</span>
+                                    </a>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>

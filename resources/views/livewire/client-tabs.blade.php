@@ -336,14 +336,11 @@
                     Jedna historia rozmów i ustaleń. „Oddzwoń” to data przy wpisie — nie osobny typ.
                 </p>
 
-                @if($showAttemptForm && $canManage)
-                    @include('livewire.partials.client-attempt-form')
-                @endif
-
                 @include('livewire.partials.client-attempts-timeline', [
                     'attempts' => $attempts,
                     'compact' => false,
                     'canManage' => $canManage,
+                    'showAttemptForm' => $showAttemptForm,
                     'expandedAttemptId' => $expandedAttemptId,
                     'allProjects' => $allProjects,
                     'contacts' => $contacts,
@@ -354,9 +351,9 @@
             </x-ui.card>
 
         @elseif($activeTab === 'projects')
-            <x-ui.card label="Projekty klienta">
+            <x-ui.card label="Projekty klienta" reveal>
                 <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-                    <div class="small text-muted">Ostatni kontakt liczony per projekt z rejestru CRM.</div>
+                    <div class="small text-muted">Oś osób z zapotrzebowań + lista projektów. Ostatni kontakt z rejestru CRM.</div>
                     <div class="d-flex gap-2">
                         @if($canManage)
                             <x-ui.button variant="ghost" type="button" class="btn-sm" wire:click="openAttemptForm">
@@ -367,6 +364,10 @@
                             <i class="bi bi-plus-lg"></i> Nowy projekt
                         </x-ui.button>
                     </div>
+                </div>
+
+                <div class="mb-4">
+                    <livewire:client-projects-timeline :client="$client" :wire:key="'cpt-'.$client->id" />
                 </div>
 
                 @if($projects->count() > 0)

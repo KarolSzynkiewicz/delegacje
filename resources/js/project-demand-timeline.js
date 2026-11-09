@@ -1,4 +1,20 @@
 export function registerProjectDemandTimeline(Alpine) {
+    Alpine.data('clientProjectsTimeline', () => ({
+        init() {
+            this.$nextTick(() => this.centerOnToday());
+        },
+
+        centerOnToday() {
+            const body = this.$refs.scroller;
+            const today = this.$el.querySelector('.pdt-marker--today');
+            if (!body || !today) {
+                return;
+            }
+            const chart = Math.max(160, body.clientWidth - 140);
+            body.scrollLeft = Math.max(0, today.offsetLeft - chart * 0.25);
+        },
+    }));
+
     Alpine.data('demandTimeline', () => ({
         dragging: false,
         laneKey: null,

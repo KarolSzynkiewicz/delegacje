@@ -1,5 +1,9 @@
 <div>
-    <x-data-table :paginator="$projects" :has-filters="(bool) ($search || $statusFilter || $locationFilter)">
+    <x-data-table
+        class="projects-table"
+        :paginator="$projects"
+        :has-filters="(bool) ($search || $statusFilter || $locationFilter)"
+    >
         <x-slot:filters>
             <x-data-table-filters :count="$projects->total()">
                 <x-data-table-search
@@ -40,7 +44,7 @@
                 <x-livewire.sortable-header field="name" :sortField="$sortField" :sortDirection="$sortDirection">Nazwa</x-livewire.sortable-header>
                 <th class="text-start d-none d-md-table-cell">Klient</th>
                 <th class="text-start">Lokalizacja</th>
-                <th class="text-start d-none d-lg-table-cell">Kierownik</th>
+                <th class="text-start d-none d-xl-table-cell">Kierownik</th>
                 <x-livewire.sortable-header field="start_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">Data od</x-livewire.sortable-header>
                 <x-livewire.sortable-header field="end_date" :sortField="$sortField" :sortDirection="$sortDirection" class="text-start">Data do</x-livewire.sortable-header>
                 <th class="text-start" title="Wyliczane z dat start/koniec względem dzisiaj">Wg dat</th>

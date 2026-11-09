@@ -38,39 +38,38 @@
 @endphp
 
 <tr wire:key="project-{{ $project->id }}">
-    <td>
-        <div class="fw-medium">{{ $project->name }}</div>
+    <td class="projects-table__cell projects-table__cell--name">
+        <a href="{{ route($showRoute, $project) }}" class="table-link fw-semibold projects-table__truncate" title="{{ $project->name }}">{{ $project->name }}</a>
         @if($typeInfo)
-            <div class="small text-muted mt-1">{{ $typeInfo }}</div>
+            <div class="small text-muted mt-1 font-mono projects-table__truncate">{{ $typeInfo }}</div>
         @endif
     </td>
-    <td class="d-none d-md-table-cell">
+    <td class="d-none d-md-table-cell projects-table__cell">
         @if($project->client)
-            <a href="{{ route('clients.show', $project->client) }}" class="text-primary text-decoration-none">
+            <a href="{{ route('clients.show', $project->client) }}" class="table-link table-link--muted projects-table__truncate" title="{{ $project->client->name }}">
                 {{ $project->client->name }}
             </a>
         @else
-            {{ $project->client_name ?? '-' }}
+            <span class="text-muted">{{ $project->client_name ?? '—' }}</span>
         @endif
     </td>
-    <td>
+    <td class="projects-table__cell">
         @if($project->location)
-            <div><i class="bi bi-geo-alt text-muted me-1"></i>{{ $project->location->name }}</div>
+            <div class="projects-table__truncate">
+                <i class="bi bi-geo-alt text-muted me-1"></i>{{ $project->location->name }}
+            </div>
             @if($project->location->city)
-                <div class="small text-muted">{{ $project->location->city }}</div>
+                <div class="small text-muted projects-table__truncate">{{ $project->location->city }}</div>
             @endif
         @else
             <span class="text-muted">—</span>
         @endif
     </td>
-    <td class="d-none d-lg-table-cell">
+    <td class="d-none d-xl-table-cell projects-table__cell">
         @if($project->currentSiteLead?->employee)
-            <div class="d-flex align-items-center gap-1">
-                <x-project-site-lead-badge compact />
-                <a href="{{ route('employees.show', $project->currentSiteLead->employee) }}" class="text-decoration-none">
-                    {{ $project->currentSiteLead->employee->full_name }}
-                </a>
-            </div>
+            <a href="{{ route('employees.show', $project->currentSiteLead->employee) }}" class="table-link table-link--muted">
+                {{ $project->currentSiteLead->employee->full_name }}
+            </a>
         @else
             <span class="text-muted">—</span>
         @endif

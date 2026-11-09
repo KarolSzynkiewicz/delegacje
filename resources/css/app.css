@@ -119,46 +119,122 @@ body {
     transform: rotate(-90deg);
 }
 
+/* Weekly overview: compact „pracownicy bez projektu” rows */
+.wo-orphan-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.wo-orphan-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid rgba(245, 158, 11, 0.18);
+    border-radius: 0.65rem;
+    background: rgba(7, 10, 19, 0.28);
+}
+.wo-orphan-row__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.65rem;
+    align-items: center;
+}
+.wo-orphan-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.wo-orphan-chip i {
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+.wo-orphan-row__action {
+    justify-self: end;
+}
+@media (max-width: 767.98px) {
+    .wo-orphan-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "who action"
+            "meta meta";
+    }
+    .wo-orphan-row__who { grid-area: who; }
+    .wo-orphan-row__meta { grid-area: meta; }
+    .wo-orphan-row__action { grid-area: action; }
+}
+
 /* Vehicles list: keep long names inside the viewport (no sideways scroll). */
-.vehicles-table {
+.dt-table-card:has(.vehicles-table) .table-responsive,
+.dt-table-card:has(.projects-table) .table-responsive {
+    overflow-x: hidden;
+}
+.vehicles-table,
+.projects-table {
     table-layout: fixed;
     width: 100%;
 }
 .vehicles-table th,
-.vehicles-table td {
+.vehicles-table td,
+.projects-table th,
+.projects-table td {
     vertical-align: middle;
 }
-.vehicles-table__cell {
+.vehicles-table__photo {
+    width: 3.25rem;
+}
+.vehicles-table__cell,
+.projects-table__cell {
     overflow: hidden;
     max-width: 0; /* forces fixed-layout ellipsis in the column */
 }
-.vehicles-table__cell--reg {
-    width: 14%;
+.vehicles-table__cell--main {
+    width: 28%;
 }
-.vehicles-table__cell--brand {
-    width: 12%;
-}
-.vehicles-table__cell--wide {
-    width: 14%;
+.vehicles-table__cell--context {
+    width: 26%;
 }
 .vehicles-table__actions {
-    width: 5.5rem;
+    width: 3.25rem;
     white-space: nowrap;
 }
-.vehicles-table__truncate {
+.vehicles-table__truncate,
+.projects-table__truncate {
     display: block;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.vehicles-table .badge.vehicles-table__badge {
-    display: inline-block;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: middle;
+.projects-table__cell--name {
+    width: 28%;
+}
+
+/* Table entity links — no loud Bootstrap blue */
+.table a.table-link,
+a.table-link {
+    color: var(--text-main);
+    text-decoration: none;
+}
+.table a.table-link:hover,
+a.table-link:hover {
+    color: #fff;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+.table a.table-link--muted,
+a.table-link--muted {
+    color: var(--text-muted);
+}
+.table a.table-link--muted:hover,
+a.table-link--muted:hover {
+    color: var(--text-main);
 }
 
 /* Weekly overview: assigned employees table — limit long badge text */

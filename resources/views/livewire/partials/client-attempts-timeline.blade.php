@@ -2,6 +2,7 @@
     $compact = $compact ?? false;
     $canManage = $canManage ?? false;
     $expandedAttemptId = $expandedAttemptId ?? null;
+    $showAttemptForm = $showAttemptForm ?? false;
     $allProjects = $allProjects ?? collect();
     $contacts = $contacts ?? collect();
     $channelOptions = $channelOptions ?? \App\Enums\ClientContactChannel::options();
@@ -9,13 +10,17 @@
     $outcomeOptions = $outcomeOptions ?? \App\Enums\ClientContactOutcome::options();
 @endphp
 
-@if($attempts->isEmpty())
+@if($attempts->isEmpty() && ! ($showAttemptForm && $canManage && ! $compact))
     <x-ui.empty-state
         icon="telephone"
         message="{{ $compact ? 'Brak kontaktów.' : 'Brak wpisów dla wybranego filtra.' }}"
     />
 @else
     <div class="crm-timeline">
+        @if($showAttemptForm && $canManage && ! $compact)
+            @include('livewire.partials.client-attempt-form')
+        @endif
+
         @foreach($attempts as $attempt)
             @php
                 $tone = match ($attempt->outcome) {
@@ -30,9 +35,17 @@
                     && $attempt->next_action_at->lte(now()->addDays(3));
                 $isExpanded = $canManage && ! $compact && $expandedAttemptId === $attempt->id;
             @endphp
-            <div @class(['crm-timeline__item', 'crm-timeline__item--'.$tone => (bool) $tone, 'is-expanded' => $isExpanded]) wire:key="crm-attempt-{{ $attempt->id }}">
+            <div
+                @class([
+                    'crm-timeline__item',
+                    'crm-timeline__item--'.$tone => (bool) $tone && ! $isExpanded,
+                    'crm-timeline__item--editing' => $isExpanded,
+                    'is-expanded' => $isExpanded,
+                ])
+                wire:key="crm-attempt-{{ $attempt->id }}"
+            >
                 @if($isExpanded)
-                    {{-- Rozwinięta edycja — ten sam układ co nowy wpis --}}
+                    {{-- Rozwinięta edycja — ten sam układ i styl co nowy wpis --}}
                     <div class="crm-timeline__head">
                         <div class="crm-timeline__when">
                             <input
@@ -43,6 +56,7 @@
                             >
                         </div>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="crm-chip crm-chip--editing">Edycja</span>
                             <select
                                 class="form-select form-select-sm crm-inline"
                                 style="min-width: 10rem;"
@@ -53,7 +67,7 @@
                                 @endforeach
                             </select>
                             <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="toggleAttemptExpanded({{ $attempt->id }})" title="Zwiń">
-                                <i class="bi bi-chevron-up"></i>
+                                <i class="bi bi-x-lg"></i>
                             </button>
                             <button
                                 type="button"
@@ -141,7 +155,7 @@
                         </div>
                     </div>
                 @else
-                    {{-- Zwińięty podgląd — kliknij, by edytować --}}
+                    {{-- Zwinięty podgląd — kliknij, by edytować --}}
                     <button
                         type="button"
                         class="crm-timeline__summary"

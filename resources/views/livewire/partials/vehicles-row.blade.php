@@ -13,34 +13,53 @@
         default => 'info'
     };
     $brandModel = trim(($vehicle->brand ?? '').' '.($vehicle->model ?? ''));
-    $projectLabel = $locationStatus['project_names']->join(', ');
-    $houseLabel = $locationStatus['accommodation_names']->join(', ');
-    $stationLabel = (string) ($locationStatus['stationing_location'] ?? '');
+
+    $contextParts = [];
+    if ($locationStatus['in_transit']) {
+        $contextParts[] = 'W podróży';
+    } elseif (! $locationStatus['outside_base']) {
+        $contextParts[] = 'Baza';
+    } else {
+        if ($locationStatus['project_names']->isNotEmpty()) {
+            $contextParts[] = $locationStatus['project_names']->join(', ');
+        }
+        if ($locationStatus['accommodation_names']->isNotEmpty()) {
+            $contextParts[] = $locationStatus['accommodation_names']->join(', ');
+        }
+        if (! empty($locationStatus['stationing_location'])) {
+            $contextParts[] = (string) $locationStatus['stationing_location'];
+        }
+        if ($contextParts === []) {
+            $contextParts[] = 'Poza bazą';
+        }
+    }
+    $contextLabel = implode(' · ', $contextParts);
 @endphp
 
 <tr wire:key="vehicle-{{ $vehicle->id }}">
-    <td>
+    <td class="vehicles-table__photo">
         <x-ui.avatar
             :image-url="$vehicle->image_path ? $vehicle->image_url : null"
             :alt="$brandModel !== '' ? $brandModel : $vehicle->registration_number"
             :initials="substr($vehicle->registration_number, 0, 2)"
-            size="50px"
+            size="40px"
             shape="rounded"
         />
     </td>
-    <td class="vehicles-table__cell vehicles-table__cell--reg">
-        <div class="fw-medium vehicles-table__truncate" title="{{ $vehicle->registration_number }}">
+    <td class="vehicles-table__cell vehicles-table__cell--main">
+        <a href="{{ route('vehicles.show', $vehicle) }}" class="table-link fw-semibold vehicles-table__truncate" title="{{ $vehicle->registration_number }}">
             {{ $vehicle->registration_number }}
-        </div>
+        </a>
         @if($vehicle->isRetired())
             <x-ui.badge variant="danger">Wycofany</x-ui.badge>
         @endif
-        <div class="d-md-none small text-muted mt-1 vehicles-table__truncate" title="{{ $brandModel }}">{{ $brandModel }}</div>
+        @if($brandModel !== '')
+            <div class="small text-muted vehicles-table__truncate" title="{{ $brandModel }}">{{ $brandModel }}</div>
+        @endif
     </td>
-    <td class="d-none d-md-table-cell vehicles-table__cell vehicles-table__cell--brand">
-        <span class="vehicles-table__truncate" title="{{ $brandModel }}">{{ $brandModel }}</span>
+    <td>
+        <x-ui.badge variant="{{ $conditionVariant }}">{{ $condition?->label() ?? $vehicle->technical_condition }}</x-ui.badge>
     </td>
-    <td><x-ui.badge variant="{{ $conditionVariant }}">{{ $condition?->label() ?? $vehicle->technical_condition }}</x-ui.badge></td>
     <td class="text-center">
         @if($locationStatus['in_transit'])
             <x-ui.badge variant="warning">W podróży</x-ui.badge>
@@ -50,34 +69,10 @@
             <x-ui.badge variant="info">Poza bazą</x-ui.badge>
         @endif
     </td>
-    <td class="text-center d-none d-lg-table-cell vehicles-table__cell vehicles-table__cell--wide">
-        @if($locationStatus['in_transit'] || !$locationStatus['outside_base'])
-            <span class="text-muted">─</span>
-        @elseif($locationStatus['project_names']->isNotEmpty())
-            <x-ui.badge variant="info" class="vehicles-table__badge" title="{{ $projectLabel }}">{{ $projectLabel }}</x-ui.badge>
-        @else
-            <x-ui.badge variant="danger">Brak</x-ui.badge>
-        @endif
+    <td class="d-none d-lg-table-cell vehicles-table__cell vehicles-table__cell--context">
+        <span class="vehicles-table__truncate text-muted small" title="{{ $contextLabel }}">{{ $contextLabel }}</span>
     </td>
-    <td class="text-center d-none d-lg-table-cell vehicles-table__cell vehicles-table__cell--wide">
-        @if($locationStatus['in_transit'] || !$locationStatus['outside_base'])
-            <span class="text-muted">─</span>
-        @elseif($locationStatus['accommodation_names']->isNotEmpty())
-            <x-ui.badge variant="info" class="vehicles-table__badge" title="{{ $houseLabel }}">{{ $houseLabel }}</x-ui.badge>
-        @else
-            <x-ui.badge variant="danger">Brak</x-ui.badge>
-        @endif
-    </td>
-    <td class="text-center d-none d-xl-table-cell vehicles-table__cell vehicles-table__cell--wide">
-        @if($locationStatus['in_transit'])
-            <span class="text-muted">─</span>
-        @elseif($stationLabel !== '')
-            <x-ui.badge variant="info" class="vehicles-table__badge" title="{{ $stationLabel }}">{{ $stationLabel }}</x-ui.badge>
-        @else
-            <span class="text-muted">─</span>
-        @endif
-    </td>
-    <td class="text-center">
+    <td class="text-center d-none d-md-table-cell">
         @if($locationStatus['in_transit'])
             <span class="text-muted">─</span>
         @elseif($locationStatus['capacity'])
@@ -96,10 +91,7 @@
         @endif
     </td>
     <td class="text-end vehicles-table__actions">
-        <x-ui.button variant="ghost" href="{{ route('vehicles.show', $vehicle) }}" class="btn-sm">
-            <i class="bi bi-eye"></i>
-        </x-ui.button>
-        <x-ui.button variant="ghost" href="{{ route('vehicles.edit', $vehicle) }}" class="btn-sm">
+        <x-ui.button variant="ghost" href="{{ route('vehicles.edit', $vehicle) }}" class="btn-sm" title="Edytuj">
             <i class="bi bi-pencil"></i>
         </x-ui.button>
     </td>

@@ -241,15 +241,14 @@
     .crm-timeline__item--agreed { border-left-color: rgba(34, 197, 94, 0.75); }
     .crm-timeline__item--warning { border-left-color: rgba(245, 158, 11, 0.8); }
     .crm-timeline__item--danger { border-left-color: rgba(239, 68, 68, 0.75); }
-    .crm-timeline__item--draft {
+    /* Nowy wpis i rozwinięta edycja — jeden wspólny styl. */
+    .crm-timeline__item--editing,
+    .crm-timeline__item.is-expanded {
         border-style: dashed;
         border-color: rgba(168, 85, 247, 0.45);
         border-left: 3px solid rgba(168, 85, 247, 0.75);
         background: rgba(168, 85, 247, 0.06);
-    }
-    .crm-timeline__item.is-expanded {
-        border-color: rgba(59, 130, 246, 0.4);
-        box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.08);
+        box-shadow: none;
     }
     .crm-timeline__summary {
         display: block;
@@ -268,7 +267,8 @@
     .crm-timeline__summary:not(:disabled):hover .fw-semibold {
         color: #fff;
     }
-    .crm-chip--draft {
+    .crm-chip--draft,
+    .crm-chip--editing {
         border-color: rgba(168, 85, 247, 0.45);
         color: #e9d5ff;
         background: rgba(168, 85, 247, 0.16);

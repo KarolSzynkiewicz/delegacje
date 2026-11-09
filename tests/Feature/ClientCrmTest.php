@@ -6,12 +6,14 @@ use App\Enums\ClientContactChannel;
 use App\Enums\ClientContactOutcome;
 use App\Enums\ClientContactPurpose;
 use App\Enums\ClientType;
+use App\Livewire\ClientProjectsTimeline;
 use App\Livewire\ClientTabs;
 use App\Models\Client;
 use App\Models\ClientContact;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
+use App\Models\ProjectDemand;
 use App\Models\Role;
 use App\Models\TimeLog;
 use App\Models\User;
@@ -305,6 +307,58 @@ class ClientCrmTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertNull($open->fresh()->next_action_at);
+    }
+
+    public function test_client_projects_tab_shows_demand_timeline_by_project(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-10'));
+
+        $client = Client::factory()->create(['name' => 'Klient Oś']);
+        $role = Role::factory()->create(['name' => 'Dekarz']);
+        $projectA = Project::factory()->create([
+            'client_id' => $client->id,
+            'client_name' => $client->name,
+            'name' => 'Alpha Site',
+            'start_date' => '2026-10-01',
+            'end_date' => '2026-12-15',
+        ]);
+        $projectB = Project::factory()->create([
+            'client_id' => $client->id,
+            'client_name' => $client->name,
+            'name' => 'Beta Yard',
+            'start_date' => '2026-10-01',
+            'end_date' => '2026-11-30',
+        ]);
+
+        ProjectDemand::factory()->create([
+            'project_id' => $projectA->id,
+            'role_id' => $role->id,
+            'required_count' => 5,
+            'start_date' => '2026-10-05',
+            'end_date' => '2026-11-20',
+        ]);
+        ProjectDemand::factory()->create([
+            'project_id' => $projectB->id,
+            'role_id' => $role->id,
+            'required_count' => 3,
+            'start_date' => '2026-10-12',
+            'end_date' => '2026-11-10',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(ClientProjectsTimeline::class, ['client' => $client->fresh()])
+            ->assertSee('Oś zapotrzebowania')
+            ->assertSee('Alpha Site')
+            ->assertSee('Beta Yard')
+            ->assertSee('5 os.')
+            ->assertSee('3 os.')
+            ->assertSee('Razem');
+
+        Livewire::actingAs($this->user)
+            ->test(ClientTabs::class, ['client' => $client->fresh()])
+            ->set('activeTab', 'projects')
+            ->assertSee('Oś zapotrzebowania')
+            ->assertSee('Alpha Site');
     }
 
     private function makeMismatchLog(Project $project, float $hoursWorked, float $clientHours): TimeLog

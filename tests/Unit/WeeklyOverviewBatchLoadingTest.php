@@ -2,11 +2,19 @@
 
 namespace Tests\Unit;
 
+use App\Enums\LogisticsEventStatus;
+use App\Enums\LogisticsEventType;
 use App\Enums\ProjectStatus;
+use App\Models\Employee;
+use App\Models\Location;
+use App\Models\LogisticsEvent;
 use App\Models\Project;
 use App\Models\ProjectAssignment;
 use App\Models\ProjectDemand;
 use App\Models\Role;
+use App\Models\User;
+use App\Models\Vehicle;
+use App\Models\VehicleAssignment;
 use App\Services\WeeklyOverviewService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -171,5 +179,78 @@ class WeeklyOverviewBatchLoadingTest extends TestCase
             count(DB::getQueryLog()),
             'Accommodation type, lease dates and assignment employees should already be eager-loaded'
         );
+    }
+
+    public function test_employees_without_project_include_outside_base_without_resources(): void
+    {
+        $weekStart = Carbon::parse('2026-09-21')->startOfWeek();
+        $weekEnd = $weekStart->copy()->endOfWeek();
+        $base = Location::factory()->create();
+        $field = Location::factory()->create();
+        $actor = User::factory()->create();
+
+        $outsideNoResources = Employee::factory()->create(['first_name' => 'Poza', 'last_name' => 'Bazą']);
+        $withCarNoProject = Employee::factory()->create(['first_name' => 'Auto', 'last_name' => 'BezProjektu']);
+        $outsideWithProject = Employee::factory()->create(['first_name' => 'Poza', 'last_name' => 'ZProjektem']);
+        $inBaseNoResources = Employee::factory()->create(['first_name' => 'Baza', 'last_name' => 'BezNic']);
+
+        $departureForOrphan = LogisticsEvent::query()->create([
+            'type' => LogisticsEventType::DEPARTURE,
+            'event_date' => $weekStart->copy()->subDays(3),
+            'end_date' => $weekStart->copy()->subDay(),
+            'from_location_id' => $base->id,
+            'to_location_id' => $field->id,
+            'status' => LogisticsEventStatus::COMPLETED,
+            'created_by' => $actor->id,
+        ]);
+        $departureForOrphan->participants()->create(['employee_id' => $outsideNoResources->id]);
+
+        $departureForAssigned = LogisticsEvent::query()->create([
+            'type' => LogisticsEventType::DEPARTURE,
+            'event_date' => $weekStart->copy()->subDays(3),
+            'end_date' => $weekStart->copy()->subDay(),
+            'from_location_id' => $base->id,
+            'to_location_id' => $field->id,
+            'status' => LogisticsEventStatus::COMPLETED,
+            'created_by' => $actor->id,
+        ]);
+        $departureForAssigned->participants()->create(['employee_id' => $outsideWithProject->id]);
+
+        $role = Role::factory()->create();
+        $project = Project::factory()->create([
+            'start_date' => $weekStart->copy()->subWeek(),
+            'end_date' => $weekEnd->copy()->addWeek(),
+        ]);
+        ProjectAssignment::factory()->create([
+            'project_id' => $project->id,
+            'employee_id' => $outsideWithProject->id,
+            'role_id' => $role->id,
+            'start_date' => $weekStart,
+            'end_date' => $weekEnd,
+        ]);
+
+        $vehicle = Vehicle::factory()->create();
+        VehicleAssignment::factory()->create([
+            'vehicle_id' => $vehicle->id,
+            'employee_id' => $withCarNoProject->id,
+            'start_date' => $weekStart,
+            'end_date' => $weekEnd,
+            'is_return_trip' => false,
+        ]);
+
+        $rows = app(WeeklyOverviewService::class)
+            ->getEmployeesWithoutProjectButWithResources($weekStart, $weekEnd)
+            ->keyBy(fn (array $row) => $row['employee']->id);
+
+        $this->assertTrue($rows->has($outsideNoResources->id));
+        $this->assertTrue($rows[$outsideNoResources->id]['is_outside_base']);
+        $this->assertFalse($rows[$outsideNoResources->id]['has_vehicle']);
+        $this->assertFalse($rows[$outsideNoResources->id]['has_accommodation']);
+
+        $this->assertTrue($rows->has($withCarNoProject->id));
+        $this->assertTrue($rows[$withCarNoProject->id]['has_vehicle']);
+
+        $this->assertFalse($rows->has($outsideWithProject->id));
+        $this->assertFalse($rows->has($inBaseNoResources->id));
     }
 }

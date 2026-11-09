@@ -70,15 +70,12 @@
 
         <x-slot:head>
             <tr>
-                <th class="text-start">Zdjęcie</th>
-                <x-livewire.sortable-header field="registration_number" :sortField="$sortField" :sortDirection="$sortDirection">Nr Rejestracyjny</x-livewire.sortable-header>
-                <th class="text-start d-none d-md-table-cell">Marka i Model</th>
+                <th class="vehicles-table__photo" aria-label="Zdjęcie"></th>
+                <x-livewire.sortable-header field="registration_number" :sortField="$sortField" :sortDirection="$sortDirection">Pojazd</x-livewire.sortable-header>
                 <th class="text-start">Stan</th>
                 <th class="text-center">Status</th>
-                <th class="text-center d-none d-lg-table-cell">Projekty</th>
-                <th class="text-center d-none d-lg-table-cell">Domy</th>
-                <th class="text-center d-none d-xl-table-cell">Stacjonowanie</th>
-                <th class="text-center">Zapełnienie</th>
+                <th class="text-start d-none d-lg-table-cell">Kontekst</th>
+                <th class="text-center d-none d-md-table-cell">Zapełnienie</th>
                 <th class="text-end">Akcje</th>
             </tr>
         </x-slot:head>

@@ -1295,46 +1295,64 @@ class WeeklyOverviewService
     }
 
     /**
-     * Get employees who have vehicle or accommodation assignments but no project assignment in the week.
-     * Returns collection of employees with their vehicle/accommodation info.
+     * Employees without a project in the week who still look “parked” wrongly:
+     * vehicle / accommodation in the week, or outside base by trip logistics.
+     *
+     * @return Collection<int, array{
+     *   employee: Employee,
+     *   vehicle_assignments: Collection,
+     *   accommodation_assignments: Collection,
+     *   vehicles: Collection,
+     *   accommodations: Collection,
+     *   has_vehicle: bool,
+     *   has_accommodation: bool,
+     *   is_outside_base: bool,
+     * }>
      */
     public function getEmployeesWithoutProjectButWithResources(Carbon $weekStart, Carbon $weekEnd): Collection
     {
-        // Get all employees with vehicle assignments in this week
         $vehicleEmployeeIds = VehicleAssignment::where('is_return_trip', false)
             ->overlappingWith($weekStart, $weekEnd)
             ->pluck('employee_id')
             ->unique();
 
-        // Get all employees with accommodation assignments in this week
         $accommodationEmployeeIds = AccommodationAssignment::overlappingWith($weekStart, $weekEnd)
             ->pluck('employee_id')
             ->unique();
 
-        // Combine: employees who have vehicle OR accommodation
         $employeesWithResources = $vehicleEmployeeIds->merge($accommodationEmployeeIds)->unique();
 
-        if ($employeesWithResources->isEmpty()) {
+        // Trip-based field status (wyjazd/zjazd/transfer) — not the “has project ⇒ outside base” heuristic.
+        $locationTracking = app(LocationTrackingService::class);
+        $outsideBaseIds = collect();
+        for ($day = $weekStart->copy()->startOfDay(); $day->lte($weekEnd); $day->addDay()) {
+            $outsideBaseIds = $outsideBaseIds->merge(
+                $locationTracking->employeeIdsInFieldByTripOn($day)
+            );
+        }
+        $outsideBaseIdSet = $outsideBaseIds->unique()->map(fn ($id) => (int) $id)->flip();
+
+        $candidateIds = $employeesWithResources
+            ->merge($outsideBaseIdSet->keys())
+            ->unique();
+
+        if ($candidateIds->isEmpty()) {
             return collect();
         }
 
-        // Get all employees with project assignments in this week
         $employeesWithProjects = ProjectAssignment::overlappingWith($weekStart, $weekEnd)
             ->pluck('employee_id')
             ->unique();
 
-        // Find employees who have resources but NO project
-        $employeesWithoutProject = $employeesWithResources->diff($employeesWithProjects);
+        $employeesWithoutProject = $candidateIds->diff($employeesWithProjects);
 
         if ($employeesWithoutProject->isEmpty()) {
             return collect();
         }
 
-        // EAGER LOAD: Get all vehicle assignments for all employees at once
-        $employeeIdsWithoutProject = $employeesWithoutProject->toArray();
+        $employeeIdsWithoutProject = $employeesWithoutProject->values()->all();
 
-        // Load employees with their assignments and roles
-        $employees = \App\Models\Employee::whereIn('id', $employeeIdsWithoutProject)
+        $employees = Employee::whereIn('id', $employeeIdsWithoutProject)
             ->with('roles')
             ->get();
         $allVehicleAssignmentsForResources = VehicleAssignment::whereIn('employee_id', $employeeIdsWithoutProject)
@@ -1344,23 +1362,23 @@ class WeeklyOverviewService
             ->get()
             ->groupBy('employee_id');
 
-        // EAGER LOAD: Get all accommodation assignments for all employees at once
         $allAccommodationAssignmentsForResources = AccommodationAssignment::whereIn('employee_id', $employeeIdsWithoutProject)
             ->overlappingWith($weekStart, $weekEnd)
             ->with('accommodation')
             ->get()
             ->groupBy('employee_id');
 
-        // Map to include resource info (using pre-loaded data)
-        return $employees->map(function ($employee) use ($allVehicleAssignmentsForResources, $allAccommodationAssignmentsForResources) {
-            // Get vehicle assignments from pre-loaded data
+        return $employees->map(function ($employee) use (
+            $allVehicleAssignmentsForResources,
+            $allAccommodationAssignmentsForResources,
+            $outsideBaseIdSet
+        ) {
             $vehicleAssignments = $allVehicleAssignmentsForResources->get($employee->id) ?? collect();
-
-            // Get accommodation assignments from pre-loaded data
             $accommodationAssignments = $allAccommodationAssignmentsForResources->get($employee->id) ?? collect();
 
             $vehicles = $vehicleAssignments->pluck('vehicle')->filter()->unique('id');
             $accommodations = $accommodationAssignments->pluck('accommodation')->filter()->unique('id');
+            $isOutsideBase = $outsideBaseIdSet->has((int) $employee->id);
 
             return [
                 'employee' => $employee,
@@ -1370,10 +1388,10 @@ class WeeklyOverviewService
                 'accommodations' => $accommodations,
                 'has_vehicle' => $vehicles->isNotEmpty(),
                 'has_accommodation' => $accommodations->isNotEmpty(),
+                'is_outside_base' => $isOutsideBase,
             ];
         })->filter(function ($data) {
-            // Only include if they actually have at least one resource
-            return $data['has_vehicle'] || $data['has_accommodation'];
+            return $data['has_vehicle'] || $data['has_accommodation'] || $data['is_outside_base'];
         })->values();
     }
 
