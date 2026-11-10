@@ -1297,6 +1297,7 @@ class WeeklyOverviewService
     /**
      * Employees without a project in the week who still look “parked” wrongly:
      * vehicle / accommodation in the week, or outside base by trip logistics.
+     * Terminated employees are excluded (see getTerminatedEmployeesWithAssignments).
      *
      * @return Collection<int, array{
      *   employee: Employee,
@@ -1352,17 +1353,26 @@ class WeeklyOverviewService
 
         $employeeIdsWithoutProject = $employeesWithoutProject->values()->all();
 
+        // Byli / zwolnieni mają osobną sekcję „Zwolnieni z aktywnymi przypisaniami”.
         $employees = Employee::whereIn('id', $employeeIdsWithoutProject)
+            ->whereNull('terminated_at')
             ->with('roles')
             ->get();
-        $allVehicleAssignmentsForResources = VehicleAssignment::whereIn('employee_id', $employeeIdsWithoutProject)
+
+        if ($employees->isEmpty()) {
+            return collect();
+        }
+
+        $activeIds = $employees->pluck('id')->all();
+
+        $allVehicleAssignmentsForResources = VehicleAssignment::whereIn('employee_id', $activeIds)
             ->where('is_return_trip', false)
             ->overlappingWith($weekStart, $weekEnd)
             ->with('vehicle')
             ->get()
             ->groupBy('employee_id');
 
-        $allAccommodationAssignmentsForResources = AccommodationAssignment::whereIn('employee_id', $employeeIdsWithoutProject)
+        $allAccommodationAssignmentsForResources = AccommodationAssignment::whereIn('employee_id', $activeIds)
             ->overlappingWith($weekStart, $weekEnd)
             ->with('accommodation')
             ->get()

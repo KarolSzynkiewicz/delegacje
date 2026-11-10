@@ -193,6 +193,11 @@ class WeeklyOverviewBatchLoadingTest extends TestCase
         $withCarNoProject = Employee::factory()->create(['first_name' => 'Auto', 'last_name' => 'BezProjektu']);
         $outsideWithProject = Employee::factory()->create(['first_name' => 'Poza', 'last_name' => 'ZProjektem']);
         $inBaseNoResources = Employee::factory()->create(['first_name' => 'Baza', 'last_name' => 'BezNic']);
+        $terminatedOutside = Employee::factory()->create([
+            'first_name' => 'Były',
+            'last_name' => 'PozaBazą',
+            'terminated_at' => $weekStart->copy()->subWeek(),
+        ]);
 
         $departureForOrphan = LogisticsEvent::query()->create([
             'type' => LogisticsEventType::DEPARTURE,
@@ -204,6 +209,17 @@ class WeeklyOverviewBatchLoadingTest extends TestCase
             'created_by' => $actor->id,
         ]);
         $departureForOrphan->participants()->create(['employee_id' => $outsideNoResources->id]);
+
+        $departureForTerminated = LogisticsEvent::query()->create([
+            'type' => LogisticsEventType::DEPARTURE,
+            'event_date' => $weekStart->copy()->subDays(3),
+            'end_date' => $weekStart->copy()->subDay(),
+            'from_location_id' => $base->id,
+            'to_location_id' => $field->id,
+            'status' => LogisticsEventStatus::COMPLETED,
+            'created_by' => $actor->id,
+        ]);
+        $departureForTerminated->participants()->create(['employee_id' => $terminatedOutside->id]);
 
         $departureForAssigned = LogisticsEvent::query()->create([
             'type' => LogisticsEventType::DEPARTURE,
@@ -252,5 +268,6 @@ class WeeklyOverviewBatchLoadingTest extends TestCase
 
         $this->assertFalse($rows->has($outsideWithProject->id));
         $this->assertFalse($rows->has($inBaseNoResources->id));
+        $this->assertFalse($rows->has($terminatedOutside->id));
     }
 }
