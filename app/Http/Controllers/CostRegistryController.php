@@ -8,11 +8,13 @@ use App\Models\CostEntry;
 use App\Models\FixedCostEntry;
 use App\Models\FixedCostTemplate;
 use App\Services\CostRegistryService;
+use App\Support\CostRegistryListing;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Rejestr kosztów — jedna tablica nad kosztami ogólnofirmowymi, projektowymi,
@@ -26,6 +28,56 @@ class CostRegistryController extends Controller
     public function index(): View
     {
         return view('cost-registry.index');
+    }
+
+    /**
+     * CSV bieżącego widoku rejestru: te same filtry i sortowanie co tabela.
+     * Separator średnik i BOM, żeby plik otwierał się w Excelu po polsku.
+     */
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $listing = CostRegistryListing::fromRequest($request);
+        $query = $listing->sortedQuery();
+        $filename = 'rejestr-kosztow'.$listing->filenameSuffix().'.csv';
+
+        return response()->streamDownload(function () use ($query) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+
+            fputcsv($out, [
+                'Nazwa',
+                'Kontekst',
+                'Rodzaj',
+                'Spółka',
+                'Miesiąc rozliczeniowy',
+                'Data',
+                'Kwota',
+                'Waluta',
+                'Istotny finansowo',
+                'Komentarz',
+            ], ';');
+
+            foreach ($query->lazy(200) as $entry) {
+                $amount = $entry->amount();
+
+                fputcsv($out, [
+                    $entry->name,
+                    $entry->sourceContext() ?? '',
+                    $entry->source_type_label,
+                    $entry->company?->name ?? '',
+                    sprintf('%04d-%02d', $entry->period_year, $entry->period_month),
+                    $entry->sourceDate()?->format('Y-m-d') ?? '',
+                    $amount === null ? '' : number_format($amount, 2, ',', ''),
+                    $entry->currency() ?? '',
+                    $entry->financially_irrelevant ? 'nie' : 'tak',
+                    $entry->comment ?? '',
+                ], ';');
+            }
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
     }
 
     /**

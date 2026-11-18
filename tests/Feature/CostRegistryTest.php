@@ -41,7 +41,85 @@ class CostRegistryTest extends TestCase
         $this->actingAs($this->admin)
             ->get(route('cost-registry.index'))
             ->assertOk()
-            ->assertSee('Rejestr kosztów');
+            ->assertSee('Rejestr kosztów')
+            ->assertSee('Eksport CSV');
+    }
+
+    public function test_export_csv_respects_filters_and_uses_excel_format(): void
+    {
+        $company = Company::create(['name' => 'Alfa Sp. z o.o.', 'nip' => '1111111111']);
+
+        $kept = $this->fixedCost([
+            'name' => 'Czynsz marcowy',
+            'amount' => 1234.5,
+            'currency' => 'PLN',
+            'accounting_date' => '2026-03-05',
+        ]);
+        $this->entryFor($kept)->update([
+            'company_id' => $company->id,
+            'comment' => 'Faktura 3/2026',
+        ]);
+
+        $otherMonth = $this->fixedCost([
+            'name' => 'Czynsz kwietniowy',
+            'amount' => 99,
+            'accounting_date' => '2026-04-02',
+            'period_start' => '2026-04-01',
+            'period_end' => '2026-04-30',
+        ]);
+        $this->entryFor($otherMonth)->update(['period_month' => 4]);
+
+        $irrelevant = $this->projectCost([
+            'name' => 'Przesunięcie wewnętrzne',
+            'amount' => 10,
+            'incurred_date' => '2026-03-18',
+        ]);
+        $this->entryFor($irrelevant)->update(['financially_irrelevant' => true, 'period_month' => 3]);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('cost-registry.export-csv', [
+                'monthFilter' => '3',
+                'yearFilter' => '2026',
+                'currencyFilter' => 'PLN',
+            ]));
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $disposition = $response->headers->get('content-disposition');
+        $this->assertStringContainsString('rejestr-kosztow-2026-03-pln.csv', (string) $disposition);
+
+        $csv = $response->streamedContent();
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
+        $this->assertStringContainsString('Nazwa;Kontekst;Rodzaj;Spółka;"Miesiąc rozliczeniowy";Data;Kwota;Waluta;"Istotny finansowo";Komentarz', $csv);
+        $this->assertStringContainsString('"Czynsz marcowy";"Biuro (czynsze biurowe, media)";Ogólnofirmowy;"Alfa Sp. z o.o.";2026-03;2026-03-05;1234,50;PLN;tak;"Faktura 3/2026"', $csv);
+        $this->assertStringContainsString('"Przesunięcie wewnętrzne";', $csv);
+        $this->assertStringContainsString(';nie;', $csv);
+        $this->assertStringNotContainsString('Czynsz kwietniowy', $csv);
+    }
+
+    public function test_export_csv_requires_view_permission(): void
+    {
+        $this->fixedCost(['name' => 'Ukryty koszt']);
+
+        $viewer = User::factory()->create();
+        $role = \Spatie\Permission\Models\Role::create(['name' => 'eksport-kosztow', 'guard_name' => 'web']);
+        $role->givePermissionTo(
+            \Spatie\Permission\Models\Permission::firstOrCreate(['name' => 'cost-registry.view', 'guard_name' => 'web'])
+        );
+        $viewer->assignRole($role);
+
+        $ok = $this->actingAs($viewer)->get(route('cost-registry.export-csv'));
+        $ok->assertOk();
+        $this->assertStringContainsString('Ukryty koszt', $ok->streamedContent());
+
+        $stranger = User::factory()->create();
+        $stranger->assignRole(
+            \Spatie\Permission\Models\Role::create(['name' => 'bez-rejestru-kosztow', 'guard_name' => 'web'])
+        );
+
+        $this->actingAs($stranger)
+            ->get(route('cost-registry.export-csv'))
+            ->assertForbidden();
     }
 
     public function test_each_source_type_gets_a_registry_entry_on_create(): void

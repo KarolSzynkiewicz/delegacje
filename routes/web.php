@@ -604,6 +604,9 @@ Route::middleware(['auth', 'verified', 'role.required', 'permission.check'])->gr
         Route::post('cost-registry/store-many', [\App\Http\Controllers\CostRegistryController::class, 'storeMany'])
             ->name('cost-registry.store-many')
             ->defaults('resource', 'cost-registry');
+        Route::get('cost-registry/export-csv', [\App\Http\Controllers\CostRegistryController::class, 'exportCsv'])
+            ->name('cost-registry.export-csv')
+            ->defaults('resource', 'cost-registry');
         Route::resource('cost-registry', \App\Http\Controllers\CostRegistryController::class)
             ->only(['index', 'update']);
 

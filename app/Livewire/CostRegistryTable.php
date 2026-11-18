@@ -4,11 +4,8 @@ namespace App\Livewire;
 
 use App\Models\Company;
 use App\Models\CostEntry;
-use App\Models\FixedCostEntry;
-use App\Models\ProjectVariableCost;
-use App\Models\VehicleRepair;
+use App\Support\CostRegistryListing;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Url;
@@ -28,7 +25,7 @@ class CostRegistryTable extends Component
     use WithPagination;
 
     /** Wartość filtra spółki oznaczająca pozycje bez przypisanej spółki. */
-    public const COMPANY_NONE = 'none';
+    public const COMPANY_NONE = CostRegistryListing::COMPANY_NONE;
 
     #[Url(except: '')]
     public string $search = '';
@@ -65,9 +62,6 @@ class CostRegistryTable extends Component
      */
     public array $rows = [];
 
-    /** @var list<string> */
-    private const SORTABLE = ['name', 'period', 'source_type', 'company'];
-
     public function updating(string $property): void
     {
         if (str_ends_with($property, 'Filter') || $property === 'search') {
@@ -102,7 +96,7 @@ class CostRegistryTable extends Component
 
     public function sortBy(string $field): void
     {
-        if (! in_array($field, self::SORTABLE, true)) {
+        if (! in_array($field, ['name', 'period', 'source_type', 'company'], true)) {
             return;
         }
 
@@ -200,74 +194,24 @@ class CostRegistryTable extends Component
 
     // ── Zapytanie ────────────────────────────────────────────────────────────
 
-    protected function baseQuery(): Builder
+    protected function listing(): CostRegistryListing
     {
-        // Kolumny kwalifikowane nazwą tabeli — summary() dokleja JOIN
-        // do tabel źródłowych, które też mają `name` czy `currency`.
-        $query = CostEntry::query();
-
-        if ($this->search !== '') {
-            $term = trim($this->search);
-            $query->where(function (Builder $q) use ($term) {
-                $q->where('cost_entries.name', 'like', '%'.$term.'%')
-                    ->orWhere('cost_entries.comment', 'like', '%'.$term.'%');
-            });
-        }
-
-        if ($this->sourceTypeFilter !== '' && array_key_exists($this->sourceTypeFilter, CostEntry::sourceTypeOptions())) {
-            $query->where('cost_entries.source_type', $this->sourceTypeFilter);
-        }
-
-        if ($this->companyFilter === self::COMPANY_NONE) {
-            $query->whereNull('cost_entries.company_id');
-        } elseif ($this->companyFilter !== '' && ctype_digit($this->companyFilter)) {
-            $query->where('cost_entries.company_id', (int) $this->companyFilter);
-        }
-
-        if ($this->yearFilter !== '' && ctype_digit($this->yearFilter)) {
-            $query->where('cost_entries.period_year', (int) $this->yearFilter);
-        }
-
-        if ($this->monthFilter !== '' && ctype_digit($this->monthFilter)) {
-            $query->where('cost_entries.period_month', (int) $this->monthFilter);
-        }
-
-        if ($this->irrelevantFilter === 'yes') {
-            $query->where('cost_entries.financially_irrelevant', true);
-        } elseif ($this->irrelevantFilter === 'no') {
-            $query->where('cost_entries.financially_irrelevant', false);
-        }
-
-        if ($this->currencyFilter !== '') {
-            $currency = strtoupper(trim($this->currencyFilter));
-            $query->whereHasMorph(
-                'source',
-                array_values(CostEntry::sourceModels()),
-                fn (Builder $q) => $q->whereRaw('UPPER(currency) = ?', [$currency])
-            );
-        }
-
-        return $query;
+        return new CostRegistryListing(
+            search: $this->search,
+            sourceTypeFilter: $this->sourceTypeFilter,
+            companyFilter: $this->companyFilter,
+            yearFilter: $this->yearFilter,
+            monthFilter: $this->monthFilter,
+            irrelevantFilter: $this->irrelevantFilter,
+            currencyFilter: $this->currencyFilter,
+            sortField: $this->sortField,
+            sortDirection: $this->sortDirection,
+        );
     }
 
-    protected function applySort(Builder $query): void
+    protected function baseQuery(): Builder
     {
-        $dir = $this->sortDirection === 'asc' ? 'asc' : 'desc';
-
-        match ($this->sortField) {
-            'name' => $query->orderBy('cost_entries.name', $dir),
-            'source_type' => $query->orderBy('cost_entries.source_type', $dir)->orderBy('cost_entries.name'),
-            'company' => $query
-                ->orderBy(
-                    Company::query()->select('name')->whereColumn('companies.id', 'cost_entries.company_id'),
-                    $dir
-                )
-                ->orderBy('cost_entries.name'),
-            default => $query
-                ->orderBy('cost_entries.period_year', $dir)
-                ->orderBy('cost_entries.period_month', $dir)
-                ->orderByDesc('cost_entries.id'),
-        };
+        return $this->listing()->query();
     }
 
     /**
@@ -347,21 +291,7 @@ class CostRegistryTable extends Component
 
     public function render()
     {
-        $query = $this->baseQuery()
-            ->with([
-                'company:id,name',
-                'source' => function (MorphTo $morphTo) {
-                    $morphTo->morphWith([
-                        ProjectVariableCost::class => ['project:id,name'],
-                        VehicleRepair::class => ['vehicle:id,registration_number'],
-                        FixedCostEntry::class => ['template:id,name'],
-                    ]);
-                },
-            ]);
-
-        $this->applySort($query);
-
-        $entries = $query->paginate(25);
+        $entries = $this->listing()->sortedQuery()->paginate(25);
 
         // Pola inline odświeżane z bazy przy każdym renderze — zmiany są już zapisane,
         // więc nic nie ginie, a wiersz zawsze pokazuje stan po walidacji.

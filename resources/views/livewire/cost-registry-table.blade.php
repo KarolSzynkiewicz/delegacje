@@ -54,6 +54,32 @@
     <x-data-table :paginator="$entries" :has-filters="$hasFilters" class="cr-table">
         <x-slot:filters>
             <x-data-table-filters :count="$entries->total()">
+                <x-slot:actions>
+                    @php
+                        $csvParams = array_filter([
+                            'search' => $search,
+                            'sourceTypeFilter' => $sourceTypeFilter,
+                            'companyFilter' => $companyFilter,
+                            'yearFilter' => $yearFilter,
+                            'monthFilter' => $monthFilter,
+                            'irrelevantFilter' => $irrelevantFilter,
+                            'currencyFilter' => $currencyFilter,
+                            'sortField' => $sortField !== 'period' ? $sortField : null,
+                            'sortDirection' => $sortDirection !== 'desc' ? $sortDirection : null,
+                        ], fn ($value) => $value !== null && $value !== '');
+                    @endphp
+                    <x-ui.button
+                        variant="ghost"
+                        class="btn-sm"
+                        action="export"
+                        routeName="cost-registry.export-csv"
+                        :href="route('cost-registry.export-csv', $csvParams)"
+                        title="Pobierz pozycje z bieżącymi filtrami jako CSV"
+                    >
+                        Eksport CSV
+                    </x-ui.button>
+                </x-slot:actions>
+
                 <input
                     type="text"
                     wire:model.live.debounce.300ms="search"
